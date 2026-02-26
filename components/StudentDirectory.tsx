@@ -69,13 +69,24 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
               {students.map(s => (
                 <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-all group">
                   {/* Student Identity Card */}
-                  <td className="px-12 py-10 flex items-center gap-8">
-                    <div className="w-16 h-16 rounded-[28px] bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-brand-500 shadow-inner group-hover:scale-110 transition-all">
-                      {s.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-lg font-black tracking-tight">{s.name}</p>
-                      <p className="text-[10px] text-slate-400 uppercase mt-1">{s.email} • {s.grade}</p>
+                  <td className="px-12 py-10">
+                    <div className="flex items-center justify-between gap-6">
+                      <div className="flex items-center gap-8 min-w-0">
+                        <div className="w-16 h-16 rounded-[28px] bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-brand-500 shadow-inner group-hover:scale-110 transition-all">
+                          {s.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-lg font-black tracking-tight truncate">{s.name}</p>
+                          <p className="text-[10px] text-slate-400 uppercase mt-1 truncate">{s.email} • {s.grade}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => deleteEntity(s.id, 'student')}
+                        className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500 flex items-center justify-center flex-shrink-0"
+                        title="Delete student"
+                      >
+                        <i className="fas fa-trash"></i>
+                      </button>
                     </div>
                   </td>
                 </tr>

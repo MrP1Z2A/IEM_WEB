@@ -14,11 +14,13 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setIsLoading(true);
 
     try {
@@ -27,7 +29,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         // Profile fetching and redirection is handled in App.tsx via onAuthStateChange
       } else {
         await authService.signUp(email, password, fullName, selectedRole);
-        alert('Registration successful! Please check your email for verification if required.');
+        setSuccessMessage('Registration successful! Please check your email for verification if required.');
         setIsLogin(true);
       }
     } catch (err: any) {
@@ -62,6 +64,12 @@ const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
         {error && (
           <div className="mb-6 p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl border border-red-100 animate-in fade-in slide-in-from-top-2">
             {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mb-6 p-4 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-2xl border border-emerald-100 animate-in fade-in slide-in-from-top-2">
+            {successMessage}
           </div>
         )}
 

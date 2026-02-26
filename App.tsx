@@ -23,65 +23,19 @@ const INITIAL_PERMISSIONS: StudentPermissions = {
   apiAccess: false
 };
 
-const INITIAL_STUDENTS: Student[] = [
-  { 
-    id: 'NODE-781', name: 'Evelyn Harper', grade: '12th Grade', gender: 'Female', status: Status.ACTIVE, email: 'evelyn@iacademy.io', 
-    attendanceRate: 98, courseAttendance: [], securityStatus: { lastLogin: '2 mins ago', twoFactorEnabled: true, trustedDevices: 2, riskLevel: 'Low' },
-    permissions: { ...INITIAL_PERMISSIONS }, type: 'Old'
-  },
-  { 
-    id: 'NODE-742', name: 'Diana Plenty', grade: '11th Grade', gender: 'Female', status: Status.ACTIVE, email: 'diana@iacademy.io', 
-    attendanceRate: 91, courseAttendance: [], securityStatus: { lastLogin: '1 hour ago', twoFactorEnabled: true, trustedDevices: 1, riskLevel: 'Medium' },
-    permissions: { ...INITIAL_PERMISSIONS }, type: 'New'
-  },
-  { 
-    id: 'NODE-190', name: 'Marcus Aurelius', grade: '12th Grade', gender: 'Male', status: Status.ACTIVE, email: 'marcus@iacademy.io', 
-    attendanceRate: 85, courseAttendance: [], securityStatus: { lastLogin: '5 hours ago', twoFactorEnabled: false, trustedDevices: 1, riskLevel: 'Low' },
-    permissions: { ...INITIAL_PERMISSIONS, apiAccess: true }, type: 'Old'
-  }
-];
+const INITIAL_STUDENTS: Student[] = [];
 
-const INITIAL_SUBJECTS = [
-  { id: '1', code: 'MATH401', name: 'Advanced Calculus', teacher: 'Dr. Sarah Smith', room: 'Hall A', grade: '12th Grade', icon: 'fa-calculator', color: 'text-blue-500', bg: 'bg-blue-50', progress: 75, resources: 42 },
-  { id: '2', code: 'PHYS302', name: 'Quantum Physics', teacher: 'Prof. James Wilson', room: 'Lab 302', grade: '12th Grade', icon: 'fa-atom', color: 'text-purple-500', bg: 'bg-purple-50', progress: 40, resources: 28 },
-  { id: '3', code: 'BIOL205', name: 'Molecular Biology', teacher: 'Dr. Emily Brown', room: 'Lab 101', grade: '11th Grade', icon: 'fa-dna', color: 'text-emerald-500', bg: 'bg-emerald-50', progress: 62, resources: 35 },
-  { id: '4', code: 'COMP501', name: 'Neural Engineering', teacher: 'Prof. Alan Turing', room: 'Cyber Lab', grade: '12th Grade', icon: 'fa-brain', color: 'text-brand-500', bg: 'bg-brand-50', progress: 88, resources: 56 },
-];
+const INITIAL_SUBJECTS: any[] = [];
 
-const INITIAL_TEACHERS = [
-  { id: 'STAFF-101', name: 'Dr. Sarah Smith', dept: 'Mathematics', status: 'Online', load: 85, icon: 'fa-user-tie', skills: ['Calculus', 'Linear Algebra'], hours: '10am - 2pm' },
-  { id: 'STAFF-102', name: 'Prof. James Wilson', dept: 'Physics', status: 'In Lab', load: 60, icon: 'fa-user-gear', skills: ['Quantum', 'Mechanics'], hours: '1pm - 5pm' },
-  { id: 'STAFF-103', name: 'Dr. Emily Brown', dept: 'Biology', status: 'Available', load: 45, icon: 'fa-user-doctor', skills: ['Genetics', 'Virology'], hours: '9am - 12pm' },
-];
+const INITIAL_TEACHERS: any[] = [];
 
-const INITIAL_LIBRARY = [
-  { title: 'Neural Quantum Mechanics v2', author: 'Dr. Feynman', cat: 'Digital', status: 'Available', id: 'LIB-001' },
-  { title: 'Advanced Organic Chem', author: 'P. Atkins', cat: 'Physical', status: 'Borrowed', id: 'LIB-002' },
-  { title: 'Linear Algebra Concepts', author: 'Gilbert Strang', cat: 'Digital', status: 'Available', id: 'LIB-003' },
-  { title: 'Neural Engineering Ethics', author: 'Institutional Hub', cat: 'Digital', status: 'Available', id: 'LIB-004' },
-  { title: 'Biology: A Cellular Approach', author: 'Campbell', cat: 'Physical', status: 'Maintenance', id: 'LIB-005' },
-];
+const INITIAL_LIBRARY: any[] = [];
 
-const INITIAL_EXAMS = [
-  { id: 'EX-1', subject: 'Advanced Calculus', type: 'Midterm', date: 'May 28', status: 'Pending', priority: 'Critical', bg: 'bg-rose-50', color: 'text-rose-500' },
-  { id: 'EX-2', subject: 'Quantum Physics', type: 'Quantum Eval', date: 'June 02', status: 'Ready', priority: 'High', bg: 'bg-brand-50', color: 'text-brand-500' },
-  { id: 'EX-3', subject: 'Molecular Biology', type: 'Lab Final', date: 'June 10', status: 'Locked', priority: 'Medium', bg: 'bg-amber-50', color: 'text-amber-500' },
-  { id: 'EX-4', subject: 'Neural Engineering', type: 'Simulation', date: 'June 15', status: 'Draft', priority: 'High', bg: 'bg-indigo-50', color: 'text-indigo-500' },
-];
+const INITIAL_EXAMS: any[] = [];
 
-const INITIAL_HOMEWORK = [
-  { id: 'HW-1', sub: 'Advanced Calculus', title: 'Stochastic Calculus Integrals', deadline: '2 Days Left', load: 85, color: 'text-blue-500', bg: 'bg-blue-50' },
-  { id: 'HW-2', sub: 'Quantum Physics', title: 'Wave-Particle Duality Exp', deadline: '5 Days Left', load: 60, color: 'text-purple-500', bg: 'bg-purple-50' },
-  { id: 'HW-3', sub: 'Neural Engineering', title: 'Synaptic Signal Mapping', deadline: 'Today', load: 95, color: 'text-brand-500', bg: 'bg-brand-50' },
-  { id: 'HW-4', sub: 'Molecular Biology', title: 'CRISPR Sequence Synthesis', deadline: '8 Days Left', load: 40, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-];
+const INITIAL_HOMEWORK: any[] = [];
 
-const INITIAL_PROGRAMS = [
-  { id: 'PR-1', name: 'Quantum Engineering', code: 'QE-PRO', students: 1240, duration: '4 Years', icon: 'fa-atom', color: 'from-blue-600 to-indigo-600' },
-  { id: 'PR-2', name: 'Neural System Architecture', code: 'NSA-PRO', students: 850, duration: '4 Years', icon: 'fa-brain', color: 'from-brand-600 to-emerald-600' },
-  { id: 'PR-3', name: 'Advanced Stochastic Math', code: 'ASM-PRO', students: 420, duration: '2 Years', icon: 'fa-infinity', color: 'from-purple-600 to-fuchsia-600' },
-  { id: 'PR-4', name: 'Institutional Governance', code: 'GOV-PRO', students: 210, duration: '3 Years', icon: 'fa-landmark', color: 'from-amber-600 to-orange-600' },
-];
+const INITIAL_PROGRAMS: any[] = [];
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
@@ -129,6 +83,12 @@ const App: React.FC = () => {
   const [editTarget, setEditTarget] = useState<{ type: string, data: any } | null>(null);
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   const [permTarget, setPermTarget] = useState<Student | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string, onConfirm: () => void | Promise<void> } | null>(null);
+  const [studentDeleteDialog, setStudentDeleteDialog] = useState<{ id: string; name: string } | null>(null);
+  const [studentDeleteNameInput, setStudentDeleteNameInput] = useState('');
+  const [adminDeletePassword, setAdminDeletePassword] = useState('');
+  const [studentDeleteError, setStudentDeleteError] = useState<string | null>(null);
+  const [isStudentDeleteSubmitting, setIsStudentDeleteSubmitting] = useState(false);
 
   const stats = useMemo(() => {
     const total = students.length;
@@ -341,31 +301,36 @@ const App: React.FC = () => {
   };
 
   const removeStudentFromClass = async (classId: string, studentId: string) => {
-    try {
-      const { error } = await supabase
-        .from('class_students')
-        .delete()
-        .eq('class_id', classId)
-        .eq('student_id', studentId);
+    setConfirmDialog({
+      message: 'are you sure to remove this student?',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('class_students')
+            .delete()
+            .eq('class_id', classId)
+            .eq('student_id', studentId);
 
-      if (error) throw error;
+          if (error) throw error;
 
-      setClasses(prev => prev.map(classItem => {
-        if (String(classItem.id) !== classId) return classItem;
+          setClasses(prev => prev.map(classItem => {
+            if (String(classItem.id) !== classId) return classItem;
 
-        const nextStudentIds = (classItem.student_ids || []).filter((id: string) => String(id) !== studentId);
-        return {
-          ...classItem,
-          student_ids: nextStudentIds,
-          student_count: nextStudentIds.length,
-        };
-      }));
+            const nextStudentIds = (classItem.student_ids || []).filter((id: string) => String(id) !== studentId);
+            return {
+              ...classItem,
+              student_ids: nextStudentIds,
+              student_count: nextStudentIds.length,
+            };
+          }));
 
-      notify('Student removed from class.');
-    } catch (error) {
-      console.error('Remove student from class error:', error);
-      notify('Failed to remove student from class.');
-    }
+          notify('Student removed from class.');
+        } catch (error) {
+          console.error('Remove student from class error:', error);
+          notify('Failed to remove student from class.');
+        }
+      }
+    });
   };
 
   const fetchAttendanceStudentsByDate = async (date: string) => {
@@ -458,23 +423,88 @@ const App: React.FC = () => {
   };
 
   const deleteEntity = async (id: string, type: string) => {
-    if (confirm(`Are you sure you want to terminate this ${type} node? This action is irreversible.`)) {
-      // Sync with Supabase if it's a student
-      if (type === 'student') {
-        const { error } = await supabase.from('students').delete().eq('id', id);
-        if (error) console.error('Supabase Delete Error:', error);
+    if (type === 'student') {
+      const targetStudent = students.find(student => student.id === id);
+      if (!targetStudent) {
+        notify('Student not found.');
+        return;
+      }
+      setStudentDeleteDialog({ id: targetStudent.id, name: targetStudent.name });
+      setStudentDeleteNameInput('');
+      setAdminDeletePassword('');
+      setStudentDeleteError(null);
+      return;
+    }
+
+    setConfirmDialog({
+      message: `Are you sure you want to terminate this ${type} node? This action is irreversible.`,
+      onConfirm: async () => {
+        switch (type) {
+          case 'teacher': setTeachers(prev => prev.filter(t => t.id !== id)); break;
+          case 'subject': setSubjects(prev => prev.filter(s => s.id !== id)); break;
+          case 'library': setLibraryItems(prev => prev.filter(i => i.id !== id)); break;
+          case 'exam': setExams(prev => prev.filter(e => e.id !== id)); break;
+          case 'homework': setHomeworks(prev => prev.filter(h => h.id !== id)); break;
+          case 'program': setPrograms(prev => prev.filter(p => p.id !== id)); break;
+        }
+        notify(`${type.charAt(0).toUpperCase() + type.slice(1)} node deleted.`);
+      }
+    });
+  };
+
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog) return;
+    const action = confirmDialog.onConfirm;
+    setConfirmDialog(null);
+    await action();
+  };
+
+  const handleSecureStudentDelete = async () => {
+    if (!studentDeleteDialog) return;
+
+    const expectedName = studentDeleteDialog.name.trim();
+    const typedName = studentDeleteNameInput.trim();
+    if (typedName !== expectedName) {
+      setStudentDeleteError('Student name does not match.');
+      return;
+    }
+
+    if (!adminDeletePassword.trim()) {
+      setStudentDeleteError('Admin password is required.');
+      return;
+    }
+
+    setIsStudentDeleteSubmitting(true);
+    setStudentDeleteError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('verify_admin_delete_password', { input_password: adminDeletePassword });
+      if (error) {
+        console.error('Password verification error:', error);
+        setStudentDeleteError('Failed to verify admin password.');
+        return;
       }
 
-      switch (type) {
-        case 'student': setStudents(prev => prev.filter(s => s.id !== id)); break;
-        case 'teacher': setTeachers(prev => prev.filter(t => t.id !== id)); break;
-        case 'subject': setSubjects(prev => prev.filter(s => s.id !== id)); break;
-        case 'library': setLibraryItems(prev => prev.filter(i => i.id !== id)); break;
-        case 'exam': setExams(prev => prev.filter(e => e.id !== id)); break;
-        case 'homework': setHomeworks(prev => prev.filter(h => h.id !== id)); break;
-        case 'program': setPrograms(prev => prev.filter(p => p.id !== id)); break;
+      if (!data) {
+        setStudentDeleteError('Invalid admin password.');
+        return;
       }
-      notify(`${type.charAt(0).toUpperCase() + type.slice(1)} node deleted.`);
+
+      const { error: deleteError } = await supabase.from('students').delete().eq('id', studentDeleteDialog.id);
+      if (deleteError) {
+        console.error('Supabase Delete Error:', deleteError);
+        setStudentDeleteError('Failed to delete student.');
+        return;
+      }
+
+      setStudents(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
+      notify('Student node deleted.');
+      setStudentDeleteDialog(null);
+      setStudentDeleteNameInput('');
+      setAdminDeletePassword('');
+      setStudentDeleteError(null);
+    } finally {
+      setIsStudentDeleteSubmitting(false);
     }
   };
 
@@ -606,6 +636,88 @@ const App: React.FC = () => {
       {notification && (
         <div className="fixed top-4 right-4 z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-3 min-w-[220px] max-w-[90vw]">
           <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{notification.message}</p>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Confirm Deletion</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">{confirmDialog.message}</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDialog}
+                className="px-4 py-2.5 rounded-xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {studentDeleteDialog && (
+        <div className="fixed inset-0 z-[130] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Secure Student Deletion</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Retype <span className="font-black">{studentDeleteDialog.name}</span> and enter admin password to continue.
+            </p>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retype Student Name</label>
+              <input
+                type="text"
+                value={studentDeleteNameInput}
+                onChange={(e) => setStudentDeleteNameInput(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter exact student name"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
+              <input
+                type="password"
+                value={adminDeletePassword}
+                onChange={(e) => setAdminDeletePassword(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter admin password"
+              />
+            </div>
+
+            {studentDeleteError && (
+              <p className="text-xs font-bold text-rose-500">{studentDeleteError}</p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  if (isStudentDeleteSubmitting) return;
+                  setStudentDeleteDialog(null);
+                  setStudentDeleteNameInput('');
+                  setAdminDeletePassword('');
+                  setStudentDeleteError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSecureStudentDelete}
+                disabled={isStudentDeleteSubmitting}
+                className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isStudentDeleteSubmitting ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
+              >
+                {isStudentDeleteSubmitting ? 'Verifying...' : 'Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       
