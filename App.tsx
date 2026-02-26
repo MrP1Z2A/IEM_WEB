@@ -195,14 +195,6 @@ const App: React.FC = () => {
   };
 
   const uploadClassImage = async (file: File) => {
-    const fileToDataUrl = (inputFile: File) =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Failed to read image file.'));
-        reader.readAsDataURL(inputFile);
-      });
-
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const filePath = `class-${Date.now()}-${sanitizedName}`;
 
@@ -210,19 +202,17 @@ const App: React.FC = () => {
       .from('class-images')
       .upload(filePath, file, { upsert: true });
 
-    if (!error) {
-      const { data } = supabase.storage
-        .from('class-images')
-        .getPublicUrl(filePath);
+    if (error) throw error;
 
-      if (data?.publicUrl) {
-        return data.publicUrl;
-      }
+    const { data } = supabase.storage
+      .from('class-images')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded image URL.');
     }
 
-    console.error('Storage upload failed, using data URL fallback:', error);
-    notify('Storage upload failed. Using fallback image storage.');
-    return await fileToDataUrl(file);
+    return data.publicUrl;
   };
 
   const createClassWithStudents = async () => {
