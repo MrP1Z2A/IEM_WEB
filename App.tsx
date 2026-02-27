@@ -85,11 +85,25 @@ const App: React.FC = () => {
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   // Mapping: subjectId -> date -> studentId -> status
   const [subjectAttendanceStore, setSubjectAttendanceStore] = useState<Record<string, Record<string, Record<string, 'P' | 'A' | 'L'>>>>({});
+  const [isAttendanceContextNameSupported, setIsAttendanceContextNameSupported] = useState(true);
 
   // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
-  const [enrollData, setEnrollData] = useState({ name: '', email: '', type: 'New' as 'New' | 'Old', selectedStudentId: '', grade: '10th Grade' });
+  const [enrollData, setEnrollData] = useState({
+    name: '',
+    email: '',
+    type: 'New' as 'New' | 'Old',
+    selectedStudentId: '',
+    grade: '10th Grade',
+    dateOfBirth: '',
+    parentName: '',
+    parentNumber: '',
+    parentEmail: '',
+    secondaryParentName: '',
+    secondaryParentNumber: '',
+    secondaryParentEmail: '',
+  });
   const [studentProfileImage, setStudentProfileImage] = useState<File | null>(null);
   const enrollAbortCounterRef = useRef(0);
   const [editTarget, setEditTarget] = useState<{ type: string, data: any } | null>(null);
@@ -101,6 +115,10 @@ const App: React.FC = () => {
   const [adminDeletePassword, setAdminDeletePassword] = useState('');
   const [studentDeleteError, setStudentDeleteError] = useState<string | null>(null);
   const [isStudentDeleteSubmitting, setIsStudentDeleteSubmitting] = useState(false);
+  const [studentEditAuthDialog, setStudentEditAuthDialog] = useState<Student | null>(null);
+  const [studentEditAuthPassword, setStudentEditAuthPassword] = useState('');
+  const [studentEditAuthError, setStudentEditAuthError] = useState<string | null>(null);
+  const [isStudentEditAuthSubmitting, setIsStudentEditAuthSubmitting] = useState(false);
   const [classDeleteDialog, setClassDeleteDialog] = useState<{ id: string; name: string; onDeleted?: () => void } | null>(null);
   const [classDeleteNameInput, setClassDeleteNameInput] = useState('');
   const [classAdminDeletePassword, setClassAdminDeletePassword] = useState('');
@@ -909,7 +927,20 @@ const App: React.FC = () => {
   };
 
   const enrollStudentAction = (type: 'New' | 'Old') => {
-    setEnrollData({ name: '', email: '', type, selectedStudentId: '', grade: '10th Grade' });
+    setEnrollData({
+      name: '',
+      email: '',
+      type,
+      selectedStudentId: '',
+      grade: '10th Grade',
+      dateOfBirth: '',
+      parentName: '',
+      parentNumber: '',
+      parentEmail: '',
+      secondaryParentName: '',
+      secondaryParentNumber: '',
+      secondaryParentEmail: '',
+    });
     setStudentProfileImage(null);
     setIsEnrollModalOpen(true);
   };
@@ -917,7 +948,20 @@ const App: React.FC = () => {
   const abortEnrollFlow = () => {
     enrollAbortCounterRef.current += 1;
     setIsEnrollModalOpen(false);
-    setEnrollData({ name: '', email: '', type: 'New', selectedStudentId: '', grade: '10th Grade' });
+    setEnrollData({
+      name: '',
+      email: '',
+      type: 'New',
+      selectedStudentId: '',
+      grade: '10th Grade',
+      dateOfBirth: '',
+      parentName: '',
+      parentNumber: '',
+      parentEmail: '',
+      secondaryParentName: '',
+      secondaryParentNumber: '',
+      secondaryParentEmail: '',
+    });
     setStudentProfileImage(null);
   };
 
@@ -961,6 +1005,11 @@ const App: React.FC = () => {
 
       if (!enrollData.name || !enrollData.email) {
         notify('Please provide both name and email.');
+        return;
+      }
+
+      if (!enrollData.dateOfBirth || !enrollData.parentName || !enrollData.parentNumber || !enrollData.parentEmail) {
+        notify('Please provide DOB and primary parent details.');
         return;
       }
 
@@ -1012,6 +1061,13 @@ const App: React.FC = () => {
         ...newStudent,
         auth_user_id: authUserId,
         temp_password: generatedPassword,
+        date_of_birth: enrollData.dateOfBirth,
+        parent_name: enrollData.parentName,
+        parent_number: enrollData.parentNumber,
+        parent_email: enrollData.parentEmail,
+        secondary_parent_name: enrollData.secondaryParentName || null,
+        secondary_parent_number: enrollData.secondaryParentNumber || null,
+        secondary_parent_email: enrollData.secondaryParentEmail || null,
       };
 
       let createdStudentRecord: any = null;
@@ -1057,6 +1113,52 @@ const App: React.FC = () => {
   const openPermissions = (student: Student) => {
     setPermTarget(student);
     setIsPermissionsModalOpen(true);
+  };
+
+  const verifyAdminPassword = async (password: string): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('verify_admin_delete_password', { input_password: password });
+    if (error) {
+      console.error('Admin password verification error:', error);
+      return false;
+    }
+    return Boolean(data);
+  };
+
+  const requestStudentEditWithPassword = (student: Student) => {
+    setStudentEditAuthDialog(student);
+    setStudentEditAuthPassword('');
+    setStudentEditAuthError(null);
+  };
+
+  const handleStudentEditAuthConfirm = async () => {
+    if (!studentEditAuthDialog) return;
+    if (!studentEditAuthPassword.trim()) {
+      setStudentEditAuthError('Admin password is required.');
+      return;
+    }
+
+    setIsStudentEditAuthSubmitting(true);
+    setStudentEditAuthError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('verify_admin_delete_password', { input_password: studentEditAuthPassword });
+      if (error) {
+        setStudentEditAuthError('Failed to verify admin password.');
+        return;
+      }
+
+      if (!data) {
+        setStudentEditAuthError('Invalid admin password.');
+        return;
+      }
+
+      openEditModal('student', studentEditAuthDialog);
+      setStudentEditAuthDialog(null);
+      setStudentEditAuthPassword('');
+      setStudentEditAuthError(null);
+    } finally {
+      setIsStudentEditAuthSubmitting(false);
+    }
   };
 
   const togglePermission = (key: keyof StudentPermissions) => {
@@ -1117,19 +1219,43 @@ const App: React.FC = () => {
     contextId: string,
     date: string,
     studentId: string,
-    status: 'P' | 'A' | 'L'
+    status: 'P' | 'A' | 'L',
+    contextName?: string
   ) => {
-    const { error } = await supabase
-      .from('attendance_records')
-      .upsert([
-        {
-          context_type: contextType,
-          context_id: contextId,
-          attendance_date: date,
-          student_id: studentId,
-          status,
-        },
-      ], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+    const basePayload = {
+      context_type: contextType,
+      context_id: contextId,
+      attendance_date: date,
+      student_id: studentId,
+      status,
+    };
+
+    let error: any = null;
+
+    if (isAttendanceContextNameSupported && contextName) {
+      const result = await supabase
+        .from('attendance_records')
+        .upsert([
+          {
+            ...basePayload,
+            context_name: contextName,
+          },
+        ], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+      error = result.error;
+
+      if (error && /context_name/i.test(error.message || '')) {
+        setIsAttendanceContextNameSupported(false);
+        const fallbackResult = await supabase
+          .from('attendance_records')
+          .upsert([basePayload], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+        error = fallbackResult.error;
+      }
+    } else {
+      const result = await supabase
+        .from('attendance_records')
+        .upsert([basePayload], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+      error = result.error;
+    }
 
     if (error) {
       console.error('Failed to save attendance:', error);
@@ -1166,7 +1292,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const payload = studentIds.map(studentId => ({
+    const basePayload = studentIds.map(studentId => ({
       context_type: contextType,
       context_id: contextId,
       attendance_date: date,
@@ -1174,9 +1300,32 @@ const App: React.FC = () => {
       status: 'P' as const,
     }));
 
-    const { error } = await supabase
-      .from('attendance_records')
-      .upsert(payload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+    let error: any = null;
+
+    if (isAttendanceContextNameSupported && contextName) {
+      const payloadWithName = basePayload.map(item => ({
+        ...item,
+        context_name: contextName,
+      }));
+
+      const result = await supabase
+        .from('attendance_records')
+        .upsert(payloadWithName, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+      error = result.error;
+
+      if (error && /context_name/i.test(error.message || '')) {
+        setIsAttendanceContextNameSupported(false);
+        const fallbackResult = await supabase
+          .from('attendance_records')
+          .upsert(basePayload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+        error = fallbackResult.error;
+      }
+    } else {
+      const result = await supabase
+        .from('attendance_records')
+        .upsert(basePayload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+      error = result.error;
+    }
 
     if (error) {
       console.error('Failed to bulk save attendance:', error);
@@ -1317,6 +1466,51 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {studentEditAuthDialog && (
+        <div className="fixed inset-0 z-[135] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Admin Verification Required</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Enter admin password to edit student: <span className="font-black">{studentEditAuthDialog.name}</span></p>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
+              <input
+                type="password"
+                value={studentEditAuthPassword}
+                onChange={(e) => setStudentEditAuthPassword(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter admin password"
+              />
+            </div>
+
+            {studentEditAuthError && (
+              <p className="text-xs font-bold text-rose-500">{studentEditAuthError}</p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  if (isStudentEditAuthSubmitting) return;
+                  setStudentEditAuthDialog(null);
+                  setStudentEditAuthPassword('');
+                  setStudentEditAuthError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStudentEditAuthConfirm}
+                disabled={isStudentEditAuthSubmitting}
+                className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isStudentEditAuthSubmitting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
+              >
+                {isStudentEditAuthSubmitting ? 'Verifying...' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {classDeleteDialog && (
         <div className="fixed inset-0 z-[130] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
@@ -1438,6 +1632,8 @@ const App: React.FC = () => {
               setSelectedDate={setSelectedDate}
               openPermissions={openPermissions}
               openEditModal={openEditModal}
+              requestStudentEditWithPassword={requestStudentEditWithPassword}
+              verifyAdminPassword={verifyAdminPassword}
               deleteEntity={deleteEntity}
             />
           )}

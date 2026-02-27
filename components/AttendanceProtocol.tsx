@@ -33,7 +33,7 @@ interface AttendanceProtocolProps {
   selectedAttendanceSubject: string | null;
   setSelectedAttendanceSubject: (id: string | null) => void;
   subjectAttendanceStore: Record<string, Record<string, Record<string, 'P' | 'A' | 'L'>>>;
-  updateSubjectAttendance: (contextType: 'class' | 'subject', contextId: string, date: string, studentId: string, status: 'P' | 'A' | 'L') => Promise<void>;
+  updateSubjectAttendance: (contextType: 'class' | 'subject', contextId: string, date: string, studentId: string, status: 'P' | 'A' | 'L', contextName?: string) => Promise<void>;
   bulkMarkSubjectPresent: (contextType: 'class' | 'subject', contextId: string, date: string, studentIds: string[], contextName?: string) => Promise<void>;
   loadAttendanceForContext: (contextType: 'class' | 'subject', contextId: string, date: string) => Promise<void>;
   exportMonthlyAttendancePdf: (
@@ -401,7 +401,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               </button>
               <div className="min-w-0">
                 <h4 className="text-xl sm:text-2xl font-black tracking-tight break-words">
-                  Class: {selectedClassId ? `${selectedClass?.name} (${selectedClass?.class_code || 'class1'})` : subjects.find(s => s.id === selectedAttendanceSubject)?.name}
+                  Class: {selectedClassId ? `${selectedClass?.name} (${selectedClass?.class_code || ''})` : subjects.find(s => s.id === selectedAttendanceSubject)?.name}
                 </h4>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                   {selectedClassId ? 'Class Attendance View' : `Course Terminal: ${subjects.find(s => s.id === selectedAttendanceSubject)?.code}`}
@@ -490,9 +490,16 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                           key={btn} 
                           onClick={() => {
                             if (selectedClassId) {
-                              void updateSubjectAttendance('class', selectedClassId, attendanceDate, String(s.id), btn as 'P' | 'A' | 'L');
+                              void updateSubjectAttendance('class', selectedClassId, attendanceDate, String(s.id), btn as 'P' | 'A' | 'L', selectedClass?.name);
                             } else if (selectedAttendanceSubject) {
-                              void updateSubjectAttendance('subject', selectedAttendanceSubject, attendanceDate, String(s.id), btn as 'P' | 'A' | 'L');
+                              void updateSubjectAttendance(
+                                'subject',
+                                selectedAttendanceSubject,
+                                attendanceDate,
+                                String(s.id),
+                                btn as 'P' | 'A' | 'L',
+                                subjects.find(sub => sub.id === selectedAttendanceSubject)?.name
+                              );
                             }
                           }} 
                           className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-[14px] sm:rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all ${currentStatus === btn ? `bg-brand-500 text-white shadow-lg` : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}

@@ -11,7 +11,20 @@ import { Student } from '../../types';
 interface EnrollmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  enrollData: { name: string; email: string; type: 'New' | 'Old'; selectedStudentId: string; grade: string };
+  enrollData: {
+    name: string;
+    email: string;
+    type: 'New' | 'Old';
+    selectedStudentId: string;
+    grade: string;
+    dateOfBirth: string;
+    parentName: string;
+    parentNumber: string;
+    parentEmail: string;
+    secondaryParentName: string;
+    secondaryParentNumber: string;
+    secondaryParentEmail: string;
+  };
   setEnrollData: (data: any) => void;
   studentProfileImage: File | null;
   setStudentProfileImage: (file: File | null) => void;
@@ -116,6 +129,66 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                     <option key={grade} value={grade}>{grade}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Date of Birth</label>
+                <input
+                  type="date"
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.dateOfBirth}
+                  onChange={(e) => setEnrollData({ ...enrollData, dateOfBirth: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Primary Parent</p>
+                <input
+                  type="text"
+                  placeholder="Parent Name"
+                  className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.parentName}
+                  onChange={(e) => setEnrollData({ ...enrollData, parentName: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Parent Number"
+                  className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.parentNumber}
+                  onChange={(e) => setEnrollData({ ...enrollData, parentNumber: e.target.value })}
+                />
+                <input
+                  type="email"
+                  placeholder="Parent Email"
+                  className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.parentEmail}
+                  onChange={(e) => setEnrollData({ ...enrollData, parentEmail: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Secondary Parent (Optional)</p>
+                <input
+                  type="text"
+                  placeholder="Second Parent Name"
+                  className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.secondaryParentName}
+                  onChange={(e) => setEnrollData({ ...enrollData, secondaryParentName: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Second Parent Number"
+                  className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.secondaryParentNumber}
+                  onChange={(e) => setEnrollData({ ...enrollData, secondaryParentNumber: e.target.value })}
+                />
+                <input
+                  type="email"
+                  placeholder="Second Parent Email"
+                  className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.secondaryParentEmail}
+                  onChange={(e) => setEnrollData({ ...enrollData, secondaryParentEmail: e.target.value })}
+                />
               </div>
 
               <div>

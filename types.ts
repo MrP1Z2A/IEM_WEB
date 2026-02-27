@@ -52,6 +52,13 @@ export interface Student {
   };
   permissions?: StudentPermissions;
   type?: 'New' | 'Old';
+  date_of_birth?: string;
+  parent_name?: string;
+  parent_number?: string;
+  parent_email?: string;
+  secondary_parent_name?: string;
+  secondary_parent_number?: string;
+  secondary_parent_email?: string;
 }
 
 export type PageId = 
