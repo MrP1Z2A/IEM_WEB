@@ -30,28 +30,26 @@ const RegistrationHub: React.FC<RegistrationHubProps> = ({
 
       {/* Onboarding Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* New Student Card */}
         <div className="bg-white dark:bg-slate-900 p-8 sm:p-10 lg:p-12 rounded-[36px] sm:rounded-[48px] lg:rounded-[64px] shadow-premium border border-slate-100 dark:border-slate-800 text-center space-y-6 sm:space-y-8">
           <div className="w-24 h-24 bg-indigo-500/10 text-indigo-500 rounded-[32px] flex items-center justify-center text-4xl mx-auto shadow-inner">
-            <i className="fas fa-sparkles"></i>
+            <i className="fas fa-user-plus"></i>
           </div>
           <h4 className="text-2xl sm:text-3xl font-black tracking-tight">New Student Protocol</h4>
-          <p className="text-slate-400 text-sm font-semibold max-w-xs mx-auto">Initialize a new cognitive node within the institutional network.</p>
+          <p className="text-slate-400 text-sm font-semibold max-w-xs mx-auto">Register a student profile and initialize their account.</p>
           <button 
             onClick={() => enrollStudentAction('New')} 
             className="w-full py-6 bg-indigo-500 text-white font-black rounded-3xl text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/20 active:scale-95 transition-all"
           >
-            Start Onboarding
+            Register Student
           </button>
         </div>
 
-        {/* Legacy/Old Student Card */}
         <div className="bg-white dark:bg-slate-900 p-8 sm:p-10 lg:p-12 rounded-[36px] sm:rounded-[48px] lg:rounded-[64px] shadow-premium border border-slate-100 dark:border-slate-800 text-center space-y-6 sm:space-y-8">
           <div className="w-24 h-24 bg-slate-900/10 text-slate-900 dark:text-white rounded-[32px] flex items-center justify-center text-4xl mx-auto shadow-inner">
             <i className="fas fa-clock-rotate-left"></i>
           </div>
           <h4 className="text-2xl sm:text-3xl font-black tracking-tight">Old Student Re-Entry</h4>
-          <p className="text-slate-400 text-sm font-semibold max-w-xs mx-auto">Re-verify and reintegrate a legacy node into the system hubs.</p>
+          <p className="text-slate-400 text-sm font-semibold max-w-xs mx-auto">Re-activate and update an existing student profile.</p>
           <button 
             onClick={() => enrollStudentAction('Old')} 
             className="w-full py-6 bg-slate-900 text-white font-black rounded-3xl text-xs uppercase tracking-widest shadow-xl shadow-slate-900/20 active:scale-95 transition-all"

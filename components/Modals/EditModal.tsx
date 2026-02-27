@@ -43,27 +43,18 @@ const EditModal: React.FC<EditModalProps> = ({
         <div className="p-5 sm:p-8 lg:p-10 space-y-6 max-h-[60vh] overflow-y-auto no-scrollbar">
           {Object.entries(editTarget.data).map(([key, value]) => {
             // Skip internal or complex fields
-            if (key === 'id' || key === 'icon' || key === 'color' || key === 'bg' || typeof value === 'object') return null;
-            
-            // Special handling for student type selection
-            if (editTarget.type === 'student' && key === 'type') {
-              return (
-                <div key={key}>
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Student Categorization</label>
-                  <div className="flex gap-4">
-                    {['New', 'Old'].map(t => (
-                      <button 
-                        key={t}
-                        onClick={() => setEditTarget({ ...editTarget, data: { ...editTarget.data, type: t } })}
-                        className={`flex-1 py-4 rounded-2xl font-black text-xs uppercase tracking-widest border-2 transition-all ${editTarget.data.type === t ? 'bg-brand-500 text-white border-brand-500' : 'bg-transparent text-slate-400 border-slate-100 dark:border-slate-800'}`}
-                      >
-                        {t} Student
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            }
+            if (
+              key === 'id' ||
+              key === 'icon' ||
+              key === 'color' ||
+              key === 'bg' ||
+              key === 'created_at' ||
+              key === 'auth_user_id' ||
+              key === 'temp_password' ||
+              key === 'temp_password_created_at' ||
+              typeof value === 'object'
+            ) return null;
+            if (editTarget.type === 'student' && (key === 'attendanceRate' || key === 'status' || key === 'type')) return null;
 
             // Standard text/number input
             return (

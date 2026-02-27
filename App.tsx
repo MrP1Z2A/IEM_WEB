@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { jsPDF } from 'jspdf';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, AreaChart, Area, Cell, RadarChart, PolarGrid, PolarAngleAxis, Radar
 } from 'recharts';
 import { Status, Student, PageId, StudentPermissions } from './types';
 import { supabase } from './supabaseClient';
+import { authService } from './services/authService';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import StudentDirectory from './components/StudentDirectory';
@@ -36,6 +38,13 @@ const INITIAL_EXAMS: any[] = [];
 const INITIAL_HOMEWORK: any[] = [];
 
 const INITIAL_PROGRAMS: any[] = [];
+
+type AttendanceContextType = 'class' | 'subject';
+
+const normalizeClassCodeBase = (name: string) => {
+  const sanitized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return sanitized || 'class';
+};
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
@@ -69,6 +78,7 @@ const App: React.FC = () => {
   const [classImage, setClassImage] = useState<File | null>(null);
   const [classOuterColor, setClassOuterColor] = useState('#f8fafc');
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [isClassCodeSupported, setIsClassCodeSupported] = useState(true);
 
   // Attendance State (Subject-specific)
   const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
@@ -80,6 +90,8 @@ const App: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
   const [enrollData, setEnrollData] = useState({ name: '', email: '', type: 'New' as 'New' | 'Old', selectedStudentId: '', grade: '10th Grade' });
+  const [studentProfileImage, setStudentProfileImage] = useState<File | null>(null);
+  const enrollAbortCounterRef = useRef(0);
   const [editTarget, setEditTarget] = useState<{ type: string, data: any } | null>(null);
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   const [permTarget, setPermTarget] = useState<Student | null>(null);
@@ -89,6 +101,12 @@ const App: React.FC = () => {
   const [adminDeletePassword, setAdminDeletePassword] = useState('');
   const [studentDeleteError, setStudentDeleteError] = useState<string | null>(null);
   const [isStudentDeleteSubmitting, setIsStudentDeleteSubmitting] = useState(false);
+  const [classDeleteDialog, setClassDeleteDialog] = useState<{ id: string; name: string; onDeleted?: () => void } | null>(null);
+  const [classDeleteNameInput, setClassDeleteNameInput] = useState('');
+  const [classAdminDeletePassword, setClassAdminDeletePassword] = useState('');
+  const [classDeleteError, setClassDeleteError] = useState<string | null>(null);
+  const [isClassDeleteSubmitting, setIsClassDeleteSubmitting] = useState(false);
+  const [newStudentCredentials, setNewStudentCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
 
   const stats = useMemo(() => {
     const total = students.length;
@@ -96,6 +114,11 @@ const App: React.FC = () => {
     const atRisk = students.filter(s => s.attendanceRate < 90).length;
     return { total, avgAttendance: avgAttendance.toFixed(1), atRisk, activeSubjects: subjects.length };
   }, [students, subjects]);
+
+  const notify = useCallback((message: string) => {
+    setNotification({ message, type: 'info' });
+    setTimeout(() => setNotification(null), 3000);
+  }, []);
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -146,6 +169,7 @@ const App: React.FC = () => {
     if (!error && data) {
       const mappedClasses = data.map((classItem: any) => ({
         ...classItem,
+        class_code: classItem.class_code || null,
         outer_color: classItem.color || classItem.outer_color || '#f8fafc',
         student_ids: (classItem.class_students || []).map((relation: any) => String(relation.student_id)),
         student_count: (classItem.class_students || []).length,
@@ -153,6 +177,24 @@ const App: React.FC = () => {
       setClasses(mappedClasses);
     }
   };
+
+  const buildNextClassCode = useCallback((name: string, excludeClassId?: string) => {
+    const base = normalizeClassCodeBase(name);
+    const prefixRegex = new RegExp(`^${base}(\\d+)$`);
+
+    const nextNumber = classes
+      .filter(classItem => (excludeClassId ? String(classItem.id) !== excludeClassId : true))
+      .reduce((max, classItem) => {
+        const existingCode = String(classItem.class_code || '');
+        const matched = existingCode.match(prefixRegex);
+        if (!matched) return max;
+        const parsed = Number(matched[1]);
+        if (!Number.isFinite(parsed)) return max;
+        return Math.max(max, parsed);
+      }, 0) + 1;
+
+    return `${base}${nextNumber}`;
+  }, [classes]);
 
   const uploadClassImage = async (file: File) => {
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -175,6 +217,31 @@ const App: React.FC = () => {
     return data.publicUrl;
   };
 
+  const uploadStudentProfileImage = async (file: File) => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `profiles/student-${Date.now()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from('student_profile')
+      .upload(filePath, file, {
+        upsert: false,
+        contentType: file.type || 'image/jpeg',
+        cacheControl: '3600',
+      });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('student_profile')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded student profile URL.');
+    }
+
+    return data.publicUrl;
+  };
+
   const createClassWithStudents = async () => {
     try {
       if (!className.trim()) {
@@ -188,11 +255,35 @@ const App: React.FC = () => {
         imageUrl = await uploadClassImage(classImage);
       }
 
-      const { data: classData, error: classError } = await supabase
-        .from('classes')
-        .insert([{ name: className, image_url: imageUrl, color: classOuterColor }])
-        .select()
-        .single();
+      const nextClassCode = buildNextClassCode(className);
+
+      const insertPayload = isClassCodeSupported
+        ? { name: className, image_url: imageUrl, color: classOuterColor, class_code: nextClassCode }
+        : { name: className, image_url: imageUrl, color: classOuterColor };
+
+      let classData: any = null;
+      let classError: any = null;
+
+      {
+        const result = await supabase
+          .from('classes')
+          .insert([insertPayload])
+          .select()
+          .single();
+        classData = result.data;
+        classError = result.error;
+      }
+
+      if (classError && /class_code/i.test(classError.message || '')) {
+        setIsClassCodeSupported(false);
+        const fallbackResult = await supabase
+          .from('classes')
+          .insert([{ name: className, image_url: imageUrl, color: classOuterColor }])
+          .select()
+          .single();
+        classData = fallbackResult.data;
+        classError = fallbackResult.error;
+      }
 
       if (classError) throw classError;
 
@@ -209,7 +300,7 @@ const App: React.FC = () => {
         if (relationError) throw relationError;
       }
 
-      setClasses(prev => [{ ...classData, color: classOuterColor, outer_color: classOuterColor, student_ids: selectedStudents, student_count: payload.length }, ...prev]);
+      setClasses(prev => [{ ...classData, class_code: classData.class_code || (isClassCodeSupported ? nextClassCode : null), color: classOuterColor, outer_color: classOuterColor, student_ids: selectedStudents, student_count: payload.length }, ...prev]);
       notify('Class created successfully!');
       setClassName('');
       setSelectedStudents([]);
@@ -225,12 +316,14 @@ const App: React.FC = () => {
     setEditingClassId(String(classItem.id));
     setClassName(classItem.name || '');
     setClassOuterColor(classItem.color || classItem.outer_color || '#f8fafc');
+    setSelectedStudents((classItem.student_ids || []).map((id: any) => String(id)));
     setClassImage(null);
   };
 
   const cancelEditClass = () => {
     setEditingClassId(null);
     setClassName('');
+    setSelectedStudents([]);
     setClassImage(null);
     setClassOuterColor('#f8fafc');
   };
@@ -245,26 +338,76 @@ const App: React.FC = () => {
     try {
       const targetClass = classes.find(classItem => String(classItem.id) === editingClassId);
       let imageUrl = targetClass?.image_url || '';
+      const currentStudentIds = (targetClass?.student_ids || []).map((id: any) => String(id));
+      const nextStudentIds = selectedStudents.map(id => String(id));
+
+      const studentsToAdd = nextStudentIds.filter(id => !currentStudentIds.includes(id));
+      const studentsToRemove = currentStudentIds.filter(id => !nextStudentIds.includes(id));
+      const classCode = buildNextClassCode(className, editingClassId);
 
       if (classImage) {
         imageUrl = await uploadClassImage(classImage);
       }
 
-      const { error } = await supabase
-        .from('classes')
-        .update({ name: className, image_url: imageUrl, color: classOuterColor })
-        .eq('id', editingClassId);
+      const updatePayload = isClassCodeSupported
+        ? { name: className, image_url: imageUrl, color: classOuterColor, class_code: classCode }
+        : { name: className, image_url: imageUrl, color: classOuterColor };
+
+      let error: any = null;
+
+      {
+        const result = await supabase
+          .from('classes')
+          .update(updatePayload)
+          .eq('id', editingClassId);
+        error = result.error;
+      }
+
+      if (error && /class_code/i.test(error.message || '')) {
+        setIsClassCodeSupported(false);
+        const fallbackResult = await supabase
+          .from('classes')
+          .update({ name: className, image_url: imageUrl, color: classOuterColor })
+          .eq('id', editingClassId);
+        error = fallbackResult.error;
+      }
 
       if (error) throw error;
+
+      if (studentsToRemove.length > 0) {
+        const { error: removeRelationsError } = await supabase
+          .from('class_students')
+          .delete()
+          .eq('class_id', editingClassId)
+          .in('student_id', studentsToRemove);
+
+        if (removeRelationsError) throw removeRelationsError;
+      }
+
+      if (studentsToAdd.length > 0) {
+        const addPayload = studentsToAdd.map(studentId => ({
+          class_id: editingClassId,
+          student_id: studentId,
+        }));
+
+        const { error: addRelationsError } = await supabase
+          .from('class_students')
+          .insert(addPayload);
+
+        if (addRelationsError) throw addRelationsError;
+      }
 
       setClasses(prev => prev.map(classItem => {
         if (String(classItem.id) !== editingClassId) return classItem;
         return {
           ...classItem,
           name: className,
+          class_code: isClassCodeSupported ? classCode : (classItem.class_code || null),
           image_url: imageUrl,
           color: classOuterColor,
           outer_color: classOuterColor,
+          student_ids: nextStudentIds,
+          student_count: nextStudentIds.length,
         };
       }));
 
@@ -276,28 +419,146 @@ const App: React.FC = () => {
     }
   };
 
-  const deleteClass = async (classId: string) => {
-    try {
-      const { error: relationDeleteError } = await supabase
-        .from('class_students')
-        .delete()
-        .eq('class_id', classId);
-
-      if (relationDeleteError) throw relationDeleteError;
-
-      const { error: classDeleteError } = await supabase
-        .from('classes')
-        .delete()
-        .eq('id', classId);
-
-      if (classDeleteError) throw classDeleteError;
-
-      setClasses(prev => prev.filter(classItem => String(classItem.id) !== classId));
-      notify('Class deleted successfully.');
-    } catch (error) {
-      console.error('Delete class error:', error);
-      notify('Failed to delete class.');
+  const exportMonthlyAttendancePdf = useCallback(async (
+    contextType: AttendanceContextType,
+    contextId: string,
+    month: string,
+    studentList: Array<{ id: string; name: string }>,
+    contextLabel?: string
+  ) => {
+    if (!month) {
+      notify('Please choose a month to export.');
+      return;
     }
+
+    if (!contextId) {
+      notify('Please choose a class or subject first.');
+      return;
+    }
+
+    const [yearStr, monthStr] = month.split('-');
+    const year = Number(yearStr);
+    const monthNumber = Number(monthStr);
+    if (!Number.isFinite(year) || !Number.isFinite(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+      notify('Invalid month selected.');
+      return;
+    }
+
+    const monthStart = `${month}-01`;
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    const monthEnd = `${month}-${String(lastDay).padStart(2, '0')}`;
+
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('student_id, status, attendance_date')
+      .eq('context_type', contextType)
+      .eq('context_id', contextId)
+      .gte('attendance_date', monthStart)
+      .lte('attendance_date', monthEnd)
+      .order('attendance_date', { ascending: true });
+
+    if (error) {
+      console.error('Attendance export query failed:', error);
+      notify(`Failed to export attendance: ${error.message}`);
+      return;
+    }
+
+    const countsByStudent: Record<string, { present: number; absent: number; late: number; total: number }> = {};
+    (data || []).forEach((row: any) => {
+      const studentId = String(row.student_id);
+      if (!countsByStudent[studentId]) {
+        countsByStudent[studentId] = { present: 0, absent: 0, late: 0, total: 0 };
+      }
+      if (row.status === 'P') countsByStudent[studentId].present += 1;
+      if (row.status === 'A') countsByStudent[studentId].absent += 1;
+      if (row.status === 'L') countsByStudent[studentId].late += 1;
+      countsByStudent[studentId].total += 1;
+    });
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const monthLabel = new Date(year, monthNumber - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const headerTitle = `Attendance Report - ${monthLabel}`;
+    const subTitle = `${contextType.toUpperCase()}: ${contextLabel || contextId}`;
+
+    doc.setFontSize(18);
+    doc.text(headerTitle, 40, 40);
+    doc.setFontSize(11);
+    doc.text(subTitle, 40, 60);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 78);
+
+    let y = 110;
+    const lineHeight = 20;
+    const columns = [
+      { label: 'Student Name', x: 40 },
+      { label: 'Student ID', x: 260 },
+      { label: 'Present', x: 430 },
+      { label: 'Absent', x: 510 },
+      { label: 'Late', x: 580 },
+      { label: 'Marked Days', x: 650 },
+      { label: 'Rate %', x: 760 },
+    ];
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    columns.forEach(col => doc.text(col.label, col.x, y));
+    y += 10;
+    doc.line(40, y, 820, y);
+    y += 16;
+    doc.setFont('helvetica', 'normal');
+
+    const rows = studentList.map(student => {
+      const stats = countsByStudent[String(student.id)] || { present: 0, absent: 0, late: 0, total: 0 };
+      const rate = stats.total === 0 ? 0 : Math.round((stats.present / stats.total) * 100);
+      return {
+        name: student.name,
+        id: String(student.id),
+        ...stats,
+        rate,
+      };
+    });
+
+    rows.forEach(row => {
+      if (y > 560) {
+        doc.addPage();
+        y = 50;
+        doc.setFont('helvetica', 'bold');
+        columns.forEach(col => doc.text(col.label, col.x, y));
+        y += 10;
+        doc.line(40, y, 820, y);
+        y += 16;
+        doc.setFont('helvetica', 'normal');
+      }
+
+      doc.text(row.name.slice(0, 32), 40, y);
+      doc.text(row.id.slice(0, 18), 260, y);
+      doc.text(String(row.present), 430, y);
+      doc.text(String(row.absent), 510, y);
+      doc.text(String(row.late), 580, y);
+      doc.text(String(row.total), 650, y);
+      doc.text(String(row.rate), 760, y);
+      y += lineHeight;
+    });
+
+    const safeContext = (contextLabel || contextId).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    doc.save(`attendance-${safeContext}-${month}.pdf`);
+    notify(`Attendance PDF exported for ${monthLabel}.`);
+  }, [notify]);
+
+  const deleteClass = (classId: string, onDeleted?: () => void) => {
+    const targetClass = classes.find(classItem => String(classItem.id) === classId);
+    if (!targetClass) {
+      notify('Class not found.');
+      return;
+    }
+
+    setClassDeleteDialog({
+      id: classId,
+      name: targetClass.name || 'Unnamed Class',
+      onDeleted
+    });
+    setClassDeleteNameInput('');
+    setClassAdminDeletePassword('');
+    setClassDeleteError(null);
   };
 
   const removeStudentFromClass = async (classId: string, studentId: string) => {
@@ -388,9 +649,34 @@ const App: React.FC = () => {
     }
   }, [students, currentPage]);
 
-  const notify = (message: string) => {
-    setNotification({ message, type: 'info' });
-    setTimeout(() => setNotification(null), 3000);
+  const generateStudentPassword = () => {
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const digits = '23456789';
+    const specials = '@#$%&*!';
+    const allChars = `${lower}${upper}${digits}${specials}`;
+
+    const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+
+    const passwordChars = [pick(lower), pick(upper), pick(digits), pick(specials)];
+    for (let i = passwordChars.length; i < 12; i += 1) {
+      passwordChars.push(pick(allChars));
+    }
+
+    for (let i = passwordChars.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]];
+    }
+
+    return passwordChars.join('');
+  };
+
+  const generateStudentNodeId = () => {
+    const randomSeed = globalThis.crypto?.randomUUID
+      ? globalThis.crypto.randomUUID().replace(/-/g, '')
+      : `${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
+
+    return `NODE-${randomSeed.slice(0, 10).toUpperCase()}`;
   };
 
   const openEditModal = (type: string, data: any) => {
@@ -404,8 +690,23 @@ const App: React.FC = () => {
     
     // Sync with Supabase if it's a student
     if (type === 'student') {
-      const { error } = await supabase.from('students').upsert(data);
-      if (error) console.error('Supabase Update Error:', error);
+      const existingStudent = students.find(student => student.id === data.id);
+      const studentPayload = {
+        ...data,
+        status: data.status ?? existingStudent?.status ?? Status.PENDING,
+        attendanceRate: data.attendanceRate ?? existingStudent?.attendanceRate ?? 100,
+      };
+
+      const { error } = await supabase.from('students').upsert(studentPayload);
+      if (error) {
+        console.error('Supabase Update Error:', error);
+        notify(`Student sync failed: ${error.message}`);
+        return;
+      }
+
+      if (studentPayload !== data) {
+        setEditTarget({ ...editTarget, data: studentPayload });
+      }
     }
 
     switch (type) {
@@ -490,6 +791,28 @@ const App: React.FC = () => {
         return;
       }
 
+      const { error: classRelationDeleteError } = await supabase
+        .from('class_students')
+        .delete()
+        .eq('student_id', studentDeleteDialog.id);
+
+      if (classRelationDeleteError) {
+        console.error('Class relation delete error:', classRelationDeleteError);
+        setStudentDeleteError('Failed to delete student class relations.');
+        return;
+      }
+
+      const { error: attendanceDeleteError } = await supabase
+        .from('attendance_records')
+        .delete()
+        .eq('student_id', studentDeleteDialog.id);
+
+      if (attendanceDeleteError) {
+        console.error('Attendance delete error:', attendanceDeleteError);
+        setStudentDeleteError('Failed to delete student attendance records.');
+        return;
+      }
+
       const { error: deleteError } = await supabase.from('students').delete().eq('id', studentDeleteDialog.id);
       if (deleteError) {
         console.error('Supabase Delete Error:', deleteError);
@@ -498,6 +821,20 @@ const App: React.FC = () => {
       }
 
       setStudents(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
+      setAllStudents(prev => prev.filter(student => String(student.id) !== studentDeleteDialog.id));
+      setAttendanceStudents(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
+      setClasses(prev => prev.map(classItem => {
+        const nextStudentIds = (classItem.student_ids || []).filter((id: string) => String(id) !== studentDeleteDialog.id);
+        if (nextStudentIds.length === (classItem.student_ids || []).length) {
+          return classItem;
+        }
+
+        return {
+          ...classItem,
+          student_ids: nextStudentIds,
+          student_count: nextStudentIds.length,
+        };
+      }));
       notify('Student node deleted.');
       setStudentDeleteDialog(null);
       setStudentDeleteNameInput('');
@@ -508,12 +845,86 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSecureClassDelete = async () => {
+    if (!classDeleteDialog) return;
+
+    const expectedName = classDeleteDialog.name.trim();
+    const typedName = classDeleteNameInput.trim();
+    if (typedName !== expectedName) {
+      setClassDeleteError('Class name does not match.');
+      return;
+    }
+
+    if (!classAdminDeletePassword.trim()) {
+      setClassDeleteError('Admin password is required.');
+      return;
+    }
+
+    setIsClassDeleteSubmitting(true);
+    setClassDeleteError(null);
+
+    try {
+      const { data, error } = await supabase.rpc('verify_admin_delete_password', { input_password: classAdminDeletePassword });
+      if (error) {
+        console.error('Password verification error:', error);
+        setClassDeleteError('Failed to verify admin password.');
+        return;
+      }
+
+      if (!data) {
+        setClassDeleteError('Invalid admin password.');
+        return;
+      }
+
+      const { error: relationDeleteError } = await supabase
+        .from('class_students')
+        .delete()
+        .eq('class_id', classDeleteDialog.id);
+      if (relationDeleteError) {
+        console.error('Delete class relations error:', relationDeleteError);
+        setClassDeleteError('Failed to delete class students relations.');
+        return;
+      }
+
+      const { error: classDeleteErrorResult } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', classDeleteDialog.id);
+      if (classDeleteErrorResult) {
+        console.error('Delete class error:', classDeleteErrorResult);
+        setClassDeleteError('Failed to delete class.');
+        return;
+      }
+
+      setClasses(prev => prev.filter(classItem => String(classItem.id) !== classDeleteDialog.id));
+      classDeleteDialog.onDeleted?.();
+      notify('Class deleted successfully.');
+      setClassDeleteDialog(null);
+      setClassDeleteNameInput('');
+      setClassAdminDeletePassword('');
+      setClassDeleteError(null);
+    } finally {
+      setIsClassDeleteSubmitting(false);
+    }
+  };
+
   const enrollStudentAction = (type: 'New' | 'Old') => {
     setEnrollData({ name: '', email: '', type, selectedStudentId: '', grade: '10th Grade' });
+    setStudentProfileImage(null);
     setIsEnrollModalOpen(true);
   };
 
+  const abortEnrollFlow = () => {
+    enrollAbortCounterRef.current += 1;
+    setIsEnrollModalOpen(false);
+    setEnrollData({ name: '', email: '', type: 'New', selectedStudentId: '', grade: '10th Grade' });
+    setStudentProfileImage(null);
+  };
+
   const handleEnrollSubmit = async () => {
+    const enrollToken = enrollAbortCounterRef.current;
+    const isEnrollmentAborted = () => enrollToken !== enrollAbortCounterRef.current;
+
     try {
       if (enrollData.type === 'Old') {
         if (!enrollData.selectedStudentId) {
@@ -521,7 +932,7 @@ const App: React.FC = () => {
           return;
         }
 
-        const target = students.find(student => student.id === enrollData.selectedStudentId);
+        const target = students.find(student => String(student.id) === String(enrollData.selectedStudentId));
         if (!target) {
           notify('Selected student not found.');
           return;
@@ -541,9 +952,10 @@ const App: React.FC = () => {
 
         if (dbError) throw dbError;
 
-        setStudents(prev => prev.map(student => student.id === updatedStudent.id ? updatedStudent : student));
+        setStudents(prev => prev.map(student => String(student.id) === String(updatedStudent.id) ? updatedStudent : student));
+        setAllStudents(prev => prev.map(student => String(student.id) === String(updatedStudent.id) ? updatedStudent : student));
         notify('Old student re-entry completed.');
-        setIsEnrollModalOpen(false);
+        abortEnrollFlow();
         return;
       }
 
@@ -552,30 +964,90 @@ const App: React.FC = () => {
         return;
       }
 
-      const newId = `NODE-${Math.floor(100 + Math.random() * 900)}`;
+      const generatedPassword = generateStudentPassword();
+
+      let profileImageUrl: string | undefined;
+      if (studentProfileImage) {
+        try {
+          profileImageUrl = await uploadStudentProfileImage(studentProfileImage);
+        } catch (uploadError: any) {
+          console.error('Student profile upload failed:', uploadError);
+          notify(`Profile upload failed: ${uploadError?.message || 'Upload blocked. Student will be created without image.'}`);
+          profileImageUrl = undefined;
+        }
+      }
+
+      if (isEnrollmentAborted()) {
+        return;
+      }
+
+      let authUserId: string | null = null;
+      try {
+        const authData = await authService.signUp(enrollData.email, generatedPassword, enrollData.name, 'student');
+        authUserId = authData?.user?.id || null;
+      } catch (authError: any) {
+        console.error('Auth sign-up failed, continuing with student profile only:', authError);
+      }
+
+      if (isEnrollmentAborted()) {
+        return;
+      }
+
       const newStudent: Student = {
-        id: newId,
+        id: generateStudentNodeId(),
         name: enrollData.name,
         grade: enrollData.grade,
         gender: 'Male',
         status: Status.PENDING,
         email: enrollData.email,
+        avatar: profileImageUrl,
         attendanceRate: 100,
         courseAttendance: [],
         securityStatus: { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
         permissions: { ...INITIAL_PERMISSIONS },
-        type: enrollData.type
+        type: 'New'
       };
 
-      const { error: dbError } = await supabase.from('students').insert([newStudent]);
+      const insertPayload = {
+        ...newStudent,
+        auth_user_id: authUserId,
+        temp_password: generatedPassword,
+      };
+
+      let createdStudentRecord: any = null;
+      let dbError: any = null;
+
+      {
+        const result = await supabase.from('students').insert([insertPayload]).select().single();
+        createdStudentRecord = result.data;
+        dbError = result.error;
+      }
+
+      if (dbError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(dbError.message || '')) {
+        const { id, ...payloadWithoutId } = insertPayload;
+        const retryResult = await supabase.from('students').insert([payloadWithoutId]).select().single();
+        createdStudentRecord = retryResult.data;
+        dbError = retryResult.error;
+      }
 
       if (dbError) throw dbError;
 
-      notify(`${enrollData.type} Student Node Created & Synced.`);
+      if (isEnrollmentAborted()) {
+        if (createdStudentRecord?.id) {
+          await supabase.from('students').delete().eq('id', createdStudentRecord.id);
+        }
+        return;
+      }
 
-      setStudents(prev => [newStudent, ...prev]);
-      setIsEnrollModalOpen(false);
-      openEditModal('student', newStudent);
+      const createdStudent = mapStudentFromDB(createdStudentRecord || newStudent);
+
+      notify(`New Student Node Created & Synced.`);
+      setNewStudentCredentials({ name: createdStudent.name, email: createdStudent.email, password: generatedPassword });
+
+      setStudents(prev => [createdStudent, ...prev]);
+      setAllStudents(prev => [createdStudent, ...prev]);
+      abortEnrollFlow();
+      openEditModal('student', createdStudent);
     } catch (error: any) {
       console.error('Enrollment Error:', error);
       notify(`Sync Failed: ${error.message}`);
@@ -597,38 +1069,129 @@ const App: React.FC = () => {
     setPermTarget(updated);
   };
 
-  const updateSubjectAttendance = (subjectId: string, date: string, studentId: string, status: 'P' | 'A' | 'L') => {
+  const getAttendanceStoreKey = useCallback((contextType: AttendanceContextType, contextId: string) => `${contextType}:${contextId}`, []);
+
+  const setAttendanceForDate = useCallback((
+    storeKey: string,
+    date: string,
+    studentStatuses: Record<string, 'P' | 'A' | 'L'>
+  ) => {
     setSubjectAttendanceStore(prev => {
-      const subjectData = prev[subjectId] || {};
-      const dateData = subjectData[date] || {};
+      const contextData = prev[storeKey] || {};
       return {
         ...prev,
-        [subjectId]: {
-          ...subjectData,
+        [storeKey]: {
+          ...contextData,
+          [date]: studentStatuses,
+        },
+      };
+    });
+  }, []);
+
+  const loadAttendanceForContext = useCallback(async (contextType: AttendanceContextType, contextId: string, date: string) => {
+    if (!contextId || !date) return;
+
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('student_id, status')
+      .eq('context_type', contextType)
+      .eq('context_id', contextId)
+      .eq('attendance_date', date);
+
+    if (error) {
+      console.error('Failed to load attendance:', error);
+      notify(`Failed to load attendance: ${error.message}`);
+      return;
+    }
+
+    const nextDateData: Record<string, 'P' | 'A' | 'L'> = {};
+    (data || []).forEach((item: any) => {
+      nextDateData[String(item.student_id)] = item.status;
+    });
+
+    setAttendanceForDate(getAttendanceStoreKey(contextType, contextId), date, nextDateData);
+  }, [getAttendanceStoreKey, notify, setAttendanceForDate]);
+
+  const updateSubjectAttendance = useCallback(async (
+    contextType: AttendanceContextType,
+    contextId: string,
+    date: string,
+    studentId: string,
+    status: 'P' | 'A' | 'L'
+  ) => {
+    const { error } = await supabase
+      .from('attendance_records')
+      .upsert([
+        {
+          context_type: contextType,
+          context_id: contextId,
+          attendance_date: date,
+          student_id: studentId,
+          status,
+        },
+      ], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+
+    if (error) {
+      console.error('Failed to save attendance:', error);
+      notify(`Failed to save attendance: ${error.message}`);
+      return;
+    }
+
+    const storeKey = getAttendanceStoreKey(contextType, contextId);
+    setSubjectAttendanceStore(prev => {
+      const contextData = prev[storeKey] || {};
+      const dateData = contextData[date] || {};
+      return {
+        ...prev,
+        [storeKey]: {
+          ...contextData,
           [date]: {
             ...dateData,
-            [studentId]: status
-          }
-        }
+            [studentId]: status,
+          },
+        },
       };
     });
-  };
+  }, [getAttendanceStoreKey, notify]);
 
-  const bulkMarkSubjectPresent = (subjectId: string, date: string) => {
-    setSubjectAttendanceStore(prev => {
-      const subjectData = prev[subjectId] || {};
-      const newDateData: Record<string, 'P'> = {};
-      students.forEach(s => newDateData[s.id] = 'P');
-      return {
-        ...prev,
-        [subjectId]: {
-          ...subjectData,
-          [date]: newDateData
-        }
-      };
+  const bulkMarkSubjectPresent = useCallback(async (
+    contextType: AttendanceContextType,
+    contextId: string,
+    date: string,
+    studentIds: string[],
+    contextName?: string
+  ) => {
+    if (studentIds.length === 0) {
+      notify('No students found to mark attendance.');
+      return;
+    }
+
+    const payload = studentIds.map(studentId => ({
+      context_type: contextType,
+      context_id: contextId,
+      attendance_date: date,
+      student_id: studentId,
+      status: 'P' as const,
+    }));
+
+    const { error } = await supabase
+      .from('attendance_records')
+      .upsert(payload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+
+    if (error) {
+      console.error('Failed to bulk save attendance:', error);
+      notify(`Failed to save attendance: ${error.message}`);
+      return;
+    }
+
+    const nextDateData: Record<string, 'P'> = {};
+    studentIds.forEach(studentId => {
+      nextDateData[studentId] = 'P';
     });
-    notify(`All students marked Present for ${subjects.find(s => s.id === subjectId)?.name}.`);
-  };
+
+    setAttendanceForDate(getAttendanceStoreKey(contextType, contextId), date, nextDateData);
+    notify(`All students marked Present for ${contextName || 'selected attendance context'}.`);
+  }, [getAttendanceStoreKey, notify, setAttendanceForDate]);
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc] dark:bg-slate-950 transition-colors duration-500 relative">
@@ -636,6 +1199,39 @@ const App: React.FC = () => {
       {notification && (
         <div className="fixed top-4 right-4 z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-3 min-w-[220px] max-w-[90vw]">
           <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{notification.message}</p>
+        </div>
+      )}
+
+      {newStudentCredentials && (
+        <div className="fixed inset-0 z-[140] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Student Login Credentials</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Share these once with the student.</p>
+
+            <div className="rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 space-y-2">
+              <p className="text-sm"><span className="font-black">Name:</span> {newStudentCredentials.name}</p>
+              <p className="text-sm"><span className="font-black">Email:</span> {newStudentCredentials.email}</p>
+              <p className="text-sm"><span className="font-black">Password:</span> {newStudentCredentials.password}</p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(`Email: ${newStudentCredentials.email}\nPassword: ${newStudentCredentials.password}`);
+                  notify('Credentials copied.');
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Copy
+              </button>
+              <button
+                onClick={() => setNewStudentCredentials(null)}
+                className="px-4 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs uppercase tracking-widest"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -720,13 +1316,74 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {classDeleteDialog && (
+        <div className="fixed inset-0 z-[130] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Secure Class Deletion</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Retype <span className="font-black">{classDeleteDialog.name}</span> and enter admin password to continue.
+            </p>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retype Class Name</label>
+              <input
+                type="text"
+                value={classDeleteNameInput}
+                onChange={(e) => setClassDeleteNameInput(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter exact class name"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
+              <input
+                type="password"
+                value={classAdminDeletePassword}
+                onChange={(e) => setClassAdminDeletePassword(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter admin password"
+              />
+            </div>
+
+            {classDeleteError && (
+              <p className="text-xs font-bold text-rose-500">{classDeleteError}</p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  if (isClassDeleteSubmitting) return;
+                  setClassDeleteDialog(null);
+                  setClassDeleteNameInput('');
+                  setClassAdminDeletePassword('');
+                  setClassDeleteError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSecureClassDelete}
+                disabled={isClassDeleteSubmitting}
+                className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isClassDeleteSubmitting ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
+              >
+                {isClassDeleteSubmitting ? 'Verifying...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* ENROLLMENT MODAL */}
       <EnrollmentModal 
         isOpen={isEnrollModalOpen}
-        onClose={() => setIsEnrollModalOpen(false)}
+        onClose={abortEnrollFlow}
         enrollData={enrollData}
         setEnrollData={setEnrollData}
+        studentProfileImage={studentProfileImage}
+        setStudentProfileImage={setStudentProfileImage}
         students={students}
         onSubmit={handleEnrollSubmit}
       />
@@ -823,6 +1480,8 @@ const App: React.FC = () => {
               subjectAttendanceStore={subjectAttendanceStore}
               updateSubjectAttendance={updateSubjectAttendance}
               bulkMarkSubjectPresent={bulkMarkSubjectPresent}
+              loadAttendanceForContext={loadAttendanceForContext}
+              exportMonthlyAttendancePdf={exportMonthlyAttendancePdf}
               notify={notify}
             />
           )}

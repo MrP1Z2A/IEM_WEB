@@ -28,13 +28,21 @@ interface AttendanceProtocolProps {
   startEditClass: (classItem: any) => void;
   cancelEditClass: () => void;
   saveClassEdits: () => void;
-  deleteClass: (classId: string) => void;
+  deleteClass: (classId: string, onDeleted?: () => void) => void;
   removeStudentFromClass: (classId: string, studentId: string) => void;
   selectedAttendanceSubject: string | null;
   setSelectedAttendanceSubject: (id: string | null) => void;
   subjectAttendanceStore: Record<string, Record<string, Record<string, 'P' | 'A' | 'L'>>>;
-  updateSubjectAttendance: (subjectId: string, date: string, studentId: string, status: 'P' | 'A' | 'L') => void;
-  bulkMarkSubjectPresent: (subjectId: string, date: string) => void;
+  updateSubjectAttendance: (contextType: 'class' | 'subject', contextId: string, date: string, studentId: string, status: 'P' | 'A' | 'L') => Promise<void>;
+  bulkMarkSubjectPresent: (contextType: 'class' | 'subject', contextId: string, date: string, studentIds: string[], contextName?: string) => Promise<void>;
+  loadAttendanceForContext: (contextType: 'class' | 'subject', contextId: string, date: string) => Promise<void>;
+  exportMonthlyAttendancePdf: (
+    contextType: 'class' | 'subject',
+    contextId: string,
+    month: string,
+    studentList: Array<{ id: string; name: string }>,
+    contextLabel?: string
+  ) => Promise<void>;
   notify: (msg: string) => void;
 }
 
@@ -65,24 +73,55 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
   subjectAttendanceStore,
   updateSubjectAttendance,
   bulkMarkSubjectPresent,
+  loadAttendanceForContext,
+  exportMonthlyAttendancePdf,
   notify
 }) => {
   const [selectedClassId, setSelectedClassId] = React.useState<string | null>(null);
+  const [isClassFormOpen, setIsClassFormOpen] = React.useState(false);
+  const [exportMonth, setExportMonth] = React.useState(new Date().toISOString().slice(0, 7));
   const classImageInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    if (editingClassId) {
+      setIsClassFormOpen(true);
+    }
+  }, [editingClassId]);
 
   const selectedClass = classes.find(c => String(c.id) === selectedClassId);
   const selectedClassStudentIds: string[] = selectedClass?.student_ids || [];
   const selectedClassStudents = allStudents.filter(student => selectedClassStudentIds.includes(String(student.id)));
 
   const activeAttendanceId = selectedClassId || selectedAttendanceSubject;
+  const attendanceStoreKey = selectedClassId ? `class:${selectedClassId}` : selectedAttendanceSubject ? `subject:${selectedAttendanceSubject}` : null;
   const activeStudents = selectedClassId ? selectedClassStudents : students;
 
-  const markAllPresentForClass = () => {
+  React.useEffect(() => {
+    if (selectedClassId) {
+      void loadAttendanceForContext('class', selectedClassId, attendanceDate);
+      return;
+    }
+
+    if (selectedAttendanceSubject) {
+      void loadAttendanceForContext('subject', selectedAttendanceSubject, attendanceDate);
+    }
+  }, [selectedClassId, selectedAttendanceSubject, attendanceDate, loadAttendanceForContext]);
+
+  React.useEffect(() => {
+    if (attendanceDate?.length >= 7) {
+      setExportMonth(attendanceDate.slice(0, 7));
+    }
+  }, [attendanceDate]);
+
+  const markAllPresentForClass = async () => {
     if (!selectedClassId) return;
-    activeStudents.forEach(student => {
-      updateSubjectAttendance(selectedClassId, attendanceDate, String(student.id), 'P');
-    });
-    notify(`All students marked Present for ${selectedClass?.name || 'selected class'}.`);
+    await bulkMarkSubjectPresent(
+      'class',
+      selectedClassId,
+      attendanceDate,
+      activeStudents.map(student => String(student.id)),
+      selectedClass?.name || 'selected class'
+    );
   };
 
   return (
@@ -109,11 +148,17 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
         </div>
         {activeAttendanceId && (
           <button 
-            onClick={() => {
+            onClick={async () => {
               if (selectedClassId) {
-                markAllPresentForClass();
+                await markAllPresentForClass();
               } else if (selectedAttendanceSubject) {
-                bulkMarkSubjectPresent(selectedAttendanceSubject, attendanceDate);
+                await bulkMarkSubjectPresent(
+                  'subject',
+                  selectedAttendanceSubject,
+                  attendanceDate,
+                  activeStudents.map(student => String(student.id)),
+                  subjects.find(s => s.id === selectedAttendanceSubject)?.name
+                );
               }
             }} 
             className="w-full xl:w-auto px-8 sm:px-10 py-4 sm:py-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-slate-800 dark:text-white font-black rounded-[24px] sm:rounded-[32px] text-[10px] sm:text-xs uppercase tracking-widest shadow-premium"
@@ -129,11 +174,17 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight">{editingClassId ? 'Edit Class' : 'Create Class'}</h2>
             <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-slate-400 mt-2">{editingClassId ? 'Update class appearance and details' : 'Build a class and attach student profiles'}</p>
           </div>
-          <div className="w-14 h-14 rounded-2xl bg-brand-50 text-brand-500 flex items-center justify-center text-2xl shadow-inner">
-            <i className="fas fa-users-viewfinder"></i>
-          </div>
+          <button
+            onClick={() => setIsClassFormOpen(prev => !prev)}
+            className="px-4 py-2 rounded-xl bg-brand-50 text-brand-500 border border-brand-100 text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
+          >
+            <i className={`fas ${isClassFormOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
+            {isClassFormOpen ? 'Hide Form' : 'Create Class'}
+          </button>
         </div>
 
+        {isClassFormOpen && (
+          <>
         <div className="space-y-3">
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Class Name</label>
           <input
@@ -203,6 +254,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                   className="w-4 h-4 rounded border-slate-300 text-brand-500 focus:ring-brand-500"
                 />
                 <span className="font-semibold text-sm">{student.name}</span>
+                <span className="text-[10px] text-slate-400 uppercase tracking-widest">({student.id})</span>
               </label>
             ))}
           </div>
@@ -242,67 +294,72 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
             </button>
           </div>
         </div>
+          </>
+        )}
 
-        {classes.length > 0 && (
-          <div className="space-y-3 pt-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Created Classes</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {classes.map((classItem) => (
-                <div
-                  key={classItem.id}
-                  onClick={() => {
-                    setSelectedClassId(String(classItem.id));
-                    setSelectedAttendanceSubject(null);
-                  }}
-                  className="rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden cursor-pointer hover:-translate-y-1 transition-all"
-                  style={{ backgroundColor: '#f8fafc' }}
-                >
-                  <div className="flex justify-end p-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startEditClass(classItem);
-                      }}
-                      className="w-8 h-8 mr-2 rounded-lg bg-white dark:bg-slate-900 text-slate-400 hover:text-brand-500 border border-slate-100 dark:border-slate-700 flex items-center justify-center"
-                      title="Edit class"
-                    >
-                      <i className="fas fa-pen"></i>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteClass(String(classItem.id));
+      </div>
+
+      {classes.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[56px] p-6 sm:p-8 lg:p-10 border border-slate-100 dark:border-slate-800 shadow-premium space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Created Classes</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {classes.map((classItem) => (
+              <div
+                key={classItem.id}
+                onClick={() => {
+                  setSelectedClassId(String(classItem.id));
+                  setSelectedAttendanceSubject(null);
+                }}
+                className="rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden cursor-pointer hover:-translate-y-1 transition-all"
+                style={{ backgroundColor: '#f8fafc' }}
+              >
+                <div className="flex justify-end p-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startEditClass(classItem);
+                    }}
+                    className="w-8 h-8 mr-2 rounded-lg bg-white dark:bg-slate-900 text-slate-400 hover:text-brand-500 border border-slate-100 dark:border-slate-700 flex items-center justify-center"
+                    title="Edit class"
+                  >
+                    <i className="fas fa-pen"></i>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteClass(String(classItem.id), () => {
                         if (selectedClassId === String(classItem.id)) {
                           setSelectedClassId(null);
                         }
-                      }}
-                      className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 text-slate-400 hover:text-rose-500 border border-slate-100 dark:border-slate-700 flex items-center justify-center"
-                      title="Delete class"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </div>
-                  <div className="h-24" style={{ backgroundColor: classItem.color || classItem.outer_color || '#f8fafc' }}>
-                    {classItem.image_url ? (
-                      <img src={classItem.image_url} alt={classItem.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-black uppercase tracking-widest">
-                        No Image
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3 space-y-1 bg-white dark:bg-slate-900">
-                    <p className="font-black text-sm truncate">{classItem.name}</p>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-brand-500">
-                      {(classItem.student_count ?? 0)} Students
-                    </p>
-                  </div>
+                      });
+                    }}
+                    className="w-8 h-8 rounded-lg bg-white dark:bg-slate-900 text-slate-400 hover:text-rose-500 border border-slate-100 dark:border-slate-700 flex items-center justify-center"
+                    title="Delete class"
+                  >
+                    <i className="fas fa-trash"></i>
+                  </button>
                 </div>
-              ))}
-            </div>
+                <div className="h-24" style={{ backgroundColor: classItem.color || classItem.outer_color || '#f8fafc' }}>
+                  {classItem.image_url ? (
+                    <img src={classItem.image_url} alt={classItem.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-black uppercase tracking-widest">
+                      No Image
+                    </div>
+                  )}
+                </div>
+                <div className="p-3 space-y-1 bg-white dark:bg-slate-900">
+                  <p className="font-black text-sm truncate">{classItem.name}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{classItem.class_code || `${classItem.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'class'}1`}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-brand-500">
+                    {(classItem.student_count ?? 0)} Students
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Subject Selection Grid or Student List */}
       {!activeAttendanceId ? (
@@ -344,11 +401,59 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               </button>
               <div className="min-w-0">
                 <h4 className="text-xl sm:text-2xl font-black tracking-tight break-words">
-                  Marking: {selectedClassId ? selectedClass?.name : subjects.find(s => s.id === selectedAttendanceSubject)?.name}
+                  Marking: {selectedClassId ? `${selectedClass?.name} (${selectedClass?.class_code || 'class1'})` : subjects.find(s => s.id === selectedAttendanceSubject)?.name}
                 </h4>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                   {selectedClassId ? 'Class Attendance View' : `Course Terminal: ${subjects.find(s => s.id === selectedAttendanceSubject)?.code}`}
                 </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800 px-4 py-3 border border-slate-100 dark:border-slate-700">
+                <i className="fas fa-calendar text-slate-400"></i>
+                <input
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(e) => setAttendanceDate(e.target.value)}
+                  className="bg-transparent text-sm font-black uppercase tracking-widest text-slate-500 border-none focus:ring-0 cursor-pointer"
+                />
+              </div>
+              <div className="flex items-center gap-2 rounded-2xl bg-slate-50 dark:bg-slate-800 px-3 py-3 border border-slate-100 dark:border-slate-700">
+                <input
+                  type="month"
+                  value={exportMonth}
+                  onChange={(e) => setExportMonth(e.target.value)}
+                  className="bg-transparent text-xs font-black uppercase tracking-widest text-slate-500 border-none focus:ring-0 cursor-pointer"
+                  title="Select export month"
+                />
+                <button
+                  onClick={() => {
+                    if (selectedClassId) {
+                      void exportMonthlyAttendancePdf(
+                        'class',
+                        selectedClassId,
+                        exportMonth,
+                        activeStudents.map(student => ({ id: String(student.id), name: student.name })),
+                        selectedClass?.class_code || selectedClass?.name
+                      );
+                    } else if (selectedAttendanceSubject) {
+                      const subjectName = subjects.find(s => s.id === selectedAttendanceSubject)?.name || selectedAttendanceSubject;
+                      void exportMonthlyAttendancePdf(
+                        'subject',
+                        selectedAttendanceSubject,
+                        exportMonth,
+                        activeStudents.map(student => ({ id: String(student.id), name: student.name })),
+                        subjectName
+                      );
+                    } else {
+                      notify('Please select a class or subject before exporting.');
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest"
+                  title="Export selected month as PDF"
+                >
+                  PDF
+                </button>
               </div>
             </div>
           </div>
@@ -357,7 +462,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
           <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[64px] p-3 sm:p-6 shadow-premium border border-slate-100 dark:border-slate-800 overflow-hidden">
             <div className="divide-y divide-slate-50 dark:divide-slate-800">
               {activeStudents.map(s => {
-                const currentStatus = (subjectAttendanceStore[activeAttendanceId]?.[attendanceDate] || {})[s.id];
+                const currentStatus = (attendanceStoreKey ? subjectAttendanceStore[attendanceStoreKey]?.[attendanceDate] : undefined)?.[s.id];
                 return (
                   <div key={s.id} className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-slate-50 dark:hover:bg-white/5 transition-all group first:rounded-t-[48px] last:rounded-b-[48px]">
                     <div className="flex items-center gap-8">
@@ -365,8 +470,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                         {s.name.charAt(0)}
                       </div>
                       <div>
-                        <p className="text-lg font-black tracking-tight">{s.name}</p>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-widest">{s.id}</p>
+                        <p className="text-lg font-black tracking-tight">{s.name} <span className="text-xs text-slate-400">({s.id})</span></p>
                       </div>
                       {selectedClassId && (
                         <button
@@ -384,7 +488,13 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                       {['P', 'A', 'L'].map((btn) => (
                         <button 
                           key={btn} 
-                          onClick={() => updateSubjectAttendance(activeAttendanceId, attendanceDate, s.id, btn as any)} 
+                          onClick={() => {
+                            if (selectedClassId) {
+                              void updateSubjectAttendance('class', selectedClassId, attendanceDate, String(s.id), btn as 'P' | 'A' | 'L');
+                            } else if (selectedAttendanceSubject) {
+                              void updateSubjectAttendance('subject', selectedAttendanceSubject, attendanceDate, String(s.id), btn as 'P' | 'A' | 'L');
+                            }
+                          }} 
                           className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-[14px] sm:rounded-[20px] text-[10px] font-black uppercase tracking-widest transition-all ${currentStatus === btn ? `bg-brand-500 text-white shadow-lg` : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
                         >
                           {btn === 'P' ? 'Present' : btn === 'A' ? 'Absent' : 'Late'}
