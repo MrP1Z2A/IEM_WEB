@@ -401,7 +401,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               </button>
               <div className="min-w-0">
                 <h4 className="text-xl sm:text-2xl font-black tracking-tight break-words">
-                  Marking: {selectedClassId ? `${selectedClass?.name} (${selectedClass?.class_code || 'class1'})` : subjects.find(s => s.id === selectedAttendanceSubject)?.name}
+                  Class: {selectedClassId ? `${selectedClass?.name} (${selectedClass?.class_code || 'class1'})` : subjects.find(s => s.id === selectedAttendanceSubject)?.name}
                 </h4>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                   {selectedClassId ? 'Class Attendance View' : `Course Terminal: ${subjects.find(s => s.id === selectedAttendanceSubject)?.code}`}
