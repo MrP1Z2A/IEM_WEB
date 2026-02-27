@@ -698,6 +698,24 @@ const App: React.FC = () => {
   };
 
   const openEditModal = (type: string, data: any) => {
+    if (type === 'student') {
+      setEditTarget({
+        type,
+        data: {
+          ...data,
+          date_of_birth: data?.date_of_birth ?? '',
+          parent_name: data?.parent_name ?? '',
+          parent_number: data?.parent_number ?? '',
+          parent_email: data?.parent_email ?? '',
+          secondary_parent_name: data?.secondary_parent_name ?? '',
+          secondary_parent_number: data?.secondary_parent_number ?? '',
+          secondary_parent_email: data?.secondary_parent_email ?? '',
+        },
+      });
+      setIsEditModalOpen(true);
+      return;
+    }
+
     setEditTarget({ type, data: { ...data } });
     setIsEditModalOpen(true);
   };
@@ -739,6 +757,41 @@ const App: React.FC = () => {
     notify(`${type.charAt(0).toUpperCase() + type.slice(1)} synchronized.`);
     setIsEditModalOpen(false);
     setEditTarget(null);
+  };
+
+  const updateStudentProfilePhoto = async (studentId: string, file: File): Promise<Student> => {
+    const profileImageUrl = await uploadStudentProfileImage(file);
+
+    const { error } = await supabase
+      .from('students')
+      .update({ avatar: profileImageUrl })
+      .eq('id', studentId);
+
+    if (error) {
+      throw error;
+    }
+
+    let updatedStudent: Student | null = null;
+
+    setStudents(prev => prev.map(student => {
+      if (String(student.id) !== String(studentId)) return student;
+      const next = { ...student, avatar: profileImageUrl };
+      updatedStudent = next;
+      return next;
+    }));
+
+    setAllStudents(prev => prev.map((student: any) => {
+      if (String(student.id) !== String(studentId)) return student;
+      return { ...student, avatar: profileImageUrl };
+    }));
+
+    notify('Profile photo updated successfully.');
+
+    if (updatedStudent) {
+      return updatedStudent;
+    }
+
+    throw new Error('Student not found after photo update.');
   };
 
   const deleteEntity = async (id: string, type: string) => {
@@ -1467,7 +1520,7 @@ const App: React.FC = () => {
       )}
 
       {studentEditAuthDialog && (
-        <div className="fixed inset-0 z-[135] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[240] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
             <h3 className="text-xl font-black tracking-tight">Admin Verification Required</h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">Enter admin password to edit student: <span className="font-black">{studentEditAuthDialog.name}</span></p>
@@ -1634,6 +1687,7 @@ const App: React.FC = () => {
               openEditModal={openEditModal}
               requestStudentEditWithPassword={requestStudentEditWithPassword}
               verifyAdminPassword={verifyAdminPassword}
+              updateStudentProfilePhoto={updateStudentProfilePhoto}
               deleteEntity={deleteEntity}
             />
           )}

@@ -48,6 +48,10 @@ const EditModal: React.FC<EditModalProps> = ({
               key === 'icon' ||
               key === 'color' ||
               key === 'bg' ||
+              key === 'avatar' ||
+              key === 'avatar_url' ||
+              key === 'profile_image_url' ||
+              key === 'image_url' ||
               key === 'created_at' ||
               key === 'auth_user_id' ||
               key === 'temp_password' ||

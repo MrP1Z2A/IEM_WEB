@@ -17,6 +17,7 @@ interface StudentDirectoryProps {
   openEditModal: (type: string, data: any) => void;
   requestStudentEditWithPassword: (student: Student) => void;
   verifyAdminPassword: (password: string) => Promise<boolean>;
+  updateStudentProfilePhoto: (studentId: string, file: File) => Promise<Student>;
   deleteEntity: (id: string, type: string) => void;
 }
 
@@ -28,15 +29,26 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
   openEditModal,
   requestStudentEditWithPassword,
   verifyAdminPassword,
+  updateStudentProfilePhoto,
   deleteEntity
 }) => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedStudent, setSelectedStudent] = React.useState<Student | null>(null);
+  const [pendingInfoStudent, setPendingInfoStudent] = React.useState<Student | null>(null);
+  const [infoAuthDialogOpen, setInfoAuthDialogOpen] = React.useState(false);
+  const [infoAuthInput, setInfoAuthInput] = React.useState('');
+  const [infoAuthError, setInfoAuthError] = React.useState<string | null>(null);
+  const [isInfoAuthSubmitting, setIsInfoAuthSubmitting] = React.useState(false);
   const [isTempPasswordVisible, setIsTempPasswordVisible] = React.useState(false);
   const [tempPasswordAuthDialogOpen, setTempPasswordAuthDialogOpen] = React.useState(false);
   const [tempPasswordAuthInput, setTempPasswordAuthInput] = React.useState('');
   const [tempPasswordAuthError, setTempPasswordAuthError] = React.useState<string | null>(null);
   const [isTempPasswordAuthSubmitting, setIsTempPasswordAuthSubmitting] = React.useState(false);
+  const [isPhotoUploading, setIsPhotoUploading] = React.useState(false);
+  const [photoUploadError, setPhotoUploadError] = React.useState<string | null>(null);
+  const profilePhotoInputRef = React.useRef<HTMLInputElement | null>(null);
+  const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
+  const ALLOWED_PROFILE_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
   const hiddenStudentInfoKeys = new Set([
     'temp_password',
@@ -98,7 +110,92 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     setTempPasswordAuthInput('');
     setTempPasswordAuthError(null);
     setIsTempPasswordAuthSubmitting(false);
+    setIsPhotoUploading(false);
+    setPhotoUploadError(null);
   }, [selectedStudent?.id]);
+
+  React.useEffect(() => {
+    if (!selectedStudent) return;
+    const latest = students.find(student => String(student.id) === String(selectedStudent.id));
+    if (!latest) return;
+    setSelectedStudent(prev => {
+      if (!prev) return prev;
+      if (prev === latest) return prev;
+      return { ...latest };
+    });
+  }, [students, selectedStudent?.id]);
+
+  const requestOpenStudentInfo = (student: Student) => {
+    setPendingInfoStudent(student);
+    setInfoAuthDialogOpen(true);
+    setInfoAuthInput('');
+    setInfoAuthError(null);
+    setIsInfoAuthSubmitting(false);
+  };
+
+  const confirmOpenStudentInfo = async () => {
+    if (!pendingInfoStudent) return;
+    if (!infoAuthInput.trim()) {
+      setInfoAuthError('Admin password is required.');
+      return;
+    }
+
+    setIsInfoAuthSubmitting(true);
+    setInfoAuthError(null);
+
+    try {
+      const ok = await verifyAdminPassword(infoAuthInput);
+      if (!ok) {
+        setInfoAuthError('Invalid admin password.');
+        return;
+      }
+
+      setSelectedStudent(pendingInfoStudent);
+      setInfoAuthDialogOpen(false);
+      setInfoAuthInput('');
+      setInfoAuthError(null);
+    } finally {
+      setIsInfoAuthSubmitting(false);
+    }
+  };
+
+  const handleChangeProfilePhoto = () => {
+    if (isPhotoUploading) return;
+    profilePhotoInputRef.current?.click();
+  };
+
+  const handleProfilePhotoSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedStudent) {
+      return;
+    }
+
+    if (!ALLOWED_PROFILE_PHOTO_TYPES.has(file.type)) {
+      setPhotoUploadError('Only JPG, PNG, or WEBP images are allowed.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+      setPhotoUploadError('Image size must be 5MB or less.');
+      event.target.value = '';
+      return;
+    }
+
+    setIsPhotoUploading(true);
+    setPhotoUploadError(null);
+
+    try {
+      const updatedStudent = await updateStudentProfilePhoto(selectedStudent.id, file);
+      setSelectedStudent(updatedStudent);
+    } catch (error: any) {
+      console.error('Profile photo update failed:', error);
+      setPhotoUploadError(error?.message || 'Failed to upload profile photo.');
+    } finally {
+      setIsPhotoUploading(false);
+      event.target.value = '';
+    }
+  };
 
   const unlockTempPassword = async () => {
     if (!tempPasswordAuthInput.trim()) {
@@ -123,6 +220,11 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     } finally {
       setIsTempPasswordAuthSubmitting(false);
     }
+  };
+
+  const handleRequestStudentEdit = (student: Student) => {
+    setSelectedStudent(null);
+    requestStudentEditWithPassword(student);
   };
 
   return (
@@ -208,7 +310,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setSelectedStudent(s)}
+                          onClick={() => requestOpenStudentInfo(s)}
                           className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-brand-500 flex items-center justify-center flex-shrink-0"
                           title="View student info"
                         >
@@ -261,11 +363,22 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedStudent.email}</p>
                 <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">ID: {selectedStudent.id}</p>
                 <button
-                  onClick={() => requestStudentEditWithPassword(selectedStudent)}
+                  onClick={handleChangeProfilePhoto}
+                  disabled={isPhotoUploading}
                   className="mt-3 px-3 py-1.5 rounded-lg bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest"
                 >
-                  Change Profile Photo
+                  {isPhotoUploading ? 'Uploading...' : 'Change Profile Photo'}
                 </button>
+                <input
+                  ref={profilePhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePhotoSelected}
+                  className="hidden"
+                />
+                {photoUploadError && (
+                  <p className="mt-2 text-xs font-bold text-rose-500">{photoUploadError}</p>
+                )}
               </div>
             </div>
 
@@ -301,7 +414,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => requestStudentEditWithPassword(selectedStudent)}
+                onClick={() => handleRequestStudentEdit(selectedStudent)}
                 className="px-4 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs uppercase tracking-widest"
               >
                 Edit (Admin Password)
@@ -353,6 +466,49 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                 className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isTempPasswordAuthSubmitting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
               >
                 {isTempPasswordAuthSubmitting ? 'Verifying...' : 'Unlock'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {infoAuthDialogOpen && (
+        <div className="fixed inset-0 z-[226] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-lg font-black tracking-tight">Admin Verification</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Enter admin password to view student information.</p>
+
+            <input
+              type="password"
+              value={infoAuthInput}
+              onChange={(e) => setInfoAuthInput(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+              placeholder="Admin password"
+            />
+
+            {infoAuthError && (
+              <p className="text-xs font-bold text-rose-500">{infoAuthError}</p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  if (isInfoAuthSubmitting) return;
+                  setInfoAuthDialogOpen(false);
+                  setPendingInfoStudent(null);
+                  setInfoAuthInput('');
+                  setInfoAuthError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmOpenStudentInfo}
+                disabled={isInfoAuthSubmitting}
+                className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isInfoAuthSubmitting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
+              >
+                {isInfoAuthSubmitting ? 'Verifying...' : 'Open'}
               </button>
             </div>
           </div>
