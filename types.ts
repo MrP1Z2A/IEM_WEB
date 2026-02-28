@@ -66,6 +66,7 @@ export type PageId =
   | 'students' 
   | 'student-import'
   | 'student-register'
+  | 'live-calendar'
   | 'student-assign'
   | 'student-attendance'
   | 'class-attendance'

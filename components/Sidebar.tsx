@@ -61,6 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
       <nav className="flex-1 overflow-y-auto no-scrollbar pb-10">
         <SidebarMenuItem id="dashboard" icon="fa-house" label="Dashboard" activePage={currentPage} />
+        <SidebarMenuItem id="live-calendar" icon="fa-calendar-days" label="Live Calendar" activePage={currentPage} />
         <SidebarMenuItem icon="fa-user-group" label="Students" activePage={currentPage} hasDropdown>
            <SidebarSubItem id="students" label="Directory" activePage={currentPage} />
            <SidebarSubItem id="student-attendance" label="Daily Attendance" activePage={currentPage} />

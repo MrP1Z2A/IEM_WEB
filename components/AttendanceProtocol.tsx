@@ -47,6 +47,7 @@ interface AttendanceProtocolProps {
   classAttendancePage?: boolean;
   courseAttendanceOnly?: boolean;
   focusClassId?: string | null;
+  focusCourse?: { id: string; name: string; classId: string; className?: string } | null;
   openClassAttendancePage?: (classId: string) => void;
   onExitClassAttendancePage?: () => void;
 }
@@ -83,6 +84,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
   classAttendancePage = false,
   courseAttendanceOnly = false,
   focusClassId = null,
+  focusCourse = null,
   openClassAttendancePage,
   onExitClassAttendancePage,
 }) => {
@@ -118,17 +120,55 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
   const [editCourseImage, setEditCourseImage] = React.useState<File | null>(null);
   const [editCourseError, setEditCourseError] = React.useState<string | null>(null);
   const [classSearchQuery, setClassSearchQuery] = React.useState('');
-  const [exportMonth, setExportMonth] = React.useState(new Date().toISOString().slice(0, 7));
+  const [exportMonth, setExportMonth] = React.useState(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  });
+  const [isCourseCalendarOpen, setIsCourseCalendarOpen] = React.useState(true);
+  const [isCourseCalendarLoading, setIsCourseCalendarLoading] = React.useState(false);
+  const [courseCalendarEvents, setCourseCalendarEvents] = React.useState<Array<{
+    id: string;
+    title: string;
+    event_date: string;
+    start_time: string;
+    end_time: string;
+    class_name: string;
+    course_name: string | null;
+    notes: string | null;
+  }>>([]);
   const classImageInputRef = React.useRef<HTMLInputElement | null>(null);
   const timetableInputRef = React.useRef<HTMLInputElement | null>(null);
   const newCourseImageInputRef = React.useRef<HTMLInputElement | null>(null);
   const editCourseImageInputRef = React.useRef<HTMLInputElement | null>(null);
+  const didInitializeDailyDateRef = React.useRef(false);
+
+  const getTodayIsoDate = React.useCallback(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const handleGlobalDateChange = React.useCallback((date: string) => {
+    setAttendanceDate(date);
+  }, [setAttendanceDate]);
 
   React.useEffect(() => {
     if (editingClassId) {
       setIsClassFormOpen(true);
     }
   }, [editingClassId]);
+
+  React.useEffect(() => {
+    if (didInitializeDailyDateRef.current) return;
+    didInitializeDailyDateRef.current = true;
+
+    const today = getTodayIsoDate();
+    handleGlobalDateChange(today);
+  }, [getTodayIsoDate, handleGlobalDateChange]);
 
   React.useEffect(() => {
     if (classAttendancePage) {
@@ -173,6 +213,56 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
       setExportMonth(attendanceDate.slice(0, 7));
     }
   }, [attendanceDate]);
+
+  React.useEffect(() => {
+    const loadCourseCalendarEvents = async () => {
+      if (!courseAttendanceOnly || !focusCourse?.id || !activeClassId || !attendanceDate) {
+        setCourseCalendarEvents([]);
+        setIsCourseCalendarLoading(false);
+        return;
+      }
+
+      setIsCourseCalendarLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('live_calendar_events')
+          .select('id, title, event_date, start_time, end_time, class_id, class_name, course_id, course_name, notes')
+          .eq('class_id', activeClassId)
+          .eq('event_date', attendanceDate)
+          .order('event_date', { ascending: true })
+          .order('start_time', { ascending: true });
+
+        if (error) throw error;
+
+        const filtered = (data || [])
+          .filter((event: any) => {
+            const eventCourseId = event?.course_id ? String(event.course_id) : '';
+            const eventCourseName = event?.course_name ? String(event.course_name).toLowerCase() : '';
+            return eventCourseId === String(focusCourse.id) || eventCourseName === String(focusCourse.name || '').toLowerCase();
+          })
+          .map((event: any) => ({
+            id: String(event.id),
+            title: String(event.title || ''),
+            event_date: String(event.event_date || ''),
+            start_time: String(event.start_time || '').slice(0, 5),
+            end_time: String(event.end_time || '').slice(0, 5),
+            class_name: String(event.class_name || selectedClass?.name || ''),
+            course_name: event.course_name ? String(event.course_name) : null,
+            notes: event.notes ? String(event.notes) : null,
+          }));
+
+        setCourseCalendarEvents(filtered);
+      } catch (error: any) {
+        console.error('Failed to load course timetable events:', error);
+        notify(`Failed to load course timetable: ${error?.message || 'Unknown error'}`);
+        setCourseCalendarEvents([]);
+      } finally {
+        setIsCourseCalendarLoading(false);
+      }
+    };
+
+    void loadCourseCalendarEvents();
+  }, [courseAttendanceOnly, focusCourse?.id, focusCourse?.name, activeClassId, attendanceDate, notify, selectedClass?.name]);
 
   React.useEffect(() => {
     if (activeAttendanceId) {
@@ -736,6 +826,28 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-5 duration-700 pb-20">
+      <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800 px-4 py-3 border border-slate-100 dark:border-slate-700">
+            <i className="fas fa-calendar-day text-slate-400"></i>
+            <input
+              type="date"
+              value={attendanceDate}
+              onChange={(e) => handleGlobalDateChange(e.target.value)}
+              className="bg-transparent text-sm font-black uppercase tracking-widest text-slate-500 border-none focus:ring-0 cursor-pointer"
+              title="Search day, month, and year"
+            />
+          </div>
+          <button
+            onClick={() => handleGlobalDateChange(getTodayIsoDate())}
+            className="px-4 py-2 rounded-xl bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest"
+            title="Reset to today's date"
+          >
+            Today
+          </button>
+        </div>
+      </div>
+
       {!courseAttendanceOnly && (
         <>
           {/* Header with Date Picker and Actions */}
@@ -760,7 +872,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                   <input 
                     type="date" 
                     value={attendanceDate} 
-                    onChange={(e) => setAttendanceDate(e.target.value)} 
+                    onChange={(e) => handleGlobalDateChange(e.target.value)} 
                     className="bg-transparent text-sm font-black uppercase tracking-widest text-slate-500 border-none focus:ring-0 cursor-pointer" 
                   />
                   <div className="h-4 w-px bg-slate-200 dark:bg-slate-800"></div>
@@ -1148,6 +1260,63 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                   })}
                 </div>
               </div>
+              )}
+
+              {courseAttendanceOnly && focusCourse && (
+                <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
+                  <button
+                    onClick={() => setIsCourseCalendarOpen(prev => !prev)}
+                    title={isCourseCalendarOpen ? 'Click to collapse course timetable calendar' : 'Click to expand course timetable calendar'}
+                    className="inline-flex items-center gap-3 px-3 py-2 rounded-xl border border-brand-200 dark:border-brand-800 bg-white dark:bg-slate-900 text-xs sm:text-sm font-black uppercase tracking-[0.18em] text-slate-700 hover:text-brand-500 dark:text-slate-200 dark:hover:text-brand-300 cursor-pointer"
+                  >
+                    <span className={`w-8 h-8 rounded-full flex items-center justify-center border ${isCourseCalendarOpen ? 'bg-brand-500 border-brand-400 text-white shadow-lg shadow-brand-500/40' : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-200'}`}>
+                      <i className={`fas ${isCourseCalendarOpen ? 'fa-chevron-down' : 'fa-chevron-right'} text-sm`}></i>
+                    </span>
+                    <span className={`${isCourseCalendarOpen ? 'text-brand-500 dark:text-brand-400' : ''}`}>Course Timetable Calendar</span>
+                    <span className="text-[10px] sm:text-xs font-bold tracking-normal normal-case text-brand-600 dark:text-brand-300">
+                      {focusCourse.name}
+                    </span>
+                  </button>
+
+                  {isCourseCalendarOpen && (
+                    <div className="mt-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Live Calendar Timetable</p>
+                        <span className="bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-widest text-slate-500">
+                          {attendanceDate}
+                        </span>
+                      </div>
+
+                      {isCourseCalendarLoading && (
+                        <p className="text-xs font-semibold text-slate-500">Loading timetable entries...</p>
+                      )}
+
+                      {!isCourseCalendarLoading && courseCalendarEvents.length === 0 && (
+                        <p className="text-xs font-semibold text-slate-500">No timetable entries found for this course on this date.</p>
+                      )}
+
+                      {!isCourseCalendarLoading && courseCalendarEvents.length > 0 && (
+                        <div className="space-y-3">
+                          {courseCalendarEvents.map((event, index) => (
+                            <div
+                              key={event.id}
+                              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3"
+                            >
+                              <p className="text-xs font-black text-brand-500 uppercase tracking-widest">Period {index + 1}</p>
+                              <p className="text-sm font-black text-slate-700 dark:text-slate-200 mt-1">{event.title}</p>
+                              <p className="text-[11px] font-semibold text-slate-500 mt-1">
+                                {event.start_time} - {event.end_time}
+                              </p>
+                              {event.notes && (
+                                <p className="text-[11px] text-slate-500 mt-1">{event.notes}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </>
           )}

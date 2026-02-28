@@ -12,6 +12,7 @@ import Dashboard from './components/Dashboard';
 import StudentDirectory from './components/StudentDirectory';
 import RegistrationHub from './components/RegistrationHub';
 import AttendanceProtocol from './components/AttendanceProtocol';
+import LiveCalendar from './components/LiveCalendar';
 import EnrollmentModal from './components/Modals/EnrollmentModal';
 import EditModal from './components/Modals/EditModal';
 import PermissionsModal from './components/Modals/PermissionsModal';
@@ -44,6 +45,13 @@ type AttendanceContextType = 'class' | 'subject';
 const normalizeClassCodeBase = (name: string) => {
   const sanitized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
   return sanitized || 'class';
+};
+
+const getLocalIsoDate = (date: Date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 const getInitialEnrollData = (type: 'New' | 'Old' = 'New') => ({
@@ -100,7 +108,7 @@ const App: React.FC = () => {
 
   // Attendance State (Subject-specific)
   const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceDate, setAttendanceDate] = useState(getLocalIsoDate());
   // Mapping: subjectId -> date -> studentId -> status
   const [subjectAttendanceStore, setSubjectAttendanceStore] = useState<Record<string, Record<string, Record<string, 'P' | 'A' | 'L'>>>>({});
   const [isAttendanceContextNameSupported, setIsAttendanceContextNameSupported] = useState(true);
@@ -1737,6 +1745,13 @@ const App: React.FC = () => {
           {/* DASHBOARD */}
           {currentPage === 'dashboard' && <Dashboard stats={stats} />}
 
+          {currentPage === 'live-calendar' && (
+            <LiveCalendar
+              classes={classes}
+              notify={notify}
+            />
+          )}
+
           {/* STUDENTS PAGE (DIRECTORY) - FULL CRUD CONTROLS */}
           {currentPage === 'students' && (
             <StudentDirectory 
@@ -1902,6 +1917,7 @@ const App: React.FC = () => {
                 classAttendancePage
                 courseAttendanceOnly
                 focusClassId={selectedClassCourse.classId}
+                focusCourse={selectedClassCourse}
                 onExitClassAttendancePage={() => {
                   setCurrentPage('class-attendance');
                   setSelectedClassAttendanceId(selectedClassCourse.classId);
@@ -2042,7 +2058,7 @@ const App: React.FC = () => {
           )}
 
           {/* FALLBACK HUB */}
-          {![ 'dashboard', 'students', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teachers', 'library', 'homework', 'programs', 'exam', 'security', 'subject' ].includes(currentPage) && (
+          {![ 'dashboard', 'live-calendar', 'students', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teachers', 'library', 'homework', 'programs', 'exam', 'security', 'subject' ].includes(currentPage) && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>
