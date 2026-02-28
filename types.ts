@@ -68,6 +68,8 @@ export type PageId =
   | 'student-register'
   | 'student-assign'
   | 'student-attendance'
+  | 'class-attendance'
+  | 'class-course'
   | 'teachers' 
   | 'library' 
   | 'account' 

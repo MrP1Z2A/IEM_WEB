@@ -11,6 +11,7 @@ import { supabase } from '../supabaseClient';
 
 interface StudentDirectoryProps {
   students: Student[];
+  classes: any[];
   selectedDate: string;
   setSelectedDate: (date: string) => void;
   openPermissions: (student: Student) => void;
@@ -23,6 +24,7 @@ interface StudentDirectoryProps {
 
 const StudentDirectory: React.FC<StudentDirectoryProps> = ({
   students,
+  classes,
   selectedDate,
   setSelectedDate,
   openPermissions,
@@ -75,6 +77,14 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
       student.email.toLowerCase().includes(q)
     );
   });
+
+  const getStudentClassName = (studentId: string) => {
+    const matchedClass = classes.find(classItem =>
+      (classItem?.student_ids || []).map((id: any) => String(id)).includes(String(studentId))
+    );
+
+    return matchedClass?.name ? String(matchedClass.name) : 'No Class';
+  };
 
   const renderDetailValue = (value: unknown) => {
     if (value === null || value === undefined || value === '') {
@@ -304,8 +314,13 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="text-lg font-black tracking-tight truncate">{s.name}</p>
-                          <p className="text-[10px] text-slate-400 uppercase mt-1 truncate">{s.email} • {s.grade}</p>
+                          <p className="text-lg font-black tracking-tight truncate">
+                            {s.name}
+                            <span className="text-xs text-slate-400 font-bold ml-2">• {getStudentClassName(String(s.id))}</span>
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-1 truncate">
+                            <span className="lowercase">{String(s.email || '').toLowerCase()}</span>
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

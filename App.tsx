@@ -46,8 +46,27 @@ const normalizeClassCodeBase = (name: string) => {
   return sanitized || 'class';
 };
 
+const getInitialEnrollData = (type: 'New' | 'Old' = 'New') => ({
+  name: '',
+  email: '',
+  type,
+  selectedStudentId: '',
+  selectedClassId: '',
+  selectedClassCourseId: '',
+  grade: '10th Grade',
+  dateOfBirth: '',
+  parentName: '',
+  parentNumber: '',
+  parentEmail: '',
+  secondaryParentName: '',
+  secondaryParentNumber: '',
+  secondaryParentEmail: '',
+});
+
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
+  const [selectedClassAttendanceId, setSelectedClassAttendanceId] = useState<string | null>(null);
+  const [selectedClassCourse, setSelectedClassCourse] = useState<{ id: string; name: string; classId: string; className?: string } | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notification, setNotification] = useState<{message: string, type: 'success' | 'info'} | null>(null);
@@ -73,7 +92,6 @@ const App: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState('');
   const [classes, setClasses] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
-  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [className, setClassName] = useState('');
   const [classImage, setClassImage] = useState<File | null>(null);
   const [classOuterColor, setClassOuterColor] = useState('#f8fafc');
@@ -90,20 +108,9 @@ const App: React.FC = () => {
   // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
-  const [enrollData, setEnrollData] = useState({
-    name: '',
-    email: '',
-    type: 'New' as 'New' | 'Old',
-    selectedStudentId: '',
-    grade: '10th Grade',
-    dateOfBirth: '',
-    parentName: '',
-    parentNumber: '',
-    parentEmail: '',
-    secondaryParentName: '',
-    secondaryParentNumber: '',
-    secondaryParentEmail: '',
-  });
+  const [enrollData, setEnrollData] = useState(getInitialEnrollData());
+  const [enrollClassCourses, setEnrollClassCourses] = useState<Array<{ id: string; name: string; class_id: string }>>([]);
+  const [isEnrollClassCoursesLoading, setIsEnrollClassCoursesLoading] = useState(false);
   const [studentProfileImage, setStudentProfileImage] = useState<File | null>(null);
   const enrollAbortCounterRef = useRef(0);
   const [editTarget, setEditTarget] = useState<{ type: string, data: any } | null>(null);
@@ -305,23 +312,9 @@ const App: React.FC = () => {
 
       if (classError) throw classError;
 
-      const payload = selectedStudents.map(studentId => ({
-        class_id: classData.id,
-        student_id: studentId
-      }));
-
-      if (payload.length > 0) {
-        const { error: relationError } = await supabase
-          .from('class_students')
-          .insert(payload);
-
-        if (relationError) throw relationError;
-      }
-
-      setClasses(prev => [{ ...classData, class_code: classData.class_code || (isClassCodeSupported ? nextClassCode : null), color: classOuterColor, outer_color: classOuterColor, student_ids: selectedStudents, student_count: payload.length }, ...prev]);
+      setClasses(prev => [{ ...classData, class_code: classData.class_code || (isClassCodeSupported ? nextClassCode : null), color: classOuterColor, outer_color: classOuterColor, student_ids: [], student_count: 0 }, ...prev]);
       notify('Class created successfully!');
       setClassName('');
-      setSelectedStudents([]);
       setClassImage(null);
       setClassOuterColor('#f8fafc');
     } catch (err: any) {
@@ -334,14 +327,12 @@ const App: React.FC = () => {
     setEditingClassId(String(classItem.id));
     setClassName(classItem.name || '');
     setClassOuterColor(classItem.color || classItem.outer_color || '#f8fafc');
-    setSelectedStudents((classItem.student_ids || []).map((id: any) => String(id)));
     setClassImage(null);
   };
 
   const cancelEditClass = () => {
     setEditingClassId(null);
     setClassName('');
-    setSelectedStudents([]);
     setClassImage(null);
     setClassOuterColor('#f8fafc');
   };
@@ -356,11 +347,6 @@ const App: React.FC = () => {
     try {
       const targetClass = classes.find(classItem => String(classItem.id) === editingClassId);
       let imageUrl = targetClass?.image_url || '';
-      const currentStudentIds = (targetClass?.student_ids || []).map((id: any) => String(id));
-      const nextStudentIds = selectedStudents.map(id => String(id));
-
-      const studentsToAdd = nextStudentIds.filter(id => !currentStudentIds.includes(id));
-      const studentsToRemove = currentStudentIds.filter(id => !nextStudentIds.includes(id));
       const classCode = buildNextClassCode(className, editingClassId);
 
       if (classImage) {
@@ -392,29 +378,6 @@ const App: React.FC = () => {
 
       if (error) throw error;
 
-      if (studentsToRemove.length > 0) {
-        const { error: removeRelationsError } = await supabase
-          .from('class_students')
-          .delete()
-          .eq('class_id', editingClassId)
-          .in('student_id', studentsToRemove);
-
-        if (removeRelationsError) throw removeRelationsError;
-      }
-
-      if (studentsToAdd.length > 0) {
-        const addPayload = studentsToAdd.map(studentId => ({
-          class_id: editingClassId,
-          student_id: studentId,
-        }));
-
-        const { error: addRelationsError } = await supabase
-          .from('class_students')
-          .insert(addPayload);
-
-        if (addRelationsError) throw addRelationsError;
-      }
-
       setClasses(prev => prev.map(classItem => {
         if (String(classItem.id) !== editingClassId) return classItem;
         return {
@@ -424,8 +387,8 @@ const App: React.FC = () => {
           image_url: imageUrl,
           color: classOuterColor,
           outer_color: classOuterColor,
-          student_ids: nextStudentIds,
-          student_count: nextStudentIds.length,
+          student_ids: classItem.student_ids || [],
+          student_count: classItem.student_count ?? (classItem.student_ids || []).length,
         };
       }));
 
@@ -656,13 +619,13 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (currentPage === 'student-attendance' && attendanceDate) {
+    if ((currentPage === 'student-attendance' || currentPage === 'class-attendance') && attendanceDate) {
       fetchAttendanceStudentsByDate(attendanceDate);
     }
   }, [attendanceDate, currentPage]);
 
   useEffect(() => {
-    if (currentPage !== 'student-attendance') {
+    if (currentPage !== 'student-attendance' && currentPage !== 'class-attendance') {
       setAttendanceStudents(students);
     }
   }, [students, currentPage]);
@@ -957,13 +920,36 @@ const App: React.FC = () => {
         return;
       }
 
-      const { error: classDeleteErrorResult } = await supabase
+      const { data: deletedClassRows, error: classDeleteErrorResult } = await supabase
         .from('classes')
         .delete()
-        .eq('id', classDeleteDialog.id);
+        .eq('id', classDeleteDialog.id)
+        .select('id');
       if (classDeleteErrorResult) {
         console.error('Delete class error:', classDeleteErrorResult);
         setClassDeleteError('Failed to delete class.');
+        return;
+      }
+
+      if (!deletedClassRows || deletedClassRows.length === 0) {
+        setClassDeleteError('Supabase did not delete the class row. Check table permissions (RLS) for delete on classes.');
+        return;
+      }
+
+      const { data: verifyRows, error: verifyError } = await supabase
+        .from('classes')
+        .select('id')
+        .eq('id', classDeleteDialog.id)
+        .limit(1);
+
+      if (verifyError) {
+        console.error('Class delete verify error:', verifyError);
+        setClassDeleteError('Class delete verification failed.');
+        return;
+      }
+
+      if (verifyRows && verifyRows.length > 0) {
+        setClassDeleteError('Class still exists in database after delete attempt.');
         return;
       }
 
@@ -980,20 +966,9 @@ const App: React.FC = () => {
   };
 
   const enrollStudentAction = (type: 'New' | 'Old') => {
-    setEnrollData({
-      name: '',
-      email: '',
-      type,
-      selectedStudentId: '',
-      grade: '10th Grade',
-      dateOfBirth: '',
-      parentName: '',
-      parentNumber: '',
-      parentEmail: '',
-      secondaryParentName: '',
-      secondaryParentNumber: '',
-      secondaryParentEmail: '',
-    });
+    setEnrollData(getInitialEnrollData(type));
+    setEnrollClassCourses([]);
+    setIsEnrollClassCoursesLoading(false);
     setStudentProfileImage(null);
     setIsEnrollModalOpen(true);
   };
@@ -1001,22 +976,49 @@ const App: React.FC = () => {
   const abortEnrollFlow = () => {
     enrollAbortCounterRef.current += 1;
     setIsEnrollModalOpen(false);
-    setEnrollData({
-      name: '',
-      email: '',
-      type: 'New',
-      selectedStudentId: '',
-      grade: '10th Grade',
-      dateOfBirth: '',
-      parentName: '',
-      parentNumber: '',
-      parentEmail: '',
-      secondaryParentName: '',
-      secondaryParentNumber: '',
-      secondaryParentEmail: '',
-    });
+    setEnrollData(getInitialEnrollData());
+    setEnrollClassCourses([]);
+    setIsEnrollClassCoursesLoading(false);
     setStudentProfileImage(null);
   };
+
+  useEffect(() => {
+    const loadEnrollClassCourses = async () => {
+      if (!isEnrollModalOpen || enrollData.type !== 'New') {
+        setEnrollClassCourses([]);
+        setIsEnrollClassCoursesLoading(false);
+        return;
+      }
+
+      if (!enrollData.selectedClassId) {
+        setEnrollClassCourses([]);
+        setIsEnrollClassCoursesLoading(false);
+        return;
+      }
+
+      setIsEnrollClassCoursesLoading(true);
+      const { data, error } = await supabase
+        .from('class_courses')
+        .select('id, name, class_id')
+        .eq('class_id', enrollData.selectedClassId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Failed to load enrollment class courses:', error);
+        setEnrollClassCourses([]);
+      } else {
+        setEnrollClassCourses((data || []).map((course: any) => ({
+          id: String(course.id),
+          name: String(course.name || ''),
+          class_id: String(course.class_id),
+        })));
+      }
+
+      setIsEnrollClassCoursesLoading(false);
+    };
+
+    void loadEnrollClassCourses();
+  }, [isEnrollModalOpen, enrollData.type, enrollData.selectedClassId]);
 
   const handleEnrollSubmit = async () => {
     const enrollToken = enrollAbortCounterRef.current;
@@ -1063,6 +1065,16 @@ const App: React.FC = () => {
 
       if (!enrollData.dateOfBirth || !enrollData.parentName || !enrollData.parentNumber || !enrollData.parentEmail) {
         notify('Please provide DOB and primary parent details.');
+        return;
+      }
+
+      if (!enrollData.selectedClassId) {
+        notify('Please choose a class for the student.');
+        return;
+      }
+
+      if (!enrollData.selectedClassCourseId) {
+        notify('Please choose a class course for the student.');
         return;
       }
 
@@ -1150,7 +1162,52 @@ const App: React.FC = () => {
 
       const createdStudent = mapStudentFromDB(createdStudentRecord || newStudent);
 
-      notify(`New Student Node Created & Synced.`);
+      const assignmentIssues: string[] = [];
+
+      {
+        const classAssignResult = await supabase
+          .from('class_students')
+          .insert([{ class_id: enrollData.selectedClassId, student_id: createdStudent.id }]);
+
+        if (classAssignResult.error && !/duplicate key|already exists/i.test(classAssignResult.error.message || '')) {
+          assignmentIssues.push(`class assignment failed (${classAssignResult.error.message})`);
+        } else {
+          setClasses(prev => prev.map(classItem => {
+            if (String(classItem.id) !== enrollData.selectedClassId) return classItem;
+            const existingIds = (classItem.student_ids || []).map((id: any) => String(id));
+            if (existingIds.includes(String(createdStudent.id))) {
+              return classItem;
+            }
+            return {
+              ...classItem,
+              student_ids: [...existingIds, String(createdStudent.id)],
+              student_count: (classItem.student_count ?? existingIds.length) + 1,
+            };
+          }));
+        }
+      }
+
+      {
+        const primaryCourseAssign = await supabase
+          .from('class_course_students')
+          .insert([{ class_id: enrollData.selectedClassId, class_course_id: enrollData.selectedClassCourseId, student_id: createdStudent.id }]);
+
+        if (primaryCourseAssign.error && /relation|does not exist|column/i.test(primaryCourseAssign.error.message || '')) {
+          const fallbackCourseAssign = await supabase
+            .from('student_courses')
+            .insert([{ course_id: enrollData.selectedClassCourseId, student_id: createdStudent.id }]);
+
+          if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
+            assignmentIssues.push(`course assignment failed (${fallbackCourseAssign.error.message})`);
+          }
+        } else if (primaryCourseAssign.error && !/duplicate key|already exists/i.test(primaryCourseAssign.error.message || '')) {
+          assignmentIssues.push(`course assignment failed (${primaryCourseAssign.error.message})`);
+        }
+      }
+
+      notify(assignmentIssues.length > 0
+        ? `New Student Node Created, but ${assignmentIssues.join(' and ')}.`
+        : 'New Student Node Created & Synced.');
       setNewStudentCredentials({ name: createdStudent.name, email: createdStudent.email, password: generatedPassword });
 
       setStudents(prev => [createdStudent, ...prev]);
@@ -1632,6 +1689,9 @@ const App: React.FC = () => {
         studentProfileImage={studentProfileImage}
         setStudentProfileImage={setStudentProfileImage}
         students={students}
+        classes={classes}
+        classCourses={enrollClassCourses}
+        isClassCoursesLoading={isEnrollClassCoursesLoading}
         onSubmit={handleEnrollSubmit}
       />
 
@@ -1681,6 +1741,7 @@ const App: React.FC = () => {
           {currentPage === 'students' && (
             <StudentDirectory 
               students={students}
+              classes={classes}
               selectedDate={selectedDate}
               setSelectedDate={setSelectedDate}
               openPermissions={openPermissions}
@@ -1710,8 +1771,6 @@ const App: React.FC = () => {
               setAttendanceDate={setAttendanceDate}
               classes={classes}
               allStudents={allStudents}
-              selectedStudents={selectedStudents}
-              setSelectedStudents={setSelectedStudents}
               className={className}
               setClassName={setClassName}
               classImage={classImage}
@@ -1733,7 +1792,122 @@ const App: React.FC = () => {
               loadAttendanceForContext={loadAttendanceForContext}
               exportMonthlyAttendancePdf={exportMonthlyAttendancePdf}
               notify={notify}
+              openClassCoursePage={(course) => {
+                setSelectedClassAttendanceId(course.classId);
+                setSelectedClassCourse(course);
+                setCurrentPage('class-course');
+              }}
+              openClassAttendancePage={(classId) => {
+                setSelectedClassAttendanceId(classId);
+                setCurrentPage('class-attendance');
+              }}
             />
+          )}
+
+          {currentPage === 'class-attendance' && (
+            <AttendanceProtocol
+              students={attendanceStudents}
+              subjects={subjects}
+              attendanceDate={attendanceDate}
+              setAttendanceDate={setAttendanceDate}
+              classes={classes}
+              allStudents={allStudents}
+              className={className}
+              setClassName={setClassName}
+              classImage={classImage}
+              setClassImage={setClassImage}
+              classOuterColor={classOuterColor}
+              setClassOuterColor={setClassOuterColor}
+              createClassWithStudents={createClassWithStudents}
+              editingClassId={editingClassId}
+              startEditClass={startEditClass}
+              cancelEditClass={cancelEditClass}
+              saveClassEdits={saveClassEdits}
+              deleteClass={deleteClass}
+              removeStudentFromClass={removeStudentFromClass}
+              selectedAttendanceSubject={selectedAttendanceSubject}
+              setSelectedAttendanceSubject={setSelectedAttendanceSubject}
+              subjectAttendanceStore={subjectAttendanceStore}
+              updateSubjectAttendance={updateSubjectAttendance}
+              bulkMarkSubjectPresent={bulkMarkSubjectPresent}
+              loadAttendanceForContext={loadAttendanceForContext}
+              exportMonthlyAttendancePdf={exportMonthlyAttendancePdf}
+              notify={notify}
+              openClassCoursePage={(course) => {
+                setSelectedClassAttendanceId(course.classId);
+                setSelectedClassCourse(course);
+                setCurrentPage('class-course');
+              }}
+              classAttendancePage
+              focusClassId={selectedClassAttendanceId}
+              onExitClassAttendancePage={() => {
+                setCurrentPage('student-attendance');
+                setSelectedClassAttendanceId(null);
+              }}
+            />
+          )}
+
+          {currentPage === 'class-course' && selectedClassCourse && (
+            <div className="space-y-10 animate-in fade-in duration-500 pb-20">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[56px] p-6 sm:p-8 lg:p-10 border border-slate-100 dark:border-slate-800 shadow-premium">
+                <div className="flex items-center gap-4 sm:gap-6 lg:gap-8 min-w-0">
+                  <button
+                    onClick={() => setCurrentPage('class-attendance')}
+                    className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 transition-all"
+                  >
+                    <i className="fas fa-arrow-left"></i>
+                  </button>
+                  <div className="min-w-0">
+                    <h3 className="text-2xl sm:text-3xl font-black tracking-tight">Course Page: {selectedClassCourse.name}</h3>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2">
+                      Class: {selectedClassCourse.className || selectedClassCourse.classId}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <AttendanceProtocol
+                students={attendanceStudents}
+                subjects={subjects}
+                attendanceDate={attendanceDate}
+                setAttendanceDate={setAttendanceDate}
+                classes={classes}
+                allStudents={allStudents}
+                className={className}
+                setClassName={setClassName}
+                classImage={classImage}
+                setClassImage={setClassImage}
+                classOuterColor={classOuterColor}
+                setClassOuterColor={setClassOuterColor}
+                createClassWithStudents={createClassWithStudents}
+                editingClassId={editingClassId}
+                startEditClass={startEditClass}
+                cancelEditClass={cancelEditClass}
+                saveClassEdits={saveClassEdits}
+                deleteClass={deleteClass}
+                removeStudentFromClass={removeStudentFromClass}
+                selectedAttendanceSubject={selectedAttendanceSubject}
+                setSelectedAttendanceSubject={setSelectedAttendanceSubject}
+                subjectAttendanceStore={subjectAttendanceStore}
+                updateSubjectAttendance={updateSubjectAttendance}
+                bulkMarkSubjectPresent={bulkMarkSubjectPresent}
+                loadAttendanceForContext={loadAttendanceForContext}
+                exportMonthlyAttendancePdf={exportMonthlyAttendancePdf}
+                notify={notify}
+                openClassCoursePage={(course) => {
+                  setSelectedClassAttendanceId(course.classId);
+                  setSelectedClassCourse(course);
+                  setCurrentPage('class-course');
+                }}
+                classAttendancePage
+                courseAttendanceOnly
+                focusClassId={selectedClassCourse.classId}
+                onExitClassAttendancePage={() => {
+                  setCurrentPage('class-attendance');
+                  setSelectedClassAttendanceId(selectedClassCourse.classId);
+                }}
+              />
+            </div>
           )}
 
           {/* EXAM PAGE - WITH CRUD */}
@@ -1868,7 +2042,7 @@ const App: React.FC = () => {
           )}
 
           {/* FALLBACK HUB */}
-          {![ 'dashboard', 'students', 'student-attendance', 'student-register', 'teachers', 'library', 'homework', 'programs', 'exam', 'security', 'subject' ].includes(currentPage) && (
+          {![ 'dashboard', 'students', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teachers', 'library', 'homework', 'programs', 'exam', 'security', 'subject' ].includes(currentPage) && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>

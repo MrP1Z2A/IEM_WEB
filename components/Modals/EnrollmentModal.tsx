@@ -16,6 +16,8 @@ interface EnrollmentModalProps {
     email: string;
     type: 'New' | 'Old';
     selectedStudentId: string;
+    selectedClassId: string;
+    selectedClassCourseId: string;
     grade: string;
     dateOfBirth: string;
     parentName: string;
@@ -29,6 +31,9 @@ interface EnrollmentModalProps {
   studentProfileImage: File | null;
   setStudentProfileImage: (file: File | null) => void;
   students: Student[];
+  classes: any[];
+  classCourses: Array<{ id: string; name: string; class_id: string }>;
+  isClassCoursesLoading: boolean;
   onSubmit: () => void;
 }
 
@@ -40,6 +45,9 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
   studentProfileImage,
   setStudentProfileImage,
   students,
+  classes,
+  classCourses,
+  isClassCoursesLoading,
   onSubmit
 }) => {
   if (!isOpen) return null;
@@ -80,19 +88,6 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                   ))}
                 </select>
               </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Change Grade</label>
-                <select
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
-                  value={enrollData.grade}
-                  onChange={(e) => setEnrollData({ ...enrollData, grade: e.target.value })}
-                >
-                  {['6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'].map(grade => (
-                    <option key={grade} value={grade}>{grade}</option>
-                  ))}
-                </select>
-              </div>
             </>
           ) : (
             <>
@@ -119,14 +114,38 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Grade</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Class</label>
                 <select
                   className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
-                  value={enrollData.grade}
-                  onChange={(e) => setEnrollData({ ...enrollData, grade: e.target.value })}
+                  value={enrollData.selectedClassId}
+                  onChange={(e) => setEnrollData({ ...enrollData, selectedClassId: e.target.value, selectedClassCourseId: '' })}
                 >
-                  {['6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'].map(grade => (
-                    <option key={grade} value={grade}>{grade}</option>
+                  <option value="">Choose a class...</option>
+                  {classes.map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name} ({classItem.class_code || classItem.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Class Course</label>
+                <select
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all disabled:opacity-60"
+                  value={enrollData.selectedClassCourseId}
+                  onChange={(e) => setEnrollData({ ...enrollData, selectedClassCourseId: e.target.value })}
+                  disabled={!enrollData.selectedClassId || isClassCoursesLoading}
+                >
+                  <option value="">
+                    {!enrollData.selectedClassId
+                      ? 'Choose class first...'
+                      : isClassCoursesLoading
+                        ? 'Loading class courses...'
+                        : 'Choose a class course...'}
+                  </option>
+                  {classCourses.map((course) => (
+                    <option key={course.id} value={course.id}>{course.name}</option>
                   ))}
                 </select>
               </div>
@@ -218,6 +237,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                   )}
                 </div>
               </div>
+
             </>
           )}
 
