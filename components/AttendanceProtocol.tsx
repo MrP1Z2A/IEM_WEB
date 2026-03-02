@@ -1584,7 +1584,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
           {!courseAttendanceOnly && isEditCourseModalOpen && (
             <div className="fixed inset-0 z-[230] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+              <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
                 <div className="flex items-center justify-between gap-4">
                   <h3 className="text-xl font-black tracking-tight">Edit Course</h3>
                   <button

@@ -37,7 +37,7 @@ export interface Student {
   id: string;
   created_at?: string;
   name: string;
-  grade: string;
+  role: UserRole;
   gender: 'Male' | 'Female';
   status: Status;
   email: string;
@@ -66,6 +66,7 @@ export type PageId =
   | 'students' 
   | 'student-import'
   | 'student-register'
+  | 'teacher-register'
   | 'live-calendar'
   | 'student-assign'
   | 'student-attendance'

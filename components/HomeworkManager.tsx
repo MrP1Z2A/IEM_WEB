@@ -1,0 +1,767 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../supabaseClient';
+
+type AppClass = {
+  id: string;
+  name: string;
+  class_code?: string | null;
+  image_url?: string | null;
+  avatar?: string | null;
+  avatar_url?: string | null;
+  profile_image_url?: string | null;
+  color?: string | null;
+  outer_color?: string | null;
+};
+type AppCourse = {
+  id: string;
+  class_id: string;
+  name: string;
+  image_url?: string | null;
+  avatar?: string | null;
+  avatar_url?: string | null;
+  profile_image_url?: string | null;
+};
+type HomeworkItem = {
+  id: string;
+  class_id: string;
+  class_course_id: string;
+  title: string;
+  description: string;
+  attachment_url: string | null;
+  created_at?: string;
+};
+
+const ALLOWED_FILE_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
+
+export default function HomeworkManager() {
+  const [error, setError] = useState<string | null>(null);
+  const [classes, setClasses] = useState<AppClass[]>([]);
+  const [courses, setCourses] = useState<AppCourse[]>([]);
+
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState('');
+
+  const [homeworkItems, setHomeworkItems] = useState<HomeworkItem[]>([]);
+  const [openHomework, setOpenHomework] = useState<Record<string, boolean>>({});
+
+  const [isLoadingAcademic, setIsLoadingAcademic] = useState(true);
+  const [isLoadingHomework, setIsLoadingHomework] = useState(false);
+  const [isSavingHomework, setIsSavingHomework] = useState(false);
+
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [editingHomeworkId, setEditingHomeworkId] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const selectedClass = useMemo(
+    () => classes.find(item => item.id === selectedClassId) || null,
+    [classes, selectedClassId]
+  );
+
+  const classCourses = useMemo(
+    () => courses.filter(item => item.class_id === selectedClassId),
+    [courses, selectedClassId]
+  );
+
+  const selectedCourse = useMemo(
+    () => classCourses.find(item => item.id === selectedCourseId) || null,
+    [classCourses, selectedCourseId]
+  );
+
+  const resolveStorageUrl = (rawValue: unknown, buckets: string[]) => {
+    if (typeof rawValue !== 'string') return '';
+    const candidate = rawValue.trim();
+    if (!candidate) return '';
+    if (/^(https?:|data:|blob:)/i.test(candidate)) {
+      return candidate;
+    }
+
+    const cleanedPath = candidate.replace(/^\/+/, '');
+    for (const bucket of buckets) {
+      const { data } = supabase.storage.from(bucket).getPublicUrl(cleanedPath);
+      if (data?.publicUrl) {
+        return data.publicUrl;
+      }
+    }
+
+    return '';
+  };
+
+  const resolveClassImageUrl = (item: AppClass) => {
+    const candidate = item.image_url || item.avatar_url || item.avatar || item.profile_image_url;
+    return resolveStorageUrl(candidate, ['class_image', 'course_profile', 'student_profile']);
+  };
+
+  const resolveCourseImageUrl = (item: AppCourse) => {
+    const candidate = item.image_url || item.avatar_url || item.avatar || item.profile_image_url;
+    return resolveStorageUrl(candidate, ['course_profile', 'class_image', 'student_profile']);
+  };
+
+  const resetComposer = () => {
+    setEditingHomeworkId(null);
+    setTitle('');
+    setBody('');
+    setSelectedFile(null);
+    setIsComposerOpen(false);
+  };
+
+  const fetchAcademicData = async () => {
+    setIsLoadingAcademic(true);
+    setError(null);
+
+    try {
+      let classRows: any[] = [];
+      let classError: any = null;
+
+      {
+        const result = await supabase
+          .from('classes')
+          .select('*')
+          .order('created_at', { ascending: false });
+        classRows = result.data || [];
+        classError = result.error;
+      }
+
+      if (classError && /created_at|column|schema cache|does not exist/i.test(classError.message || '')) {
+        const fallbackClassResult = await supabase
+          .from('classes')
+          .select('*');
+        classRows = fallbackClassResult.data || [];
+        classError = fallbackClassResult.error;
+      }
+
+      if (classError) {
+        throw classError;
+      }
+
+      let courseRows: any[] = [];
+      let courseError: any = null;
+
+      {
+        const result = await supabase
+          .from('class_courses')
+          .select('*')
+          .order('created_at', { ascending: false });
+        courseRows = result.data || [];
+        courseError = result.error;
+      }
+
+      if (courseError && /created_at|column|schema cache|does not exist/i.test(courseError.message || '')) {
+        const fallbackCourseResult = await supabase
+          .from('class_courses')
+          .select('*');
+        courseRows = fallbackCourseResult.data || [];
+        courseError = fallbackCourseResult.error;
+      }
+
+      if (courseError) {
+        throw courseError;
+      }
+
+      setClasses(
+        classRows.map((row: any) => ({
+          id: String(row.id),
+          name: String(row.name || ''),
+          class_code: row.class_code ? String(row.class_code) : null,
+          image_url: row.image_url ? String(row.image_url) : null,
+          avatar: row.avatar ? String(row.avatar) : null,
+          avatar_url: row.avatar_url ? String(row.avatar_url) : null,
+          profile_image_url: row.profile_image_url ? String(row.profile_image_url) : null,
+          color: row.color ? String(row.color) : null,
+          outer_color: row.outer_color ? String(row.outer_color) : null,
+        }))
+      );
+
+      setCourses(
+        courseRows.map((row: any) => ({
+          id: String(row.id),
+          class_id: String(row.class_id),
+          name: String(row.name || ''),
+          image_url: row.image_url ? String(row.image_url) : null,
+          avatar: row.avatar ? String(row.avatar) : null,
+          avatar_url: row.avatar_url ? String(row.avatar_url) : null,
+          profile_image_url: row.profile_image_url ? String(row.profile_image_url) : null,
+        }))
+      );
+    } catch (loadError: any) {
+      console.error('Failed to load classes/courses:', loadError);
+      setError(loadError?.message || 'Failed to load classes and courses.');
+    } finally {
+      setIsLoadingAcademic(false);
+    }
+  };
+
+  const fetchHomework = async (classId: string, courseId: string) => {
+    if (!classId || !courseId) {
+      setHomeworkItems([]);
+      setOpenHomework({});
+      return;
+    }
+
+    setIsLoadingHomework(true);
+    setError(null);
+
+    try {
+      let rows: any[] = [];
+      let fetchError: any = null;
+
+      {
+        const result = await supabase
+          .from('homework_assignments')
+          .select('id, class_id, class_course_id, title, description, attachment_url, created_at')
+          .eq('class_id', classId)
+          .eq('class_course_id', courseId)
+          .order('created_at', { ascending: false });
+
+        rows = result.data || [];
+        fetchError = result.error;
+      }
+
+      if (fetchError && /attachment_url|column|schema cache|does not exist/i.test(fetchError.message || '')) {
+        const fallbackResult = await supabase
+          .from('homework_assignments')
+          .select('id, class_id, class_course_id, title, description, created_at')
+          .eq('class_id', classId)
+          .eq('class_course_id', courseId)
+          .order('created_at', { ascending: false });
+
+        rows = fallbackResult.data || [];
+        fetchError = fallbackResult.error;
+      }
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      const mappedItems: HomeworkItem[] = rows.map((row: any) => ({
+        id: String(row.id),
+        class_id: String(row.class_id),
+        class_course_id: String(row.class_course_id),
+        title: String(row.title || ''),
+        description: String(row.description || ''),
+        attachment_url: row.attachment_url ? String(row.attachment_url) : null,
+        created_at: row.created_at ? String(row.created_at) : undefined,
+      }));
+
+      setHomeworkItems(mappedItems);
+      setOpenHomework({});
+    } catch (loadError: any) {
+      console.error('Failed to load homework:', loadError);
+      setError(loadError?.message || 'Failed to load homework for this course.');
+      setHomeworkItems([]);
+      setOpenHomework({});
+    } finally {
+      setIsLoadingHomework(false);
+    }
+  };
+
+  const uploadHomeworkFile = async (file: File) => {
+    if (!selectedClassId || !selectedCourseId) {
+      throw new Error('Select class and course before uploading files.');
+    }
+
+    const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `homework/${selectedClassId}/${selectedCourseId}/${Date.now()}-${sanitized}`;
+
+    const uploadResult = await supabase
+      .storage
+      .from('homework_files')
+      .upload(path, file, {
+        upsert: false,
+        contentType: file.type || undefined,
+      });
+
+    if (uploadResult.error) {
+      throw uploadResult.error;
+    }
+
+    const publicUrlResult = supabase.storage.from('homework_files').getPublicUrl(path);
+    return publicUrlResult.data.publicUrl;
+  };
+
+  const handleSaveHomework = async () => {
+    if (!selectedClassId || !selectedCourseId) {
+      setError('Please select class and course first.');
+      return;
+    }
+
+    if (!title.trim()) {
+      setError('Homework heading is required.');
+      return;
+    }
+
+    if (!body.trim()) {
+      setError('Homework body is required.');
+      return;
+    }
+
+    if (selectedFile) {
+      if (!ALLOWED_FILE_TYPES.has(selectedFile.type)) {
+        setError('Only PDF, DOC, and DOCX files are allowed.');
+        return;
+      }
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        setError('File must be 15MB or smaller.');
+        return;
+      }
+    }
+
+    setError(null);
+    setIsSavingHomework(true);
+
+    try {
+      let uploadedUrl: string | null | undefined;
+      if (selectedFile) {
+        uploadedUrl = await uploadHomeworkFile(selectedFile);
+      }
+
+      if (editingHomeworkId) {
+        const payload: any = {
+          title: title.trim(),
+          description: body.trim(),
+        };
+
+        if (uploadedUrl !== undefined) {
+          payload.attachment_url = uploadedUrl || null;
+        }
+
+        let updateError: any = null;
+
+        {
+          const result = await supabase
+            .from('homework_assignments')
+            .update(payload)
+            .eq('id', editingHomeworkId);
+          updateError = result.error;
+        }
+
+        if (updateError && /attachment_url|column|schema cache|does not exist/i.test(updateError.message || '')) {
+          const { attachment_url, ...payloadWithoutAttachment } = payload;
+          const fallbackUpdate = await supabase
+            .from('homework_assignments')
+            .update(payloadWithoutAttachment)
+            .eq('id', editingHomeworkId);
+          updateError = fallbackUpdate.error;
+        }
+
+        if (updateError) {
+          throw updateError;
+        }
+      } else {
+        const payload: any = {
+          class_id: selectedClassId,
+          class_course_id: selectedCourseId,
+          title: title.trim(),
+          description: body.trim(),
+          attachment_url: uploadedUrl || null,
+        };
+
+        let insertError: any = null;
+
+        {
+          const result = await supabase
+            .from('homework_assignments')
+            .insert([payload]);
+          insertError = result.error;
+        }
+
+        if (insertError && /attachment_url|column|schema cache|does not exist/i.test(insertError.message || '')) {
+          const { attachment_url, ...payloadWithoutAttachment } = payload;
+          const fallbackInsert = await supabase
+            .from('homework_assignments')
+            .insert([payloadWithoutAttachment]);
+          insertError = fallbackInsert.error;
+        }
+
+        if (insertError) {
+          throw insertError;
+        }
+      }
+
+      await fetchHomework(selectedClassId, selectedCourseId);
+      resetComposer();
+    } catch (saveError: any) {
+      console.error('Failed to save homework:', saveError);
+      setError(saveError?.message || 'Failed to save homework.');
+    } finally {
+      setIsSavingHomework(false);
+    }
+  };
+
+  const handleEditHomework = (item: HomeworkItem) => {
+    setEditingHomeworkId(item.id);
+    setTitle(item.title);
+    setBody(item.description || '');
+    setSelectedFile(null);
+    setIsComposerOpen(true);
+  };
+
+  const handleDeleteHomework = async (id: string) => {
+    const confirmed = window.confirm('Delete this homework item?');
+    if (!confirmed) return;
+
+    setIsSavingHomework(true);
+    setError(null);
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('homework_assignments')
+        .delete()
+        .eq('id', id);
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      await fetchHomework(selectedClassId, selectedCourseId);
+    } catch (deleteError: any) {
+      console.error('Failed to delete homework:', deleteError);
+      setError(deleteError?.message || 'Failed to delete homework.');
+    } finally {
+      setIsSavingHomework(false);
+    }
+  };
+
+  const toggleHomeworkOpen = (id: string) => {
+    setOpenHomework(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  useEffect(() => {
+    void fetchAcademicData();
+  }, []);
+
+  useEffect(() => {
+    void fetchHomework(selectedClassId, selectedCourseId);
+  }, [selectedClassId, selectedCourseId]);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-700 pb-20">
+      <div>
+        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter">Homework Manager</h2>
+        <p className="mt-2 text-slate-500 dark:text-slate-400 font-semibold">Pick class → pick course → create and manage homework.</p>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[48px] p-6 sm:p-8 lg:p-10 shadow-premium space-y-6">
+        {error && (
+          <div className="rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-3 text-sm font-semibold text-rose-700 dark:text-rose-300">
+            {error}
+          </div>
+        )}
+
+        {!selectedClassId && (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm sm:text-base font-black uppercase tracking-widest text-slate-500">Classes</h3>
+              <span className="text-xs font-black uppercase tracking-widest text-slate-400">{classes.length} Class Blocks</span>
+            </div>
+
+            {isLoadingAcademic ? (
+              <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/30 p-6 text-sm font-bold text-slate-500">
+                Loading classes...
+              </div>
+            ) : classes.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/30 p-8 text-sm font-bold text-slate-500">
+                No classes found. Create classes first.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                {classes.map(item => {
+                  const classImageUrl = resolveClassImageUrl(item);
+                  return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setSelectedClassId(item.id);
+                      setSelectedCourseId('');
+                      resetComposer();
+                    }}
+                    className="group p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-left hover:-translate-y-0.5 transition-all"
+                  >
+                    <div className="w-full aspect-square" style={{ backgroundColor: item.color || item.outer_color || '#f8fafc' }}>
+                      {classImageUrl ? (
+                        <img src={classImageUrl} alt={item.name} className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-black uppercase tracking-widest">
+                          No Image
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 space-y-1 bg-white dark:bg-slate-900 mt-2 rounded-xl">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Class</p>
+                      <p className="font-black text-sm truncate text-brand-500">{item.name}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                        {item.class_code || `${item.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'class'}1`}
+                      </p>
+                    </div>
+                  </button>
+                )})}
+              </div>
+            )}
+          </>
+        )}
+
+        {selectedClassId && !selectedCourseId && (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={() => {
+                  setSelectedClassId('');
+                  setSelectedCourseId('');
+                  resetComposer();
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 text-xs font-black uppercase tracking-widest"
+              >
+                Back to Classes
+              </button>
+              <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+                {selectedClass?.name || 'Selected Class'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm sm:text-base font-black uppercase tracking-widest text-slate-500">Courses</h3>
+              <span className="text-xs font-black uppercase tracking-widest text-slate-400">{classCourses.length} Course Blocks</span>
+            </div>
+
+            {classCourses.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/30 p-8 text-sm font-bold text-slate-500">
+                No courses found for this class.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                {classCourses.map(item => {
+                  const courseImageUrl = resolveCourseImageUrl(item);
+                  return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setSelectedCourseId(item.id);
+                      setIsComposerOpen(false);
+                      setEditingHomeworkId(null);
+                    }}
+                    className="group p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-left hover:-translate-y-0.5 transition-all"
+                  >
+                    {courseImageUrl ? (
+                      <div className="w-full aspect-square rounded-xl overflow-hidden mb-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                        <img src={courseImageUrl} alt={item.name} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-square rounded-xl mb-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center text-slate-400 text-xs font-black uppercase tracking-widest">
+                        No Image
+                      </div>
+                    )}
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Course</p>
+                    <p className="text-sm font-black text-brand-500 mt-1 line-clamp-3">{item.name}</p>
+                  </button>
+                )})}
+              </div>
+            )}
+          </>
+        )}
+
+        {selectedClassId && selectedCourseId && (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedCourseId('');
+                    resetComposer();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200 text-xs font-black uppercase tracking-widest"
+                >
+                  Back to Courses
+                </button>
+                <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+                  {selectedClass?.name} / {selectedCourse?.name}
+                </span>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (isComposerOpen && !editingHomeworkId) {
+                    resetComposer();
+                    return;
+                  }
+                  setIsComposerOpen(true);
+                  if (!editingHomeworkId) {
+                    setTitle('');
+                    setBody('');
+                    setSelectedFile(null);
+                  }
+                }}
+                className="px-4 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-black uppercase tracking-widest"
+              >
+                {editingHomeworkId ? 'Editing Homework' : isComposerOpen ? 'Close Editor' : 'Edit Homework'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <div className="w-full aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" style={{ backgroundColor: selectedClass?.color || selectedClass?.outer_color || '#f8fafc' }}>
+                  {selectedClass && resolveClassImageUrl(selectedClass) ? (
+                    <img src={resolveClassImageUrl(selectedClass)} alt={selectedClass.name} className="w-full h-full object-contain" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs font-black uppercase tracking-widest">No Image</div>
+                  )}
+                </div>
+                <div className="p-3 space-y-1 bg-white dark:bg-slate-900 mt-2 rounded-xl">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Class</p>
+                  <p className="font-black text-sm truncate text-brand-500">{selectedClass?.name || 'Selected Class'}</p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                {selectedCourse && resolveCourseImageUrl(selectedCourse) ? (
+                  <div className="w-full aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                    <img src={resolveCourseImageUrl(selectedCourse)} alt={selectedCourse.name} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-full aspect-square rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center text-slate-400 text-xs font-black uppercase tracking-widest">
+                    No Image
+                  </div>
+                )}
+                <div className="p-3 space-y-1 bg-white dark:bg-slate-900 mt-2 rounded-xl">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Course</p>
+                  <p className="font-black text-sm truncate text-brand-500">{selectedCourse?.name || 'Selected Course'}</p>
+                </div>
+              </div>
+            </div>
+
+            {isComposerOpen && (
+              <div className="rounded-3xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 space-y-4 bg-slate-50/80 dark:bg-slate-950/40">
+                <h4 className="text-sm font-black uppercase tracking-widest text-slate-500">
+                  {editingHomeworkId ? 'Update Homework' : 'Create Homework'}
+                </h4>
+
+                <input
+                  value={title}
+                  onChange={event => setTitle(event.target.value)}
+                  placeholder="Homework heading"
+                  className="w-full bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-sm font-semibold"
+                />
+
+                <textarea
+                  value={body}
+                  onChange={event => setBody(event.target.value)}
+                  placeholder="Homework body"
+                  rows={6}
+                  className="w-full bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-sm font-semibold"
+                />
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Attach PDF / DOC / DOCX</label>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={event => setSelectedFile(event.target.files?.[0] || null)}
+                    className="w-full text-sm"
+                  />
+                  {selectedFile && (
+                    <p className="text-xs font-semibold text-slate-500">Selected: {selectedFile.name}</p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => void handleSaveHomework()}
+                    disabled={isSavingHomework}
+                    className="px-4 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-60"
+                  >
+                    {isSavingHomework ? 'Saving...' : editingHomeworkId ? 'Update Homework' : 'Create Homework'}
+                  </button>
+
+                  <button
+                    onClick={resetComposer}
+                    disabled={isSavingHomework}
+                    className="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-100 text-xs font-black uppercase tracking-widest"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-3xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 bg-slate-50/80 dark:bg-slate-950/40">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h4 className="text-sm font-black uppercase tracking-widest text-slate-500">Homework List</h4>
+                <span className="text-xs font-black uppercase tracking-widest text-slate-400">{homeworkItems.length} Items</span>
+              </div>
+
+              {isLoadingHomework ? (
+                <p className="text-sm text-slate-500 font-semibold">Loading homework...</p>
+              ) : homeworkItems.length === 0 ? (
+                <p className="text-sm text-slate-500 font-semibold">No homework yet for this course.</p>
+              ) : (
+                <div className="space-y-3">
+                  {homeworkItems.map(item => {
+                    const isOpen = Boolean(openHomework[item.id]);
+                    return (
+                      <div key={item.id} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                        <div className="flex items-center justify-between gap-3 p-4">
+                          <div className="min-w-0">
+                            <p className="font-black tracking-tight truncate">{item.title}</p>
+                            <p className="text-[11px] uppercase tracking-widest font-black text-slate-400 mt-1">
+                              {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleEditHomework(item)}
+                              className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-brand-500"
+                            >
+                              <i className="fas fa-pen-to-square text-xs"></i>
+                            </button>
+                            <button
+                              onClick={() => void handleDeleteHomework(item.id)}
+                              className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-rose-500"
+                            >
+                              <i className="fas fa-trash text-xs"></i>
+                            </button>
+                            <button
+                              onClick={() => toggleHomeworkOpen(item.id)}
+                              className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-brand-500"
+                            >
+                              <i className={`fas fa-chevron-down text-xs transition-transform ${isOpen ? 'rotate-180' : ''}`}></i>
+                            </button>
+                          </div>
+                        </div>
+
+                        {isOpen && (
+                          <div className="px-4 pb-4 border-t border-slate-100 dark:border-slate-800 pt-3 space-y-3">
+                            <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{item.description}</p>
+                            {item.attachment_url ? (
+                              <a
+                                href={item.attachment_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-500"
+                              >
+                                <i className="fas fa-paperclip"></i>
+                                Open Attachment
+                              </a>
+                            ) : (
+                              <p className="text-xs font-semibold text-slate-400">No attachment</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

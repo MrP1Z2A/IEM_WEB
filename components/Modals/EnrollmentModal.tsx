@@ -17,8 +17,8 @@ interface EnrollmentModalProps {
     type: 'New' | 'Old';
     selectedStudentId: string;
     selectedClassId: string;
+    selectedBatchCode: string;
     selectedClassCourseId: string;
-    grade: string;
     dateOfBirth: string;
     parentName: string;
     parentNumber: string;
@@ -85,6 +85,52 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                   <option value="">Choose a student...</option>
                   {students.map(student => (
                     <option key={student.id} value={student.id}>{student.name} ({student.id})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Class</label>
+                <select
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all disabled:opacity-60"
+                  value={enrollData.selectedBatchCode}
+                  onChange={(e) => {
+                    const nextClassId = e.target.value;
+                    const matchedBatchClass = classes.find(classItem => String(classItem.id) === String(nextClassId));
+                    setEnrollData({
+                      ...enrollData,
+                      selectedBatchCode: nextClassId,
+                      selectedClassId: matchedBatchClass ? String(matchedBatchClass.id) : enrollData.selectedClassId,
+                      selectedClassCourseId: '',
+                    });
+                  }}
+                >
+                  <option value="">Choose a class...</option>
+                  {classes.map((classItem) => (
+                    <option key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Course</label>
+                <select
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all disabled:opacity-60"
+                  value={enrollData.selectedClassCourseId}
+                  onChange={(e) => setEnrollData({ ...enrollData, selectedClassCourseId: e.target.value })}
+                  disabled={!enrollData.selectedClassId || isClassCoursesLoading}
+                >
+                  <option value="">
+                    {!enrollData.selectedBatchCode
+                      ? 'Choose batch first...'
+                      : isClassCoursesLoading
+                        ? 'Loading courses...'
+                        : 'Choose a course...'}
+                  </option>
+                  {classCourses.map((course) => (
+                    <option key={course.id} value={course.id}>{course.name}</option>
                   ))}
                 </select>
               </div>

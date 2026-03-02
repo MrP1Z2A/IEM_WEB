@@ -63,10 +63,15 @@ const Sidebar: React.FC<SidebarProps> = ({
         <SidebarMenuItem id="dashboard" icon="fa-house" label="Dashboard" activePage={currentPage} />
         <SidebarMenuItem id="live-calendar" icon="fa-calendar-days" label="Live Calendar" activePage={currentPage} />
         <SidebarMenuItem icon="fa-user-group" label="Students" activePage={currentPage} hasDropdown>
-           <SidebarSubItem id="students" label="Directory" activePage={currentPage} />
+            <SidebarSubItem id="students" label="Student Directory" activePage={currentPage} />
            <SidebarSubItem id="student-attendance" label="Daily Attendance" activePage={currentPage} />
            <SidebarSubItem id="student-register" label="Registration Hub" activePage={currentPage} />
         </SidebarMenuItem>
+        <SidebarMenuItem icon="fa-chalkboard-teacher" label="Teachers" activePage={currentPage} hasDropdown>
+            <SidebarSubItem id="teachers" label="Teacher Directory" activePage={currentPage} />
+            <SidebarSubItem id="teacher-register" label="Registration Hub" activePage={currentPage} />
+        </SidebarMenuItem>
+        <SidebarMenuItem id="homework" icon="fa-book-open" label="Homework" activePage={currentPage} />
       </nav>
     </aside>
   );
