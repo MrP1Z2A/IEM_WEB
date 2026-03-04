@@ -45,27 +45,27 @@ execute function public.set_live_calendar_updated_at();
 
 alter table public.live_calendar_events enable row level security;
 
--- Basic authenticated access so admins can manage timetable entries from the app.
--- Tighten these policies later if you have a dedicated admin role claim.
+-- Basic app access so timetable entries can be managed from clients using anon or authenticated keys.
+-- Tighten these policies later by scoping to tenant/admin claims.
 drop policy if exists "live_calendar_select_authenticated" on public.live_calendar_events;
 create policy "live_calendar_select_authenticated"
   on public.live_calendar_events
   for select
-  to authenticated
+  to anon, authenticated
   using (true);
 
 drop policy if exists "live_calendar_insert_authenticated" on public.live_calendar_events;
 create policy "live_calendar_insert_authenticated"
   on public.live_calendar_events
   for insert
-  to authenticated
+  to anon, authenticated
   with check (true);
 
 drop policy if exists "live_calendar_update_authenticated" on public.live_calendar_events;
 create policy "live_calendar_update_authenticated"
   on public.live_calendar_events
   for update
-  to authenticated
+  to anon, authenticated
   using (true)
   with check (true);
 
@@ -73,7 +73,7 @@ drop policy if exists "live_calendar_delete_authenticated" on public.live_calend
 create policy "live_calendar_delete_authenticated"
   on public.live_calendar_events
   for delete
-  to authenticated
+  to anon, authenticated
   using (true);
 
 do $$

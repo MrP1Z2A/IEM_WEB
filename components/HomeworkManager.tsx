@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 
 type AppClass = {
@@ -31,6 +31,19 @@ type HomeworkItem = {
   created_at?: string;
 };
 
+type CourseFolder = {
+  name: string;
+  files_count: number;
+};
+
+type CourseFolderFile = {
+  name: string;
+  path: string;
+  url: string;
+  size: number;
+  updated_at?: string;
+};
+
 const ALLOWED_FILE_TYPES = new Set([
   'application/pdf',
   'application/msword',
@@ -38,6 +51,11 @@ const ALLOWED_FILE_TYPES = new Set([
 ]);
 
 const MAX_FILE_SIZE = 15 * 1024 * 1024;
+const MAX_FOLDER_FILE_SIZE = 50 * 1024 * 1024;
+const COURSE_RESOURCES_BUCKET = 'resources';
+const FOLDER_MARKER_FILE = '__folder__.pdf';
+const isFolderMarker = (name: string) => name === '.keep' || name === FOLDER_MARKER_FILE;
+const FOLDER_FILE_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.json,.xml,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp3,.wav,.mp4,.mov,.zip,.rar,.7z,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,application/json,image/*,audio/*,video/*,application/zip,application/x-rar-compressed,application/x-7z-compressed';
 
 export default function HomeworkManager() {
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +81,13 @@ export default function HomeworkManager() {
   const [existingAttachmentPath, setExistingAttachmentPath] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => Promise<void> | void } | null>(null);
   const [isConfirmActionSubmitting, setIsConfirmActionSubmitting] = useState(false);
+  const [courseFolders, setCourseFolders] = useState<CourseFolder[]>([]);
+  const [openCourseFolders, setOpenCourseFolders] = useState<Record<string, boolean>>({});
+  const [courseFolderFiles, setCourseFolderFiles] = useState<Record<string, CourseFolderFile[]>>({});
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [uploadingFolderName, setUploadingFolderName] = useState<string | null>(null);
+  const folderUploadRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const selectedClass = useMemo(
     () => classes.find(item => item.id === selectedClassId) || null,
@@ -78,6 +103,11 @@ export default function HomeworkManager() {
     () => classCourses.find(item => item.id === selectedCourseId) || null,
     [classCourses, selectedCourseId]
   );
+
+  const courseFolderBasePath = useMemo(() => {
+    if (!selectedClassId || !selectedCourseId) return '';
+    return `course_folders/${selectedClassId}/${selectedCourseId}`;
+  }, [selectedClassId, selectedCourseId]);
 
   const resolveStorageUrl = (rawValue: unknown, buckets: string[]) => {
     if (typeof rawValue !== 'string') return '';
@@ -385,6 +415,179 @@ export default function HomeworkManager() {
     }
   };
 
+  const loadCourseFolders = async () => {
+    if (!courseFolderBasePath) {
+      setCourseFolders([]);
+      setOpenCourseFolders({});
+      setCourseFolderFiles({});
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.storage
+        .from(COURSE_RESOURCES_BUCKET)
+        .list(courseFolderBasePath, { limit: 200 });
+
+      if (error) {
+        throw error;
+      }
+
+      const folderNames = (data || [])
+        .filter((entry: any) => !entry?.id && entry?.name)
+        .map((entry: any) => String(entry.name));
+
+      const nextFolders: CourseFolder[] = [];
+
+      for (const folderName of folderNames) {
+        const folderPath = `${courseFolderBasePath}/${folderName}`;
+        const listResult = await supabase.storage
+          .from(COURSE_RESOURCES_BUCKET)
+          .list(folderPath, {
+            limit: 200,
+            sortBy: { column: 'updated_at', order: 'desc' },
+          });
+
+        const files = (listResult.data || []).filter((item: any) => item?.name && !isFolderMarker(String(item.name)) && !!item.id);
+        nextFolders.push({
+          name: folderName,
+          files_count: files.length,
+        });
+      }
+
+      nextFolders.sort((a, b) => a.name.localeCompare(b.name));
+      setCourseFolders(nextFolders);
+    } catch (folderError: any) {
+      console.error('Failed to load course folders:', folderError);
+      setError(folderError?.message || 'Failed to load course folders.');
+      setCourseFolders([]);
+    }
+  };
+
+  const createCourseFolder = async () => {
+    if (!courseFolderBasePath) {
+      setError('Please select class and course first.');
+      return;
+    }
+
+    const normalizedName = newFolderName.trim().replace(/[\\/:*?"<>|]+/g, '_');
+    if (!normalizedName) {
+      setError('Please enter a folder name.');
+      return;
+    }
+
+    setIsCreatingFolder(true);
+    setError(null);
+
+    try {
+      const keepPath = `${courseFolderBasePath}/${normalizedName}/${FOLDER_MARKER_FILE}`;
+      const marker = new Blob([new Uint8Array([37, 80, 68, 70])], { type: 'application/pdf' });
+
+      const uploadResult = await supabase.storage
+        .from(COURSE_RESOURCES_BUCKET)
+        .upload(keepPath, marker, {
+          upsert: true,
+          contentType: 'application/pdf',
+        });
+
+      if (uploadResult.error) {
+        throw uploadResult.error;
+      }
+
+      setNewFolderName('');
+      await loadCourseFolders();
+    } catch (createError: any) {
+      console.error('Failed to create folder:', createError);
+      setError(createError?.message || 'Failed to create folder.');
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
+
+  const loadFilesForFolder = async (folderName: string) => {
+    if (!courseFolderBasePath) return;
+    const folderPath = `${courseFolderBasePath}/${folderName}`;
+
+    const { data, error } = await supabase.storage
+      .from(COURSE_RESOURCES_BUCKET)
+      .list(folderPath, {
+        limit: 200,
+        sortBy: { column: 'updated_at', order: 'desc' },
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const files = (data || [])
+      .filter((item: any) => item?.name && !isFolderMarker(String(item.name)) && !!item.id)
+      .map((item: any) => {
+        const fullPath = `${folderPath}/${item.name}`;
+        const { data: urlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(fullPath);
+        return {
+          name: String(item.name),
+          path: fullPath,
+          url: urlData?.publicUrl || '',
+          size: Number(item.metadata?.size || 0),
+          updated_at: item.updated_at ? String(item.updated_at) : undefined,
+        };
+      });
+
+    setCourseFolderFiles(prev => ({ ...prev, [folderName]: files }));
+  };
+
+  const toggleCourseFolderOpen = async (folderName: string) => {
+    const nextOpen = !openCourseFolders[folderName];
+    setOpenCourseFolders(prev => ({ ...prev, [folderName]: nextOpen }));
+    if (nextOpen) {
+      try {
+        await loadFilesForFolder(folderName);
+      } catch (loadError: any) {
+        console.error('Failed to load folder files:', loadError);
+        setError(loadError?.message || 'Failed to load folder files.');
+      }
+    }
+  };
+
+  const uploadFilesToFolder = async (folderName: string, files: FileList | null) => {
+    if (!courseFolderBasePath || !files?.length) return;
+
+    const fileList = Array.from(files);
+    const oversized = fileList.find(file => file.size > MAX_FOLDER_FILE_SIZE);
+    if (oversized) {
+      setError(`File too large: ${oversized.name}. Max size is 50MB.`);
+      return;
+    }
+
+    setUploadingFolderName(folderName);
+    setError(null);
+
+    try {
+      for (const file of fileList) {
+        const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${courseFolderBasePath}/${folderName}/${Date.now()}-${sanitized}`;
+
+        const result = await supabase.storage
+          .from(COURSE_RESOURCES_BUCKET)
+          .upload(path, file, {
+            upsert: false,
+            contentType: file.type || undefined,
+          });
+
+        if (result.error) {
+          throw result.error;
+        }
+      }
+
+      await loadFilesForFolder(folderName);
+      await loadCourseFolders();
+    } catch (uploadError: any) {
+      console.error('Failed to upload folder files:', uploadError);
+      setError(uploadError?.message || 'Failed to upload files.');
+    } finally {
+      setUploadingFolderName(null);
+    }
+  };
+
   const uploadHomeworkFile = async (file: File) => {
     if (!selectedClassId || !selectedCourseId) {
       throw new Error('Select class and course before uploading files.');
@@ -594,6 +797,10 @@ export default function HomeworkManager() {
   useEffect(() => {
     void fetchHomework(selectedClassId, selectedCourseId);
   }, [selectedClassId, selectedCourseId]);
+
+  useEffect(() => {
+    void loadCourseFolders();
+  }, [courseFolderBasePath]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
@@ -939,6 +1146,107 @@ export default function HomeworkManager() {
                               </div>
                             ) : (
                               <p className="text-xs font-semibold text-slate-400">No attachment</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 dark:border-slate-700 p-4 sm:p-5 bg-slate-50/80 dark:bg-slate-950/40">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h4 className="text-sm font-black uppercase tracking-widest text-slate-500">Course Folders</h4>
+                <span className="text-xs font-black uppercase tracking-widest text-slate-400">{courseFolders.length} Folders</span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <input
+                  value={newFolderName}
+                  onChange={event => setNewFolderName(event.target.value)}
+                  placeholder="Folder name"
+                  className="flex-1 min-w-[220px] bg-white dark:bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold"
+                />
+                <button
+                  onClick={() => void createCourseFolder()}
+                  disabled={isCreatingFolder}
+                  className="px-4 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-60"
+                >
+                  {isCreatingFolder ? 'Creating...' : 'Create Folder'}
+                </button>
+              </div>
+
+              {courseFolders.length === 0 ? (
+                <p className="text-sm text-slate-500 font-semibold">No folders yet for this course.</p>
+              ) : (
+                <div className="space-y-3">
+                  {courseFolders.map(folder => {
+                    const isOpen = Boolean(openCourseFolders[folder.name]);
+                    const files = courseFolderFiles[folder.name] || [];
+                    const fileInputId = `folder-upload-${folder.name}`;
+
+                    return (
+                      <div key={folder.name} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                        <div className="flex items-center justify-between gap-3 p-4">
+                          <button
+                            onClick={() => void toggleCourseFolderOpen(folder.name)}
+                            className="min-w-0 flex items-center gap-3 text-left"
+                          >
+                            <i className={`fas fa-chevron-right text-xs transition-transform ${isOpen ? 'rotate-90 text-brand-500' : 'text-slate-400'}`}></i>
+                            <i className="fas fa-folder text-amber-500"></i>
+                            <div className="min-w-0">
+                              <p className="font-black tracking-tight truncate">{folder.name}</p>
+                              <p className="text-[11px] uppercase tracking-widest font-black text-slate-400 mt-1">{folder.files_count} Files</p>
+                            </div>
+                          </button>
+
+                          <button
+                            onClick={() => folderUploadRefs.current[fileInputId]?.click()}
+                            disabled={uploadingFolderName === folder.name}
+                            className="px-3 py-2 rounded-lg bg-brand-500 text-white text-[11px] font-black uppercase tracking-widest disabled:opacity-60"
+                          >
+                            {uploadingFolderName === folder.name ? 'Uploading...' : 'Add File'}
+                          </button>
+                          <input
+                            id={fileInputId}
+                            ref={node => {
+                              folderUploadRefs.current[fileInputId] = node;
+                            }}
+                            type="file"
+                            accept={FOLDER_FILE_ACCEPT}
+                            multiple
+                            className="hidden"
+                            onChange={event => {
+                              void uploadFilesToFolder(folder.name, event.target.files);
+                              event.target.value = '';
+                            }}
+                          />
+                        </div>
+
+                        {isOpen && (
+                          <div className="px-4 pb-4 border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2">
+                            {files.length === 0 ? (
+                              <p className="text-xs font-semibold text-slate-400">No files yet.</p>
+                            ) : (
+                              files.map(file => (
+                                <a
+                                  key={file.path}
+                                  href={file.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center justify-between gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-black truncate text-brand-500">{file.name}</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                      {file.size > 0 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : 'File'}
+                                    </p>
+                                  </div>
+                                  <i className="fas fa-up-right-from-square text-[10px] text-slate-400"></i>
+                                </a>
+                              ))
                             )}
                           </div>
                         )}

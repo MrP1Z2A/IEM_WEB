@@ -186,7 +186,7 @@ const App: React.FC = () => {
   const [newStudentCredentials, setNewStudentCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
 
   const stats = useMemo(() => {
-    const totalStudents = students.length;
+    const totalStudents = allStudents.length || students.length;
     const totalTeachers = teachers.length;
     const totalParents = parents.length;
     const demoEarning = 0;
@@ -209,7 +209,7 @@ const App: React.FC = () => {
         female: femaleTeachers,
       },
     };
-  }, [students, teachers, parents]);
+  }, [students, teachers, parents, allStudents]);
 
   const notify = useCallback((message: string) => {
     setNotification({ message, type: 'info' });
@@ -241,11 +241,9 @@ const App: React.FC = () => {
     end.setHours(23, 59, 59, 999);
 
     const { data, error } = await supabase
+      .schema('public')
       .from('students')
       .select('*')
-      .eq('role', 'student')
-      .gte('created_at', start.toISOString())
-      .lte('created_at', end.toISOString())
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -255,9 +253,9 @@ const App: React.FC = () => {
 
   const fetchAllStudents = async () => {
     const { data, error } = await supabase
+      .schema('public')
       .from('students')
-      .select('*')
-      .eq('role', 'student');
+      .select('*');
 
     if (!error && data) {
       setAllStudents(data);
@@ -265,13 +263,31 @@ const App: React.FC = () => {
   };
 
   const fetchTeachers = async () => {
-    const { data, error } = await supabase
+    const orderedResult = await supabase
+      .schema('public')
       .from('teachers')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setTeachers(data.map((teacher: any) => mapStudentFromDB({ ...teacher, role: 'teacher' })));
+    if (!orderedResult.error && Array.isArray(orderedResult.data)) {
+      setTeachers(orderedResult.data.map((teacher: any) => mapStudentFromDB({ ...teacher, role: 'teacher' })));
+      return;
+    }
+
+    const fallbackResult = await supabase
+      .schema('public')
+      .from('teachers')
+      .select('*');
+
+    if (!fallbackResult.error && Array.isArray(fallbackResult.data)) {
+      setTeachers(fallbackResult.data.map((teacher: any) => mapStudentFromDB({ ...teacher, role: 'teacher' })));
+      return;
+    }
+
+    setTeachers([]);
+    const message = orderedResult.error?.message || fallbackResult.error?.message;
+    if (message) {
+      notify(`Failed to fetch teachers from public.teachers: ${message}`);
     }
   };
 
@@ -861,7 +877,6 @@ const App: React.FC = () => {
     const { data, error } = await supabase
       .from('students')
       .select('*')
-      .eq('role', 'student')
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString())
       .order('created_at', { ascending: false });
@@ -879,9 +894,9 @@ const App: React.FC = () => {
       }
 
       const { data, error } = await supabase
+        .schema('public')
         .from('students')
         .select('*')
-        .eq('role', 'student')
         .order('created_at', { ascending: false });
 
       if (!error && data) {
@@ -895,9 +910,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchStudents = async () => {
       const { data, error } = await supabase
+        .schema('public')
         .from('students')
         .select('*')
-        .eq('role', 'student')
         .order('created_at', { ascending: false });
 
       if (!error && data) {
@@ -2238,8 +2253,7 @@ const App: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('students')
-        .select('id')
-        .eq('role', 'student');
+        .select('id');
 
       if (error) {
         console.error('Failed to load students for cloud sync:', error);
