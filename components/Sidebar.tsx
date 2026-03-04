@@ -67,9 +67,9 @@ const Sidebar: React.FC<SidebarProps> = ({
         <SidebarMenuItem id="live-calendar" icon="fa-calendar-days" label="Live Calendar" activePage={currentPage} />
         <SidebarMenuItem icon="fa-user-group" label="Students" activePage={currentPage} hasDropdown>
             <SidebarSubItem id="students" label="Student Directory" activePage={currentPage} />
-           <SidebarSubItem id="student-attendance" label="Daily Attendance" activePage={currentPage} />
            <SidebarSubItem id="student-register" label="Registration Hub" activePage={currentPage} />
         </SidebarMenuItem>
+        <SidebarMenuItem id="student-attendance" icon="fa-calendar-check" label="Class Management" activePage={currentPage} />
         <SidebarMenuItem icon="fa-chalkboard-teacher" label="Teachers" activePage={currentPage} hasDropdown>
             <SidebarSubItem id="teachers" label="Teacher Directory" activePage={currentPage} />
             <SidebarSubItem id="teacher-register" label="Registration Hub" activePage={currentPage} />

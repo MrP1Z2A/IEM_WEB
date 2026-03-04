@@ -170,7 +170,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
   return (
     <section className="space-y-6">
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
-        <h2 className="text-xl sm:text-2xl font-black tracking-tight">Daily Attendance</h2>
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">Class Management</h2>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Standalone page component for class/subject attendance.</p>
 
         <div className="mt-5 grid grid-cols-1 md:grid-cols-4 gap-3">
