@@ -16,6 +16,7 @@ import TeacherRegistrationHub from './components/TeacherRegistrationHub';
 import AttendanceProtocol from './components/AttendanceProtocol';
 import LiveCalendar from './components/LiveCalendar';
 import HomeworkManager from './components/HomeworkManager';
+import ReportCardPage from './components/Reportcard';
 import EnrollmentModal from './components/Modals/EnrollmentModal';
 import TeacherEnrollmentModal from './components/Modals/TeacherEnrollmentModal';
 import EditModal from './components/Modals/EditModal';
@@ -676,43 +677,100 @@ const App: React.FC = () => {
       onConfirm: async () => {
         try {
           if (classCourseId) {
-            let courseError: any = null;
+            let usedFallbackStudentCourses = false;
 
-            {
-              const result = await supabase
-                .from('class_course_students')
-                .delete()
-                .eq('class_id', classId)
-                .eq('class_course_id', classCourseId)
-                .eq('student_id', studentId);
-              courseError = result.error;
-            }
+            const primaryDeleteResult = await supabase
+              .from('class_course_students')
+              .delete()
+              .eq('class_id', classId)
+              .eq('class_course_id', classCourseId)
+              .eq('student_id', studentId);
 
-            if (courseError && /class_id|column|schema cache|does not exist/i.test(courseError.message || '')) {
-              const fallbackResult = await supabase
+            if (primaryDeleteResult.error && /class_id|column|schema cache|does not exist/i.test(primaryDeleteResult.error.message || '')) {
+              const secondaryDeleteResult = await supabase
                 .from('class_course_students')
                 .delete()
                 .eq('class_course_id', classCourseId)
                 .eq('student_id', studentId);
-              courseError = fallbackResult.error;
+
+              if (secondaryDeleteResult.error && isCourseAssignmentSchemaMissing(secondaryDeleteResult.error.message)) {
+                const fallbackDeleteResult = await supabase
+                  .from('student_courses')
+                  .delete()
+                  .eq('course_id', classCourseId)
+                  .eq('student_id', studentId);
+
+                if (fallbackDeleteResult.error && !isCourseAssignmentSchemaMissing(fallbackDeleteResult.error.message)) {
+                  throw fallbackDeleteResult.error;
+                }
+
+                usedFallbackStudentCourses = true;
+              } else if (secondaryDeleteResult.error && !isCourseAssignmentSchemaMissing(secondaryDeleteResult.error.message)) {
+                throw secondaryDeleteResult.error;
+              }
+            } else if (primaryDeleteResult.error && isCourseAssignmentSchemaMissing(primaryDeleteResult.error.message)) {
+              const fallbackDeleteResult = await supabase
+                .from('student_courses')
+                .delete()
+                .eq('course_id', classCourseId)
+                .eq('student_id', studentId);
+
+              if (fallbackDeleteResult.error && !isCourseAssignmentSchemaMissing(fallbackDeleteResult.error.message)) {
+                throw fallbackDeleteResult.error;
+              }
+
+              usedFallbackStudentCourses = true;
+            } else if (primaryDeleteResult.error) {
+              throw primaryDeleteResult.error;
             }
 
-            if (courseError && !isCourseAssignmentSchemaMissing(courseError.message)) {
-              throw courseError;
+            if (usedFallbackStudentCourses) {
+              const fallbackVerifyResult = await supabase
+                .from('student_courses')
+                .select('student_id')
+                .eq('course_id', classCourseId)
+                .eq('student_id', studentId)
+                .limit(1);
+
+              if (!fallbackVerifyResult.error && (fallbackVerifyResult.data || []).length > 0) {
+                throw new Error('Student still exists in student_courses after delete attempt.');
+              }
+            } else {
+              const verifyResult = await supabase
+                .from('class_course_students')
+                .select('student_id')
+                .eq('class_course_id', classCourseId)
+                .eq('student_id', studentId)
+                .limit(1);
+
+              if (!verifyResult.error && (verifyResult.data || []).length > 0) {
+                throw new Error('Student still exists in class_course_students after delete attempt.');
+              }
             }
 
-            const verifyResult = await supabase
+            const remainingInClassResult = await supabase
               .from('class_course_students')
               .select('student_id')
-              .eq('class_course_id', classCourseId)
+              .eq('class_id', classId)
               .eq('student_id', studentId)
               .limit(1);
 
-            if (!verifyResult.error && (verifyResult.data || []).length > 0) {
-              throw new Error('Student still exists in class_course_students after delete attempt.');
+            if (!remainingInClassResult.error && (remainingInClassResult.data || []).length === 0) {
+              setClasses(prev => prev.map(classItem => {
+                if (String(classItem.id) !== classId) return classItem;
+
+                const nextStudentIds = (classItem.student_ids || []).filter((id: string) => String(id) !== studentId);
+                return {
+                  ...classItem,
+                  student_ids: nextStudentIds,
+                  student_count: nextStudentIds.length,
+                };
+              }));
+            } else {
+              setClasses(prev => [...prev]);
             }
 
-            notify('Student removed from course.');
+            notify('Student removed from course successfully.');
             return;
           }
 
@@ -2992,6 +3050,10 @@ const App: React.FC = () => {
             <HomeworkManager />
           )}
 
+          {currentPage === 'report-card' && (
+            <ReportCardPage />
+          )}
+
           {/* PROGRAMS PAGE - WITH CRUD */}
           {currentPage === 'programs' && (
             <div className="space-y-12 animate-in fade-in duration-700 pb-20">
@@ -3040,7 +3102,7 @@ const App: React.FC = () => {
           )}
 
           {/* FALLBACK HUB */}
-          {![ 'dashboard', 'live-calendar', 'students', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'library', 'homework', 'programs', 'exam', 'security', 'subject' ].includes(currentPage) && (
+          {![ 'dashboard', 'live-calendar', 'students', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'library', 'homework', 'report-card', 'programs', 'exam', 'security', 'subject' ].includes(currentPage) && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>

@@ -75,6 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarSubItem id="teacher-register" label="Registration Hub" activePage={currentPage} />
         </SidebarMenuItem>
         <SidebarMenuItem id="homework" icon="fa-book-open" label="Homework" activePage={currentPage} />
+        <SidebarMenuItem id="report-card" icon="fa-file-lines" label="Report Card" activePage={currentPage} />
         <SidebarMenuItem id="security" icon="fa-user-shield" label="Security Permission" activePage={currentPage} />
       </nav>
     </aside>

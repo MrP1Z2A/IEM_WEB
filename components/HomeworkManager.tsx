@@ -128,6 +128,39 @@ export default function HomeworkManager() {
     return '';
   };
 
+  const guessFileNameFromUrl = (url: string, fallback = 'downloaded-file') => {
+    try {
+      const parsedUrl = new URL(url);
+      const segment = parsedUrl.pathname.split('/').filter(Boolean).pop() || fallback;
+      return decodeURIComponent(segment);
+    } catch {
+      return fallback;
+    }
+  };
+
+  const downloadFileDirectly = async (url: string, fallbackName?: string) => {
+    if (!url) return;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = fallbackName || guessFileNameFromUrl(url);
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (downloadError: any) {
+      setError(downloadError?.message || 'Failed to download file.');
+    }
+  };
+
   const resolveClassImageUrl = (item: AppClass) => {
     const candidate = item.image_url || item.avatar_url || item.avatar || item.profile_image_url;
     return resolveStorageUrl(candidate, ['class_image', 'course_profile', 'student_profile']);
@@ -1032,15 +1065,14 @@ export default function HomeworkManager() {
                   )}
                   {!selectedFile && existingAttachmentUrl && (
                     <div className="flex flex-wrap items-center gap-3">
-                      <a
-                        href={existingAttachmentUrl}
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => void downloadFileDirectly(existingAttachmentUrl, 'homework-attachment')}
                         className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-500"
                       >
                         <i className="fas fa-paperclip"></i>
-                        Open Current Attachment
-                      </a>
+                        Download Current Attachment
+                      </button>
                       {editingHomeworkId && (
                         <button
                           onClick={() => void handleDeleteAttachmentOnly(editingHomeworkId, existingAttachmentPath || existingAttachmentUrl, true)}
@@ -1126,15 +1158,14 @@ export default function HomeworkManager() {
                             <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{item.description}</p>
                             {item.attachment_url ? (
                               <div className="flex flex-wrap items-center gap-3">
-                                <a
-                                  href={item.attachment_url}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={() => void downloadFileDirectly(item.attachment_url || '', 'homework-attachment')}
                                   className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-500"
                                 >
                                   <i className="fas fa-paperclip"></i>
-                                  Open Attachment
-                                </a>
+                                  Download Attachment
+                                </button>
                                 <button
                                   onClick={() => void handleDeleteAttachmentOnly(item.id, item.attachment_url)}
                                   disabled={isSavingHomework}
@@ -1231,11 +1262,10 @@ export default function HomeworkManager() {
                               <p className="text-xs font-semibold text-slate-400">No files yet.</p>
                             ) : (
                               files.map(file => (
-                                <a
+                                <button
+                                  type="button"
                                   key={file.path}
-                                  href={file.url}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                  onClick={() => void downloadFileDirectly(file.url, file.name)}
                                   className="flex items-center justify-between gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                 >
                                   <div className="min-w-0">
@@ -1245,7 +1275,7 @@ export default function HomeworkManager() {
                                     </p>
                                   </div>
                                   <i className="fas fa-up-right-from-square text-[10px] text-slate-400"></i>
-                                </a>
+                                </button>
                               ))
                             )}
                           </div>

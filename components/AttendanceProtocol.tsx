@@ -118,6 +118,39 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
   const [editCourseId, setEditCourseId] = React.useState<string | null>(null);
   const [editCourseName, setEditCourseName] = React.useState('');
   const [editCourseCurrentImageUrl, setEditCourseCurrentImageUrl] = React.useState<string | null>(null);
+
+  const guessFileNameFromUrl = React.useCallback((url: string, fallback = 'downloaded-file') => {
+    try {
+      const parsedUrl = new URL(url);
+      const segment = parsedUrl.pathname.split('/').filter(Boolean).pop() || fallback;
+      return decodeURIComponent(segment);
+    } catch {
+      return fallback;
+    }
+  }, []);
+
+  const downloadFileDirectly = React.useCallback(async (url: string, fallbackName?: string) => {
+    if (!url) return;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = fallbackName || guessFileNameFromUrl(url);
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (downloadError: any) {
+      notify(downloadError?.message || 'Failed to download file.');
+    }
+  }, [guessFileNameFromUrl, notify]);
   const [editCourseImage, setEditCourseImage] = React.useState<File | null>(null);
   const [editCourseError, setEditCourseError] = React.useState<string | null>(null);
   const [classSearchQuery, setClassSearchQuery] = React.useState('');
@@ -139,6 +172,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     course_name: string | null;
     notes: string | null;
   }>>([]);
+  const [courseStudentIds, setCourseStudentIds] = React.useState<string[]>([]);
   const [isCourseHomeworkLoading, setIsCourseHomeworkLoading] = React.useState(false);
   const [courseHomeworkItems, setCourseHomeworkItems] = React.useState<Array<{
     id: string;
@@ -244,9 +278,62 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
   const selectedClassStudentIds: string[] = selectedClass?.student_ids || [];
   const selectedClassStudents = allStudents.filter(student => selectedClassStudentIds.includes(String(student.id)));
 
+  React.useEffect(() => {
+    const loadCourseStudents = async () => {
+      if (!courseAttendanceOnly || !focusCourse?.id || !activeClassId) {
+        setCourseStudentIds([]);
+        return;
+      }
+
+      try {
+        const primary = await supabase
+          .from('class_course_students')
+          .select('student_id')
+          .eq('class_id', activeClassId)
+          .eq('class_course_id', String(focusCourse.id));
+
+        if (!primary.error) {
+          setCourseStudentIds(
+            Array.from(new Set((primary.data || []).map((row: any) => String(row.student_id || '')).filter(Boolean)))
+          );
+          return;
+        }
+
+        if (!/relation|does not exist|column|schema cache/i.test(primary.error.message || '')) {
+          throw primary.error;
+        }
+
+        const fallback = await supabase
+          .from('student_courses')
+          .select('student_id')
+          .eq('course_id', String(focusCourse.id));
+
+        if (fallback.error && !/relation|does not exist|column|schema cache/i.test(fallback.error.message || '')) {
+          throw fallback.error;
+        }
+
+        setCourseStudentIds(
+          Array.from(new Set((fallback.data || []).map((row: any) => String(row.student_id || '')).filter(Boolean)))
+        );
+      } catch (error: any) {
+        console.error('Failed to load course student membership:', error);
+        notify(`Failed to load course students: ${error?.message || 'Unknown error'}`);
+        setCourseStudentIds([]);
+      }
+    };
+
+    void loadCourseStudents();
+  }, [courseAttendanceOnly, focusCourse?.id, activeClassId, classes, notify]);
+
   const activeAttendanceId = activeClassId || selectedAttendanceSubject;
   const attendanceStoreKey = activeClassId ? `class:${activeClassId}` : selectedAttendanceSubject ? `subject:${selectedAttendanceSubject}` : null;
-  const activeStudents = activeClassId ? selectedClassStudents : students;
+  const activeStudents = activeClassId
+    ? (
+      courseAttendanceOnly && focusCourse?.id
+        ? selectedClassStudents.filter(student => courseStudentIds.includes(String(student.id)))
+        : selectedClassStudents
+    )
+    : students;
   const courseFolderBasePath = React.useMemo(() => {
     if (!courseAttendanceOnly || !focusCourse?.id || !activeClassId) return '';
     return `course_folders/${activeClassId}/${String(focusCourse.id)}`;
@@ -1639,15 +1726,14 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                               </span>
                             </div>
                             {item.attachment_url && (
-                              <a
-                                href={item.attachment_url}
-                                target="_blank"
-                                rel="noreferrer"
+                              <button
+                                type="button"
+                                onClick={() => void downloadFileDirectly(item.attachment_url || '', 'homework-attachment')}
                                 className="mt-2 inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-brand-500"
                               >
                                 <i className="fas fa-paperclip"></i>
-                                Open Attachment
-                              </a>
+                                Download Attachment
+                              </button>
                             )}
                           </div>
                         ))}
@@ -1731,18 +1817,17 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                                     <p className="text-[11px] font-semibold text-slate-500">No files yet.</p>
                                   ) : (
                                     files.map(file => (
-                                      <a
+                                      <button
+                                        type="button"
                                         key={file.path}
-                                        href={file.url}
-                                        target="_blank"
-                                        rel="noreferrer"
+                                        onClick={() => void downloadFileDirectly(file.url, file.name)}
                                         className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900"
                                       >
                                         <span className="text-[11px] font-black text-brand-500 truncate">{file.name}</span>
                                         <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                           {file.size > 0 ? `${Math.max(1, Math.round(file.size / 1024))}KB` : 'File'}
                                         </span>
-                                      </a>
+                                      </button>
                                     ))
                                   )}
                                 </div>
@@ -1806,15 +1891,14 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                           key={file.path}
                           className="flex items-center gap-2 px-2 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
                         >
-                          <a
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => void downloadFileDirectly(file.url, file.name)}
                             className="text-xs font-black uppercase tracking-widest text-brand-500 hover:text-brand-600"
                             title={file.name}
                           >
                             {file.name.length > 24 ? `${file.name.slice(0, 24)}...` : file.name}
-                          </a>
+                          </button>
                           <button
                             onClick={() => void deleteTimetablePdf(file.path)}
                             className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500 flex items-center justify-center"

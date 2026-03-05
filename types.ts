@@ -86,4 +86,5 @@ export type PageId =
   | 'security' 
   | 'ai-chat'
   | 'programs'
-  | 'homework';
+  | 'homework'
+  | 'report-card';
