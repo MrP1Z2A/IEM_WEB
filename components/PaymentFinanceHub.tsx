@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { jsPDF } from 'jspdf';
 import { supabase } from '../supabaseClient';
 
 type FinanceView = 'payment' | 'payment-assign' | 'payment-history' | 'late-payment' | 'student-finance-status';
@@ -306,6 +307,11 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
     [payments, studentSearchQuery, studentMap]
   );
 
+  const filteredPaidPayments = useMemo(
+    () => filteredPayments.filter(payment => payment.status === 'paid'),
+    [filteredPayments]
+  );
+
   const filteredLatePayments = useMemo(
     () => latePayments.filter(payment => matchesStudentSearch(payment.student_id)),
     [latePayments, studentSearchQuery, studentMap]
@@ -498,6 +504,62 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const downloadPaymentStatementPdf = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const marginX = 40;
+    let y = 44;
+    const lineHeight = 16;
+    const pageHeight = doc.internal.pageSize.height;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('Payment Statement', marginX, y);
+
+    y += 20;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, marginX, y);
+
+    y += 20;
+    doc.setFontSize(10);
+    doc.text(`Paid Records: ${filteredPaidPayments.length}`, marginX, y);
+
+    y += 24;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Student | Class/Course | Collected Date | Amount', marginX, y);
+
+    y += 12;
+    doc.setDrawColor(220);
+    doc.line(marginX, y, 555, y);
+    y += 12;
+
+    doc.setFont('helvetica', 'normal');
+
+    filteredPaidPayments.forEach((payment) => {
+      const studentName = studentMap.get(payment.student_id)?.name || payment.student_id;
+      const academic = getStudentAcademic(payment.student_id);
+      const collected = toIsoDate(payment.payment_date) || '-';
+      const amount = formatMMK(payment.amount_mmk);
+      const rowText = `${studentName} | ${academic.className} / ${academic.courseName} | ${collected} | ${amount}`;
+      const wrapped = doc.splitTextToSize(rowText, 515);
+
+      if (y + (wrapped.length * lineHeight) > pageHeight - 36) {
+        doc.addPage();
+        y = 44;
+      }
+
+      doc.text(wrapped, marginX, y);
+      y += wrapped.length * lineHeight + 6;
+    });
+
+    if (filteredPaidPayments.length === 0) {
+      doc.text('No paid records found for current filters.', marginX, y);
+    }
+
+    doc.save(`payment-statement-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   const pageMeta = {
@@ -776,12 +838,21 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
 
           {(view === 'payment-history' || view === 'payment') && (
             <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[36px] p-5 sm:p-6 lg:p-8 shadow-premium space-y-4">
-              <h3 className="text-xl font-black tracking-tight">Payment History</h3>
-              {filteredPayments.length === 0 ? (
-                <p className="text-sm font-semibold text-slate-500">No payment records found.</p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-xl font-black tracking-tight">Payment History</h3>
+                <button
+                  type="button"
+                  onClick={downloadPaymentStatementPdf}
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest"
+                >
+                  Download Payment Statement
+                </button>
+              </div>
+              {filteredPaidPayments.length === 0 ? (
+                <p className="text-sm font-semibold text-slate-500">No paid records found.</p>
               ) : (
                 <div className="space-y-3">
-                  {filteredPayments.map(payment => (
+                  {filteredPaidPayments.map(payment => (
                     <div key={payment.id} className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="space-y-2">
                         <p className="text-sm font-black text-slate-900 dark:text-white">{studentMap.get(payment.student_id)?.name || payment.student_id}</p>

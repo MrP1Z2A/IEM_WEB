@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PageId } from '../types';
 import logoIem from '../src/LOGO_IEM.png';
 
@@ -16,6 +16,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   setIsMobileMenuOpen 
 }) => {
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+  const navRef = useRef<HTMLElement | null>(null);
+  const sidebarScrollTopRef = useRef(0);
+
+  useEffect(() => {
+    const navElement = navRef.current;
+    if (!navElement) return;
+
+    navElement.scrollTop = sidebarScrollTopRef.current;
+  }, [currentPage, openDropdowns, isMobileMenuOpen]);
 
   const SidebarMenuItem = ({ id, icon, label, activePage, hasDropdown, children }: any) => {
     const isOpen = openDropdowns[label];
@@ -62,7 +71,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <span className="text-xl font-black tracking-tighter">IEM</span>
       </div>
-      <nav className="flex-1 overflow-y-auto no-scrollbar pb-10">
+      <nav
+        ref={navRef}
+        onScroll={(event) => {
+          sidebarScrollTopRef.current = event.currentTarget.scrollTop;
+        }}
+        className="flex-1 overflow-y-auto no-scrollbar pb-10"
+      >
         <SidebarMenuItem id="dashboard" icon="fa-house" label="Dashboard" activePage={currentPage} />
         <SidebarMenuItem id="live-calendar" icon="fa-calendar-days" label="Live Calendar" activePage={currentPage} />
         <SidebarMenuItem icon="fa-user-group" label="Students" activePage={currentPage} hasDropdown>

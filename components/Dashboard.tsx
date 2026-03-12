@@ -26,6 +26,19 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
+  const formatCompactMMK = (value: number) => {
+    const abs = Math.abs(value || 0);
+    if (abs >= 1_000_000) {
+      const compact = (value / 1_000_000).toFixed(1).replace(/\.0$/, '');
+      return `${compact}m MMK`;
+    }
+    if (abs >= 1_000) {
+      const compact = (value / 1_000).toFixed(1).replace(/\.0$/, '');
+      return `${compact}k MMK`;
+    }
+    return `${Math.round(value || 0).toLocaleString()} MMK`;
+  };
+
   const totalStudents = stats.genderBreakdown.male + stats.genderBreakdown.female;
   const totalTeachers = stats.teacherGenderBreakdown.male + stats.teacherGenderBreakdown.female;
   const maleValue = stats.genderBreakdown.male;
@@ -74,7 +87,7 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
     { label: 'Total Students', val: stats.totalStudents, icon: 'fa-user-graduate', color: 'text-brand-500', bg: 'bg-brand-50', layout: 'sm:col-start-1 sm:row-start-1' },
     { label: 'Total Parents', val: stats.totalParents, icon: 'fa-people-roof', color: 'text-sky-600', bg: 'bg-sky-50', layout: 'sm:col-start-1 sm:row-start-2' },
     { label: 'Total Teachers', val: stats.totalTeachers, icon: 'fa-chalkboard-teacher', color: 'text-emerald-500', bg: 'bg-emerald-50', layout: 'sm:col-start-2 sm:row-start-1' },
-    { label: 'Total Earning', val: `${stats.totalEarningMMK.toLocaleString()} MMK`, icon: 'fa-sack-dollar', color: 'text-amber-600', bg: 'bg-amber-50', layout: 'sm:col-start-2 sm:row-start-2' },
+    { label: 'Total Earning', val: formatCompactMMK(stats.totalEarningMMK), icon: 'fa-sack-dollar', color: 'text-amber-600', bg: 'bg-amber-50', layout: 'sm:col-start-2 sm:row-start-2' },
   ];
 
   return (

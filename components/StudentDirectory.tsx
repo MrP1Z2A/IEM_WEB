@@ -1,4 +1,5 @@
 import React from 'react';
+import { jsPDF } from 'jspdf';
 import { Student } from '../types';
 import { supabase } from '../supabaseClient';
 
@@ -356,6 +357,57 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     }
   };
 
+  const downloadDirectoryPdf = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const marginX = 40;
+    let y = 44;
+    const lineHeight = 16;
+    const pageHeight = doc.internal.pageSize.height;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text(`${title} PDF`, marginX, y);
+
+    y += 20;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, marginX, y);
+
+    y += 20;
+    doc.text(`Records: ${filteredStudents.length}`, marginX, y);
+
+    y += 24;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Name | ID | Email | Class', marginX, y);
+
+    y += 12;
+    doc.setDrawColor(220);
+    doc.line(marginX, y, 555, y);
+    y += 12;
+
+    doc.setFont('helvetica', 'normal');
+
+    filteredStudents.forEach((student) => {
+      const rowText = `${namePrefix}${student.name} | ${student.id} | ${student.email || '-'} | ${getStudentClassName(String(student.id))}`;
+      const wrapped = doc.splitTextToSize(rowText, 515);
+
+      if (y + (wrapped.length * lineHeight) > pageHeight - 36) {
+        doc.addPage();
+        y = 44;
+      }
+
+      doc.text(wrapped, marginX, y);
+      y += wrapped.length * lineHeight + 6;
+    });
+
+    if (filteredStudents.length === 0) {
+      doc.text('No records found for current filters.', marginX, y);
+    }
+
+    const fileBase = String(title || 'directory').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    doc.save(`${fileBase}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
   return (
     <div className="space-y-12 animate-in fade-in duration-700 pb-20">
       {/* Header Section with Title and Filters */}
@@ -432,6 +484,12 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
             className={`px-4 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest ${isSelectMode ? 'bg-rose-500 text-white' : 'bg-brand-500 text-white'}`}
           >
             {isSelectMode ? 'Cancel Select' : selectLabel}
+          </button>
+          <button
+            onClick={downloadDirectoryPdf}
+            className="px-4 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest bg-slate-900 text-white"
+          >
+            Download PDF
           </button>
         </div>
       </div>
