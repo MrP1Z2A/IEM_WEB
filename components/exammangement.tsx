@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { getCurrentTenantContext, withSchoolId } from '../services/tenantService';
 import GradingModal from './Modals/Grading';
 
 type AppClass = {
@@ -569,6 +570,7 @@ export default function ExamManagementPage() {
     setError(null);
 
     try {
+      const { schoolId } = await getCurrentTenantContext();
       const previousFileUrl = editingExamId ? originalFileUrl : null;
       let nextFileUrl = fileUrl.trim() || null;
 
@@ -578,13 +580,13 @@ export default function ExamManagementPage() {
         nextFileUrl = null;
       }
 
-      const payload = {
+      const payload = withSchoolId({
         class_id: selectedClassId,
         class_course_id: selectedCourseId,
         title: title.trim(),
         description: description.trim(),
         file_url: nextFileUrl,
-      };
+      }, schoolId);
 
       if (editingExamId) {
         const updateResult = await supabase.from('exams').update(payload).eq('id', editingExamId);

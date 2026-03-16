@@ -1,5 +1,6 @@
 import React from 'react';
 import { supabase } from '../supabaseClient';
+import { getCurrentTenantContext, withSchoolId } from '../services/tenantService';
 import { Student } from '../types';
 
 type AttendanceContextType = 'class' | 'subject';
@@ -183,17 +184,18 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
     }
 
     try {
+      const { schoolId } = await getCurrentTenantContext();
       let imageUrl: string | null = null;
       if (classImage) {
         imageUrl = await uploadImage(CLASS_IMAGE_BUCKET, classImage, 'class');
       }
 
       if (editingClassId) {
-        const payload: any = {
+        const payload: any = withSchoolId({
           name: className.trim(),
           outer_color: classOuterColor,
           color: classOuterColor,
-        };
+        }, schoolId);
         if (imageUrl) payload.image_url = imageUrl;
 
         const { error } = await supabase.from('classes').update(payload).eq('id', editingClassId);
@@ -201,11 +203,11 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
 
         safeNotify('Class updated.');
       } else {
-        const payload: any = {
+        const payload: any = withSchoolId({
           name: className.trim(),
           outer_color: classOuterColor,
           color: classOuterColor,
-        };
+        }, schoolId);
         if (imageUrl) payload.image_url = imageUrl;
 
         const { error } = await supabase.from('classes').insert([payload]);
@@ -345,15 +347,16 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
 
     setIsClassCourseCreating(true);
     try {
+      const { schoolId } = await getCurrentTenantContext();
       let imageUrl: string | null = null;
       if (newCourseImage) {
         imageUrl = await uploadImage(COURSE_PROFILE_BUCKET, newCourseImage, 'course');
       }
 
-      const payload: any = {
+      const payload: any = withSchoolId({
         class_id: selectedClassId,
         name: newCourseName.trim(),
-      };
+      }, schoolId);
       if (imageUrl) payload.image_url = imageUrl;
 
       const { error } = await supabase.from('class_courses').insert([payload]);

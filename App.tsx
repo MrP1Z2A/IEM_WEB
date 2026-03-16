@@ -8,6 +8,8 @@ import {
 import { Status, Student, PageId, StudentPermissions } from './types';
 import { supabase } from './supabaseClient';
 import { authService } from './services/authService';
+import { getCurrentTenantContext, withSchoolId } from './services/tenantService';
+import CreateSchoolPage from './components/CreateSchoolPage';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import StudentDirectory from './components/StudentDirectory';
@@ -117,6 +119,7 @@ const getInitialTeacherEnrollData = () => ({
 });
 
 const App: React.FC = () => {
+  const [onboardingStatus, setOnboardingStatus] = useState<'loading' | 'needs-school' | 'ready'>('loading');
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
@@ -205,6 +208,7 @@ const App: React.FC = () => {
     const totalStudents = allStudents.length || students.length;
     const totalTeachers = teachers.length;
     const totalParents = parents.length;
+    const totalStudentServices = studentServiceStaff.length;
     const maleStudents = students.filter(student => student.gender === 'Male').length;
     const femaleStudents = students.filter(student => student.gender === 'Female').length;
     const maleTeachers = teachers.filter(teacher => teacher.gender === 'Male').length;
@@ -215,6 +219,7 @@ const App: React.FC = () => {
       totalParents,
       totalEarningMMK,
       totalTeachers,
+      totalStudentServices,
       genderBreakdown: {
         male: maleStudents,
         female: femaleStudents,
@@ -224,11 +229,59 @@ const App: React.FC = () => {
         female: femaleTeachers,
       },
     };
-  }, [students, teachers, parents, allStudents, totalEarningMMK]);
+  }, [students, teachers, parents, allStudents, totalEarningMMK, studentServiceStaff]);
 
   const notify = useCallback((message: string) => {
     setNotification({ message, type: 'info' });
     setTimeout(() => setNotification(null), 3000);
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await authService.signOut();
+      setOnboardingStatus('needs-school');
+      notify('Logged out successfully.');
+    } catch (error: any) {
+      notify(error?.message || 'Failed to log out.');
+    }
+  }, [notify]);
+
+  const requireSchoolId = useCallback(async () => {
+    const tenant = await getCurrentTenantContext();
+    return tenant.schoolId;
+  }, []);
+
+  // Check onboarding status on mount
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setOnboardingStatus('needs-school');
+          return;
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('school_id')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          setOnboardingStatus('needs-school');
+          return;
+        }
+
+        if (!profile?.school_id) {
+          setOnboardingStatus('needs-school');
+        } else {
+          setOnboardingStatus('ready');
+        }
+      } catch {
+        setOnboardingStatus('needs-school');
+      }
+    };
+    void checkOnboarding();
   }, []);
 
   useEffect(() => {
@@ -1108,7 +1161,7 @@ const App: React.FC = () => {
       ? globalThis.crypto.randomUUID().replace(/-/g, '')
       : `${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
 
-    return randomSeed.slice(0, 10).toUpperCase();
+    return `NODE-${randomSeed.slice(0, 10).toUpperCase()}`;
   };
 
   const batchRegisterStudents = async (file: File) => {
@@ -1121,6 +1174,7 @@ const App: React.FC = () => {
 
     setIsBatchRegistering(true);
     try {
+      const schoolId = await requireSchoolId();
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
@@ -1194,7 +1248,7 @@ const App: React.FC = () => {
           type: 'New',
         };
 
-        const payload = {
+        const payload = withSchoolId({
           ...newStudent,
           temp_password: generatedPassword,
           temp_password_created_at: new Date().toISOString(),
@@ -1205,7 +1259,7 @@ const App: React.FC = () => {
           secondary_parent_name: getValue(row, ['secondaryparentname']) || null,
           secondary_parent_number: getValue(row, ['secondaryparentnumber', 'secondaryparentphone']) || null,
           secondary_parent_email: getValue(row, ['secondaryparentemail']) || null,
-        };
+        }, schoolId);
 
         let createdRow: any = null;
         let insertError: any = null;
@@ -1269,6 +1323,7 @@ const App: React.FC = () => {
 
     setIsBatchTeacherRegistering(true);
     try {
+      const schoolId = await requireSchoolId();
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
@@ -1342,7 +1397,7 @@ const App: React.FC = () => {
           type: 'New',
         };
 
-        const payload = {
+        const payload = withSchoolId({
           id: newTeacher.id,
           name: newTeacher.name,
           role: 'teacher',
@@ -1352,7 +1407,7 @@ const App: React.FC = () => {
           type: newTeacher.type,
           temp_password: generatedPassword,
           temp_password_created_at: new Date().toISOString(),
-        };
+        }, schoolId);
 
         let createdRow: any = null;
         let insertError: any = null;
@@ -1434,13 +1489,14 @@ const App: React.FC = () => {
     
     // Sync with Supabase if it's a student
     if (type === 'student') {
+      const schoolId = await requireSchoolId();
       const existingStudent = students.find(student => student.id === data.id);
-      const studentPayload = {
+      const studentPayload = withSchoolId({
         ...data,
         role: data.role ?? existingStudent?.role ?? 'student',
         status: data.status ?? existingStudent?.status ?? Status.PENDING,
         attendanceRate: data.attendanceRate ?? existingStudent?.attendanceRate ?? 0,
-      };
+      }, schoolId);
 
       const { error } = await supabase.from('students').upsert(studentPayload);
       if (error) {
@@ -1455,8 +1511,9 @@ const App: React.FC = () => {
     }
 
     if (type === 'teacher') {
+      const schoolId = await requireSchoolId();
       const existingTeacher = teachers.find(teacher => teacher.id === data.id);
-      const teacherPayload = {
+      const teacherPayload = withSchoolId({
         id: data.id,
         name: data.name,
         email: data.email,
@@ -1465,7 +1522,7 @@ const App: React.FC = () => {
         status: data.status ?? existingTeacher?.status ?? Status.PENDING,
         type: data.type ?? existingTeacher?.type ?? 'New',
         avatar: data.avatar ?? existingTeacher?.avatar ?? null,
-      };
+      }, schoolId);
 
       const { error } = await supabase.from('teachers').upsert(teacherPayload);
       if (error) {
@@ -1847,6 +1904,7 @@ const App: React.FC = () => {
     const isEnrollmentAborted = () => enrollToken !== enrollAbortCounterRef.current;
 
     try {
+      const schoolId = await requireSchoolId();
       if (enrollData.type === 'Old') {
         if (!enrollData.selectedStudentId) {
           notify('Please select a student for re-entry.');
@@ -1883,7 +1941,7 @@ const App: React.FC = () => {
 
         const { error: dbError } = await supabase
           .from('students')
-          .update({ type: 'Old', status: Status.ACTIVE, role: 'student' })
+          .update({ type: 'Old', status: Status.ACTIVE, role: 'student', school_id: schoolId })
           .eq('id', updatedStudent.id);
 
         if (dbError) throw dbError;
@@ -1891,12 +1949,12 @@ const App: React.FC = () => {
         {
           const primaryCourseAssign = await supabase
             .from('class_course_students')
-            .insert([{ class_id: enrollData.selectedClassId, class_course_id: enrollData.selectedClassCourseId, student_id: updatedStudent.id }]);
+            .insert([{ class_id: enrollData.selectedClassId, class_course_id: enrollData.selectedClassCourseId, student_id: updatedStudent.id, school_id: schoolId }]);
 
           if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
             const fallbackCourseAssign = await supabase
               .from('student_courses')
-              .insert([{ course_id: enrollData.selectedClassCourseId, student_id: updatedStudent.id }]);
+              .insert([{ course_id: enrollData.selectedClassCourseId, student_id: updatedStudent.id, school_id: schoolId }]);
 
             if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
               if (isCourseAssignmentSchemaMissing(fallbackCourseAssign.error.message)) {
@@ -2024,7 +2082,7 @@ const App: React.FC = () => {
         type: 'New'
       };
 
-      const insertPayload = {
+      const insertPayload = withSchoolId({
         ...newStudent,
         auth_user_id: authUserId,
         temp_password: generatedPassword,
@@ -2035,7 +2093,7 @@ const App: React.FC = () => {
         secondary_parent_name: enrollData.secondaryParentName || null,
         secondary_parent_number: secondaryParentPhone,
         secondary_parent_email: normalizedSecondaryParentEmail || null,
-      };
+      }, schoolId);
 
       let createdStudentRecord: any = null;
       let dbError: any = null;
@@ -2069,12 +2127,12 @@ const App: React.FC = () => {
       {
         const primaryCourseAssign = await supabase
           .from('class_course_students')
-          .insert([{ class_id: enrollData.selectedClassId, class_course_id: enrollData.selectedClassCourseId, student_id: createdStudent.id }]);
+          .insert([{ class_id: enrollData.selectedClassId, class_course_id: enrollData.selectedClassCourseId, student_id: createdStudent.id, school_id: schoolId }]);
 
         if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
           const fallbackCourseAssign = await supabase
             .from('student_courses')
-            .insert([{ course_id: enrollData.selectedClassCourseId, student_id: createdStudent.id }]);
+            .insert([{ course_id: enrollData.selectedClassCourseId, student_id: createdStudent.id, school_id: schoolId }]);
 
           if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
             if (isCourseAssignmentSchemaMissing(fallbackCourseAssign.error.message)) {
@@ -2120,6 +2178,7 @@ const App: React.FC = () => {
 
   const handleTeacherEnrollSubmit = async () => {
     try {
+      const schoolId = await requireSchoolId();
       if (!teacherEnrollData.name || !teacherEnrollData.email) {
         notify('Please provide both name and email.');
         return;
@@ -2155,7 +2214,7 @@ const App: React.FC = () => {
         type: 'New',
       };
 
-      const insertPayload = {
+      const insertPayload = withSchoolId({
         id: newTeacher.id,
         name: newTeacher.name,
         email: newTeacher.email,
@@ -2165,7 +2224,7 @@ const App: React.FC = () => {
         type: newTeacher.type,
         auth_user_id: authUserId,
         temp_password: generatedPassword,
-      };
+      }, schoolId);
 
       let createdTeacherRecord: any = null;
       let dbError: any = null;
@@ -2200,6 +2259,7 @@ const App: React.FC = () => {
 
   const handleStudentServiceEnrollSubmit = async () => {
     try {
+      const schoolId = await requireSchoolId();
       if (!studentServiceEnrollData.name || !studentServiceEnrollData.email) {
         notify('Please provide both name and email.');
         return;
@@ -2235,7 +2295,7 @@ const App: React.FC = () => {
         type: 'New',
       };
 
-      const insertPayload = {
+      const insertPayload = withSchoolId({
         id: newStaff.id,
         name: newStaff.name,
         email: newStaff.email,
@@ -2245,7 +2305,7 @@ const App: React.FC = () => {
         type: newStaff.type,
         auth_user_id: authUserId,
         temp_password: generatedPassword,
-      };
+      }, schoolId);
 
       let createdRecord: any = null;
       let dbError: any = null;
@@ -2287,6 +2347,7 @@ const App: React.FC = () => {
 
     setIsBatchStudentServiceRegistering(true);
     try {
+      const schoolId = await requireSchoolId();
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
       const firstSheetName = workbook.SheetNames[0];
@@ -2358,7 +2419,7 @@ const App: React.FC = () => {
           type: 'New',
         };
 
-        const payload = {
+        const payload = withSchoolId({
           id: newStaff.id,
           name: newStaff.name,
           role: 'student_service',
@@ -2368,7 +2429,7 @@ const App: React.FC = () => {
           type: newStaff.type,
           temp_password: generatedPassword,
           temp_password_created_at: new Date().toISOString(),
-        };
+        }, schoolId);
 
         let createdRow: any = null;
         let insertError: any = null;
@@ -2793,6 +2854,22 @@ const App: React.FC = () => {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   }, [cloudSyncCountdown]);
 
+  if (onboardingStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950 flex items-center justify-center">
+        <p className="text-sm font-bold text-slate-400">Loading…</p>
+      </div>
+    );
+  }
+
+  if (onboardingStatus === 'needs-school') {
+    return (
+      <CreateSchoolPage
+        onCreated={() => setOnboardingStatus('ready')}
+      />
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-[#f8fafc] dark:bg-slate-950 transition-colors duration-500 relative">
 
@@ -3090,6 +3167,12 @@ const App: React.FC = () => {
             <div className="hidden sm:flex flex-col"><span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">System Pulse</span><span className="text-xs font-bold text-emerald-500">Live Calibration</span></div>
           </div>
           <div className="flex items-center gap-3 sm:gap-6">
+            <button
+              onClick={() => void handleLogout()}
+              className="px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-900 font-black text-xs uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-all"
+            >
+              Log Out
+            </button>
             <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-brand-500 rounded-xl active:scale-75 transition-all"><i className={`fas ${isDarkMode ? 'fa-sun' : 'fa-moon'}`}></i></button>
             <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden border-2 border-slate-200 dark:border-slate-800"><img src={DEFAULT_AVATAR} className="w-full h-full object-cover" /></div>
           </div>

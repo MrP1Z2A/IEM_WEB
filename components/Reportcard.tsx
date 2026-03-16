@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { supabase } from '../supabaseClient';
+import { getCurrentTenantContext, withSchoolId } from '../services/tenantService';
 
 type AppStudent = {
   id: string;
@@ -432,6 +433,7 @@ export default function ReportCardPage() {
     setStatus(null);
 
     try {
+      const { schoolId } = await getCurrentTenantContext();
       let uploadResult: { filePath: string; fileName: string };
       let reportTitle: string | null = null;
       let reportContent: string | null = null;
@@ -452,7 +454,7 @@ export default function ReportCardPage() {
         reportContent = generated.reportContent;
       }
 
-      const payload = {
+      const payload = withSchoolId({
         student_id: formData.student_id,
         class_id: formData.class_id,
         report_date: formData.report_date || getTodayIso(),
@@ -461,7 +463,7 @@ export default function ReportCardPage() {
         content: reportContent,
         file_path: uploadResult.filePath,
         file_name: uploadResult.fileName,
-      };
+      }, schoolId);
 
       const insertResult = await supabase.from('report_cards').insert([payload]);
       if (insertResult.error && isSchemaMissing(insertResult.error.message)) {

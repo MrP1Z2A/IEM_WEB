@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { supabase } from '../supabaseClient';
+import { getCurrentTenantContext, withSchoolId, withSchoolIdRows } from '../services/tenantService';
 
 type FinanceView = 'payment' | 'payment-assign' | 'payment-history' | 'late-payment' | 'student-finance-status';
 
@@ -440,6 +441,7 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
 
     setIsSaving(true);
     try {
+      const { schoolId } = await getCurrentTenantContext();
       const rows = selectedStudentIds.map(studentId => ({
         student_id: studentId,
         amount_mmk: Math.round(amount),
@@ -449,7 +451,7 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
         note: assignNote.trim() || null,
       }));
 
-      const insertResult = await supabase.from('student_payments').insert(rows);
+      const insertResult = await supabase.from('student_payments').insert(withSchoolIdRows(rows, schoolId));
       if (insertResult.error) throw insertResult.error;
 
       setStatus(`Assigned pending dues to ${selectedStudentIds.length} student(s).`);
@@ -483,14 +485,15 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
 
     setIsSaving(true);
     try {
-      const payload = {
+      const { schoolId } = await getCurrentTenantContext();
+      const payload = withSchoolId({
         student_id: formData.student_id,
         amount_mmk: Math.round(amount),
         payment_date: formData.payment_date || getTodayIso(),
         due_date: formData.due_date || null,
         status: formData.status,
         note: formData.note.trim() || null,
-      };
+      }, schoolId);
 
       const insertResult = await supabase.from('student_payments').insert([payload]);
       if (insertResult.error) throw insertResult.error;

@@ -14,6 +14,7 @@ interface DashboardProps {
     totalParents: number;
     totalEarningMMK: number;
     totalTeachers: number;
+    totalStudentServices: number;
     genderBreakdown: {
       male: number;
       female: number;
@@ -91,6 +92,7 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
     { label: 'Total Students', val: stats.totalStudents, icon: 'fa-user-graduate', color: 'text-brand-500', bg: 'bg-brand-50', layout: 'sm:col-start-1 sm:row-start-1' },
     { label: 'Total Parents', val: stats.totalParents, icon: 'fa-people-roof', color: 'text-sky-600', bg: 'bg-sky-50', layout: 'sm:col-start-1 sm:row-start-2' },
     { label: 'Total Teachers', val: stats.totalTeachers, icon: 'fa-chalkboard-teacher', color: 'text-emerald-500', bg: 'bg-emerald-50', layout: 'sm:col-start-2 sm:row-start-1' },
+    { label: 'Student Service', val: stats.totalStudentServices, icon: 'fa-user-gear', color: 'text-cyan-600', bg: 'bg-cyan-50', layout: 'sm:col-start-1 sm:row-start-3' },
     { label: 'Total Earning', val: formatCompactMMK(stats.totalEarningMMK), icon: 'fa-sack-dollar', color: 'text-amber-600', bg: 'bg-amber-50', layout: 'sm:col-start-2 sm:row-start-2' },
   ];
 

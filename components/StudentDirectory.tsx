@@ -69,21 +69,6 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
   const [isPhotoUploading, setIsPhotoUploading] = React.useState(false);
   const [photoUploadError, setPhotoUploadError] = React.useState<string | null>(null);
   const profilePhotoInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [showIdFormatPanel, setShowIdFormatPanel] = React.useState(false);
-  const [idPrefix, setIdPrefix] = React.useState<string>(() => {
-    try { return localStorage.getItem('dir_idPrefix') || ''; } catch { return ''; }
-  });
-  const [idPadLength, setIdPadLength] = React.useState<number>(() => {
-    try { return Number(localStorage.getItem('dir_idPadLength') || '0'); } catch { return 0; }
-  });
-  const [stripNodePrefix, setStripNodePrefix] = React.useState<boolean>(() => {
-    try { const v = localStorage.getItem('dir_stripNodePrefix'); return v === null ? true : v === 'true'; } catch { return true; }
-  });
-  const [showSavePasswordPrompt, setShowSavePasswordPrompt] = React.useState(false);
-  const [savePasswordInput, setSavePasswordInput] = React.useState('');
-  const [savePasswordError, setSavePasswordError] = React.useState<string | null>(null);
-  const [isSavingFormat, setIsSavingFormat] = React.useState(false);
-  const [saveFormatSuccess, setSaveFormatSuccess] = React.useState(false);
   const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
   const ALLOWED_PROFILE_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -117,135 +102,6 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
 
     return matchesQuery && matchesGender && matchesDate;
   });
-
-  const formatId = (id: any): string => {
-    let raw = String(id);
-    if (stripNodePrefix && raw.startsWith('NODE-')) raw = raw.slice(5);
-    const padded = idPadLength > 0 ? raw.padStart(idPadLength, '0') : raw;
-    return `${idPrefix}${padded}`;
-  };
-
-  const resolveDirectoryTable = (): 'students' | 'teachers' | 'student_services' => {
-    const normalizedTitle = String(title || '').toLowerCase();
-    if (normalizedTitle.includes('teacher')) return 'teachers';
-    if (normalizedTitle.includes('service')) return 'student_services';
-    return 'students';
-  };
-
-  const syncFormattedIdsToSupabase = async () => {
-    const allFormattedIds = students.map(student => formatId(student.id));
-    if (new Set(allFormattedIds).size !== allFormattedIds.length) {
-      return {
-        ok: false,
-        message: 'Formatted IDs are not unique. Please adjust prefix or zero-padding.',
-        updatedCount: 0,
-      };
-    }
-
-    const updates = students
-      .map(student => {
-        const oldId = String(student.id);
-        const newId = formatId(student.id);
-        return { oldId, newId };
-      })
-      .filter(item => item.oldId !== item.newId);
-
-    if (updates.length === 0) {
-      return { ok: true, message: '', updatedCount: 0 };
-    }
-
-    const targetTable = resolveDirectoryTable();
-
-    for (const updateItem of updates) {
-      const { oldId, newId } = updateItem;
-
-      if (targetTable === 'students') {
-        const studentReferenceTables: Array<{ table: string; column: string }> = [
-          { table: 'parents', column: 'student_id' },
-          { table: 'class_course_students', column: 'student_id' },
-          { table: 'student_courses', column: 'student_id' },
-          { table: 'attendance_records', column: 'student_id' },
-          { table: 'exam_grades', column: 'student_id' },
-          { table: 'report_cards', column: 'student_id' },
-          { table: 'student_payments', column: 'student_id' },
-        ];
-
-        for (const ref of studentReferenceTables) {
-          const { error: refError } = await supabase
-            .schema('public')
-            .from(ref.table)
-            .update({ [ref.column]: newId })
-            .eq(ref.column, oldId);
-
-          if (refError && !/column .* does not exist|relation .* does not exist/i.test(refError.message || '')) {
-            return {
-              ok: false,
-              message: `Failed to sync ${ref.table}.${ref.column}: ${refError.message}`,
-              updatedCount: 0,
-            };
-          }
-        }
-      }
-
-      const { error: idUpdateError } = await supabase
-        .schema('public')
-        .from(targetTable)
-        .update({ id: newId })
-        .eq('id', oldId);
-
-      if (idUpdateError) {
-        return {
-          ok: false,
-          message: `Failed to update ${targetTable}.id: ${idUpdateError.message}`,
-          updatedCount: 0,
-        };
-      }
-    }
-
-    return { ok: true, message: '', updatedCount: updates.length };
-  };
-
-  const confirmSaveIdFormat = async () => {
-    if (!savePasswordInput.trim()) return;
-
-    setIsSavingFormat(true);
-    setSavePasswordError(null);
-
-    try {
-      const ok = await verifyAdminPassword(savePasswordInput);
-      if (!ok) {
-        setSavePasswordError('Incorrect admin password.');
-        return;
-      }
-
-      try {
-        localStorage.setItem('dir_idPrefix', idPrefix);
-        localStorage.setItem('dir_idPadLength', String(idPadLength));
-        localStorage.setItem('dir_stripNodePrefix', String(stripNodePrefix));
-      } catch {
-        // Ignore localStorage errors and still continue with DB sync.
-      }
-
-      const syncResult = await syncFormattedIdsToSupabase();
-      if (!syncResult.ok) {
-        setSavePasswordError(syncResult.message || 'Failed to sync IDs to Supabase.');
-        return;
-      }
-
-      setSaveFormatSuccess(true);
-      setShowSavePasswordPrompt(false);
-      setSavePasswordInput('');
-
-      if (syncResult.updatedCount > 0) {
-        // Reload to reflect updated IDs from backend and linked pages.
-        setTimeout(() => {
-          window.location.reload();
-        }, 300);
-      }
-    } finally {
-      setIsSavingFormat(false);
-    }
-  };
 
   const getStudentClassName = (studentId: string) => {
     const matchedClass = classes.find(classItem =>
@@ -532,7 +388,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     doc.setFont('helvetica', 'normal');
 
     filteredStudents.forEach((student) => {
-      const rowText = `${namePrefix}${student.name} | ${formatId(student.id)} | ${student.email || '-'} | ${getStudentClassName(String(student.id))}`;
+      const rowText = `${namePrefix}${student.name} | ${student.id} | ${student.email || '-'} | ${getStudentClassName(String(student.id))}`;
       const wrapped = doc.splitTextToSize(rowText, 515);
 
       if (y + (wrapped.length * lineHeight) > pageHeight - 36) {
@@ -635,128 +491,9 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
           >
             Download PDF
           </button>
-          <button
-            onClick={() => setShowIdFormatPanel(p => !p)}
-            className={`px-4 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest transition-all ${
-              showIdFormatPanel ? 'bg-brand-500 text-white' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-premium'
-            }`}
-          >
-            <i className="fas fa-hashtag mr-1.5"></i> ID Format
-          </button>
 
         </div>
       </div>
-
-      {showIdFormatPanel && (
-        <div className="bg-white dark:bg-slate-900 rounded-[24px] p-5 shadow-premium border border-slate-100 dark:border-slate-800 space-y-5">
-          <div className="flex items-center justify-between gap-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">ID Format Configuration</p>
-            {saveFormatSuccess && (
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">
-                <i className="fas fa-check mr-1"></i> Saved
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-end gap-5">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Strip NODE- Prefix</p>
-              <button
-                onClick={() => setStripNodePrefix(p => !p)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all border ${
-                  stripNodePrefix
-                    ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 border-emerald-200 dark:border-emerald-700'
-                    : 'bg-slate-50 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                <i className={`fas ${stripNodePrefix ? 'fa-toggle-on' : 'fa-toggle-off'} text-base`}></i>
-                {stripNodePrefix ? 'On' : 'Off'}
-              </button>
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Display Prefix</p>
-              <input
-                type="text"
-                value={idPrefix}
-                onChange={(e) => setIdPrefix(e.target.value)}
-                placeholder="e.g. STU-"
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold outline-none w-36"
-              />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Zero Padding</p>
-              <select
-                value={idPadLength}
-                onChange={(e) => setIdPadLength(Number(e.target.value))}
-                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold outline-none"
-              >
-                <option value={0}>None</option>
-                <option value={3}>3 digits — 001</option>
-                <option value={4}>4 digits — 0001</option>
-                <option value={5}>5 digits — 00001</option>
-                <option value={6}>6 digits — 000001</option>
-              </select>
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Preview</p>
-              <div className="bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2 text-sm font-black text-brand-500 font-mono min-w-[120px]">
-                {formatId(students.length > 0 ? students[0].id : 'NODE-A1B2C3D4E5')}
-              </div>
-            </div>
-          </div>
-
-          {!showSavePasswordPrompt ? (
-            <div className="flex items-center gap-3 pt-1 border-t border-slate-100 dark:border-slate-800">
-              <button
-                onClick={() => { setShowSavePasswordPrompt(true); setSavePasswordInput(''); setSavePasswordError(null); setSaveFormatSuccess(false); }}
-                className="px-5 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-black uppercase tracking-widest shadow transition-all hover:opacity-90"
-              >
-                <i className="fas fa-floppy-disk mr-1.5"></i> Save Format
-              </button>
-              <button
-                onClick={() => { setIdPrefix(''); setIdPadLength(0); setStripNodePrefix(true); }}
-                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 border border-slate-200 dark:border-slate-700 transition-all"
-              >
-                Reset
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-end gap-3 pt-1 border-t border-slate-100 dark:border-slate-800">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Admin Password</p>
-                <input
-                  type="password"
-                  value={savePasswordInput}
-                  onChange={(e) => { setSavePasswordInput(e.target.value); setSavePasswordError(null); }}
-                  onKeyDown={async (e) => {
-                    if (e.key !== 'Enter') return;
-                    e.preventDefault();
-                    await confirmSaveIdFormat();
-                  }}
-                  placeholder="Enter admin password"
-                  autoFocus
-                  className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-semibold outline-none w-52"
-                />
-                {savePasswordError && <p className="mt-1 text-[10px] font-bold text-rose-500">{savePasswordError}</p>}
-              </div>
-              <button
-                disabled={isSavingFormat || !savePasswordInput.trim()}
-                onClick={() => void confirmSaveIdFormat()}
-                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-white transition-all ${
-                  isSavingFormat || !savePasswordInput.trim() ? 'bg-slate-300 cursor-not-allowed' : 'bg-brand-500 hover:opacity-90'
-                }`}
-              >
-                {isSavingFormat ? 'Saving...' : 'Confirm Save'}
-              </button>
-              <button
-                onClick={() => { setShowSavePasswordPrompt(false); setSavePasswordInput(''); setSavePasswordError(null); }}
-                className="px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 border border-slate-200 dark:border-slate-700 transition-all"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {isSelectMode && (
         <div className="bg-white dark:bg-slate-900 rounded-[24px] p-4 sm:p-5 shadow-premium border border-slate-100 dark:border-slate-800">
@@ -843,7 +580,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
               <div className="space-y-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                 <div className="flex items-center gap-2">
                   <i className="fas fa-id-card w-3 text-slate-300"></i>
-                  <span className="truncate">{formatId(s.id)}</span>
+                  <span className="truncate">{s.id}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <i className="fas fa-school w-3 text-slate-300"></i>
@@ -915,7 +652,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
               <div className="min-w-0">
                 <p className="text-lg font-black tracking-tight truncate">{namePrefix}{selectedStudent.name}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedStudent.email}</p>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">ID: {formatId(selectedStudent.id)}</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">ID: {selectedStudent.id}</p>
                 <button
                   onClick={handleChangeProfilePhoto}
                   disabled={isPhotoUploading}

@@ -1,10 +1,11 @@
-export type UserRole = 'student' | 'teacher' | 'parent' | 'admin';
+export type UserRole = 'student' | 'teacher' | 'parent' | 'admin' | 'owner' | 'staff' | 'student_service';
 
 export interface Profile {
   id: string;
   full_name: string;
   email: string;
   role: UserRole;
+  school_id?: string | null;
   avatar_url?: string;
   updated_at: string;
 }
@@ -35,6 +36,7 @@ export interface StudentPermissions {
 
 export interface Student {
   id: string;
+  school_id?: string | null;
   created_at?: string;
   name: string;
   role: UserRole;
