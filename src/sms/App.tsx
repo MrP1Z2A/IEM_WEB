@@ -99,9 +99,9 @@ const getInitialEnrollData = (type: 'New' | 'Old' = 'New') => ({
   role: 'student' as const,
   type,
   selectedStudentId: '',
-  selectedClassId: '',
-  selectedBatchCode: '',
-  selectedClassCourseId: '',
+  selectedClassIds: [] as string[],
+  selectedBatchCodes: [] as string[],
+  selectedClassCourseIds: [] as string[],
   dateOfBirth: '',
   parentName: '',
   parentCountryCode: '+1',
@@ -1903,7 +1903,7 @@ const App: React.FC = () => {
         return;
       }
 
-      if (!enrollData.selectedClassId) {
+      if (!enrollData.selectedClassIds || enrollData.selectedClassIds.length === 0) {
         setEnrollClassCourses([]);
         setIsEnrollClassCoursesLoading(false);
         return;
@@ -1913,7 +1913,7 @@ const App: React.FC = () => {
       const { data, error } = await supabase
         .from('class_courses')
         .select('id, name, class_id')
-        .eq('class_id', enrollData.selectedClassId)
+        .in('class_id', enrollData.selectedClassIds)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -1931,7 +1931,7 @@ const App: React.FC = () => {
     };
 
     void loadEnrollClassCourses();
-  }, [isEnrollModalOpen, enrollData.type, enrollData.selectedClassId]);
+  }, [isEnrollModalOpen, enrollData.type, enrollData.selectedClassIds]);
 
   const handleEnrollSubmit = async () => {
     const enrollToken = enrollAbortCounterRef.current;
@@ -1945,18 +1945,13 @@ const App: React.FC = () => {
           return;
         }
 
-        if (!enrollData.selectedBatchCode) {
-          notify('Please select a batch for old node initialization.');
+        if (!enrollData.selectedClassIds || enrollData.selectedClassIds.length === 0) {
+          notify('Please select at least one class.');
           return;
         }
 
-        if (!enrollData.selectedClassId) {
-          notify('Selected batch is not linked to a class.');
-          return;
-        }
-
-        if (!enrollData.selectedClassCourseId) {
-          notify('Please select a course for old node initialization.');
+        if (!enrollData.selectedClassCourseIds || enrollData.selectedClassCourseIds.length === 0) {
+          notify('Please select at least one course.');
           return;
         }
 
@@ -1980,31 +1975,45 @@ const App: React.FC = () => {
 
         if (dbError) throw dbError;
 
-        {
-          const primaryCourseAssign = await supabase
-            .from('class_course_students')
-            .insert([{ class_id: enrollData.selectedClassId, class_course_id: enrollData.selectedClassCourseId, student_id: updatedStudent.id, school_id: schoolId }]);
+        const assignments = enrollData.selectedClassCourseIds.map(courseId => {
+          const course = enrollClassCourses.find(c => String(c.id) === String(courseId));
+          return {
+            class_id: course ? course.class_id : enrollData.selectedClassIds[0],
+            class_course_id: courseId,
+            student_id: updatedStudent.id,
+            school_id: schoolId
+          };
+        });
 
-          if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
-            const fallbackCourseAssign = await supabase
-              .from('student_courses')
-              .insert([{ course_id: enrollData.selectedClassCourseId, student_id: updatedStudent.id, school_id: schoolId }]);
+        const primaryCourseAssign = await supabase
+          .from('class_course_students')
+          .insert(assignments);
 
-            if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
-              if (isCourseAssignmentSchemaMissing(fallbackCourseAssign.error.message)) {
-                throw new Error('Course assignment is not configured. Create public.class_course_students in Supabase.');
-              }
-              throw fallbackCourseAssign.error;
+        if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
+          const fallbackAssignments = enrollData.selectedClassCourseIds.map(courseId => ({
+            course_id: courseId,
+            student_id: updatedStudent.id,
+            school_id: schoolId
+          }));
+          const fallbackCourseAssign = await supabase
+            .from('student_courses')
+            .insert(fallbackAssignments);
+
+          if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
+            if (isCourseAssignmentSchemaMissing(fallbackCourseAssign.error.message)) {
+              throw new Error('Course assignment is not configured. Create public.class_course_students in Supabase.');
             }
-          } else if (primaryCourseAssign.error && !/duplicate key|already exists/i.test(primaryCourseAssign.error.message || '')) {
-            throw primaryCourseAssign.error;
+            throw fallbackCourseAssign.error;
           }
+        } else if (primaryCourseAssign.error && !/duplicate key|already exists/i.test(primaryCourseAssign.error.message || '')) {
+          throw primaryCourseAssign.error;
         }
 
         setStudents(prev => prev.map(student => String(student.id) === String(updatedStudent.id) ? updatedStudent : student));
         setAllStudents(prev => prev.map(student => String(student.id) === String(updatedStudent.id) ? updatedStudent : student));
+        
         setClasses(prev => prev.map(classItem => {
-          if (String(classItem.id) !== String(enrollData.selectedClassId)) return classItem;
+          if (!enrollData.selectedClassIds.includes(String(classItem.id))) return classItem;
           const existingIds = (classItem.student_ids || []).map((id: any) => String(id));
           if (existingIds.includes(String(updatedStudent.id))) {
             return classItem;
@@ -2055,13 +2064,13 @@ const App: React.FC = () => {
         return;
       }
 
-      if (!enrollData.selectedClassId) {
-        notify('Please choose a class for the student.');
+      if (!enrollData.selectedClassIds || enrollData.selectedClassIds.length === 0) {
+        notify('Please choose at least one class for the student.');
         return;
       }
 
-      if (!enrollData.selectedClassCourseId) {
-        notify('Please choose a class course for the student.');
+      if (!enrollData.selectedClassCourseIds || enrollData.selectedClassCourseIds.length === 0) {
+        notify('Please choose at least one class course for the student.');
         return;
       }
 
@@ -2159,14 +2168,30 @@ const App: React.FC = () => {
       const assignmentIssues: string[] = [];
 
       {
+        const assignments = enrollData.selectedClassCourseIds.map(courseId => {
+          const course = enrollClassCourses.find(c => String(c.id) === String(courseId));
+          return {
+            class_id: course ? course.class_id : enrollData.selectedClassIds[0],
+            class_course_id: courseId,
+            student_id: createdStudent.id,
+            school_id: schoolId
+          };
+        });
+
         const primaryCourseAssign = await supabase
           .from('class_course_students')
-          .insert([{ class_id: enrollData.selectedClassId, class_course_id: enrollData.selectedClassCourseId, student_id: createdStudent.id, school_id: schoolId }]);
+          .insert(assignments);
 
         if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
+          const fallbackAssignments = enrollData.selectedClassCourseIds.map(courseId => ({
+            course_id: courseId,
+            student_id: createdStudent.id,
+            school_id: schoolId
+          }));
+
           const fallbackCourseAssign = await supabase
             .from('student_courses')
-            .insert([{ course_id: enrollData.selectedClassCourseId, student_id: createdStudent.id, school_id: schoolId }]);
+            .insert(fallbackAssignments);
 
           if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
             if (isCourseAssignmentSchemaMissing(fallbackCourseAssign.error.message)) {
@@ -2181,7 +2206,7 @@ const App: React.FC = () => {
 
         if (!primaryCourseAssign.error || /duplicate key|already exists/i.test(primaryCourseAssign.error.message || '')) {
           setClasses(prev => prev.map(classItem => {
-            if (String(classItem.id) !== enrollData.selectedClassId) return classItem;
+            if (!enrollData.selectedClassIds.includes(String(classItem.id))) return classItem;
             const existingIds = (classItem.student_ids || []).map((id: any) => String(id));
             if (existingIds.includes(String(createdStudent.id))) {
               return classItem;

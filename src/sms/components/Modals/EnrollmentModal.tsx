@@ -156,9 +156,9 @@ interface EnrollmentModalProps {
     email: string;
     type: 'New' | 'Old';
     selectedStudentId: string;
-    selectedClassId: string;
-    selectedBatchCode: string;
-    selectedClassCourseId: string;
+    selectedClassIds: string[];
+    selectedBatchCodes: string[];
+    selectedClassCourseIds: string[];
     dateOfBirth: string;
     parentName: string;
     parentCountryCode: string;
@@ -198,6 +198,49 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
   const isParentEmailValid = !enrollData.parentEmail || EMAIL_PATTERN.test(enrollData.parentEmail.trim());
   const isSecondaryParentEmailValid = !enrollData.secondaryParentEmail || EMAIL_PATTERN.test(enrollData.secondaryParentEmail.trim());
 
+  const toggleClass = (classId: string) => {
+    const nextIds = enrollData.selectedClassIds.includes(classId)
+      ? enrollData.selectedClassIds.filter(id => id !== classId)
+      : [...enrollData.selectedClassIds, classId];
+    
+    // Also remove courses linked to unselected class
+    const nextCourseIds = enrollData.selectedClassCourseIds.filter(courseId => {
+      const course = classCourses.find(c => String(c.id) === String(courseId));
+      return !course || nextIds.includes(course.class_id);
+    });
+
+    setEnrollData({
+      ...enrollData,
+      selectedClassIds: nextIds,
+      selectedClassCourseIds: nextCourseIds
+    });
+  };
+
+  const toggleCourse = (courseId: string) => {
+    const nextIds = enrollData.selectedClassCourseIds.includes(courseId)
+      ? enrollData.selectedClassCourseIds.filter(id => id !== courseId)
+      : [...enrollData.selectedClassCourseIds, courseId];
+    
+    setEnrollData({ ...enrollData, selectedClassCourseIds: nextIds });
+  };
+
+  const selectAllCoursesForClass = (classId: string) => {
+    const classCourseIds = classCourses.filter(c => c.class_id === classId).map(c => c.id);
+    const otherCourseIds = enrollData.selectedClassCourseIds.filter(id => {
+      const course = classCourses.find(c => String(c.id) === String(id));
+      return course && course.class_id !== classId;
+    });
+    setEnrollData({ ...enrollData, selectedClassCourseIds: [...otherCourseIds, ...classCourseIds] });
+  };
+
+  const clearCoursesForClass = (classId: string) => {
+    const nextCourseIds = enrollData.selectedClassCourseIds.filter(id => {
+      const course = classCourses.find(c => String(c.id) === String(id));
+      return !course || course.class_id !== classId;
+    });
+    setEnrollData({ ...enrollData, selectedClassCourseIds: nextCourseIds });
+  };
+
   return (
     <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
       <div className="bg-white dark:bg-slate-900 w-full max-w-lg max-h-[90vh] rounded-[28px] sm:rounded-[40px] lg:rounded-[56px] shadow-2xl overflow-y-auto border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300">
@@ -219,69 +262,23 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
         {/* Form Content */}
         <div className="p-6 sm:p-8 lg:p-12 space-y-6 sm:space-y-8">
-          {enrollData.type === 'Old' ? (
-            <>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Select Existing Student</label>
-                <select
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
-                  value={enrollData.selectedStudentId}
-                  onChange={(e) => setEnrollData({ ...enrollData, selectedStudentId: e.target.value })}
-                >
-                  <option value="">Choose a student...</option>
-                  {students.map(student => (
-                    <option key={student.id} value={student.id}>{student.name} ({student.id})</option>
-                  ))}
-                </select>
-              </div>
+          {enrollData.type === 'Old' && (
+            <div>
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Select Existing Student</label>
+              <select
+                className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
+                value={enrollData.selectedStudentId}
+                onChange={(e) => setEnrollData({ ...enrollData, selectedStudentId: e.target.value })}
+              >
+                <option value="">Choose a student...</option>
+                {students.map(student => (
+                  <option key={student.id} value={student.id}>{student.name} ({student.id})</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Class</label>
-                <select
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all disabled:opacity-60"
-                  value={enrollData.selectedBatchCode}
-                  onChange={(e) => {
-                    const nextClassId = e.target.value;
-                    const matchedBatchClass = classes.find(classItem => String(classItem.id) === String(nextClassId));
-                    setEnrollData({
-                      ...enrollData,
-                      selectedBatchCode: nextClassId,
-                      selectedClassId: matchedBatchClass ? String(matchedBatchClass.id) : enrollData.selectedClassId,
-                      selectedClassCourseId: '',
-                    });
-                  }}
-                >
-                  <option value="">Choose a class...</option>
-                  {classes.map((classItem) => (
-                    <option key={classItem.id} value={classItem.id}>
-                      {classItem.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Course</label>
-                <select
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all disabled:opacity-60"
-                  value={enrollData.selectedClassCourseId}
-                  onChange={(e) => setEnrollData({ ...enrollData, selectedClassCourseId: e.target.value })}
-                  disabled={!enrollData.selectedClassId || isClassCoursesLoading}
-                >
-                  <option value="">
-                    {!enrollData.selectedBatchCode
-                      ? 'Choose batch first...'
-                      : isClassCoursesLoading
-                        ? 'Loading courses...'
-                        : 'Choose a course...'}
-                  </option>
-                  {classCourses.map((course) => (
-                    <option key={course.id} value={course.id}>{course.name}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          ) : (
+          {enrollData.type === 'New' && (
             <>
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Full Legal Name</label>
@@ -305,44 +302,104 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                 />
                 {!isStudentEmailValid && <p className="mt-2 text-[11px] font-bold text-rose-500">Enter a valid email format (example@domain.com).</p>}
               </div>
+            </>
+          )}
 
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Class</label>
-                <select
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
-                  value={enrollData.selectedClassId}
-                  onChange={(e) => setEnrollData({ ...enrollData, selectedClassId: e.target.value, selectedClassCourseId: '' })}
-                >
-                  <option value="">Choose a class...</option>
-                  {classes.map((classItem) => (
-                    <option key={classItem.id} value={classItem.id}>
-                      {classItem.name} ({classItem.class_code || classItem.id})
-                    </option>
-                  ))}
-                </select>
+          {/* Multi-Select Classes */}
+          <div>
+            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Target Classes (Multiple)</label>
+            <div className="flex flex-wrap gap-2">
+              {classes.map((classItem) => {
+                const isSelected = enrollData.selectedClassIds.includes(String(classItem.id));
+                return (
+                  <button
+                    key={classItem.id}
+                    onClick={() => toggleClass(String(classItem.id))}
+                    className={`px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border-2 transition-all ${
+                      isSelected 
+                        ? 'bg-brand-500 border-brand-500 text-white shadow-lg shadow-brand-500/20' 
+                        : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {classItem.name}
+                  </button>
+                );
+              })}
+              {classes.length === 0 && <p className="text-xs font-bold text-slate-400">No classes found.</p>}
+            </div>
+          </div>
+
+          {/* Multi-Select Courses */}
+          <div>
+            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">
+              {isClassCoursesLoading ? 'Updating Course Nodes...' : 'Course Nodes (Multiple)'}
+            </label>
+            
+            {enrollData.selectedClassIds.length === 0 ? (
+              <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center">
+                <i className="fas fa-layer-group text-slate-300 text-2xl mb-2"></i>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select class first</p>
               </div>
+            ) : (
+              <div className="space-y-6">
+                {enrollData.selectedClassIds.map(classId => {
+                  const classItem = classes.find(c => String(c.id) === String(classId));
+                  const coursesForClass = classCourses.filter(c => String(c.class_id) === String(classId));
+                  
+                  if (coursesForClass.length === 0 && !isClassCoursesLoading) return null;
 
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Class Course</label>
-                <select
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all disabled:opacity-60"
-                  value={enrollData.selectedClassCourseId}
-                  onChange={(e) => setEnrollData({ ...enrollData, selectedClassCourseId: e.target.value })}
-                  disabled={!enrollData.selectedClassId || isClassCoursesLoading}
-                >
-                  <option value="">
-                    {!enrollData.selectedClassId
-                      ? 'Choose class first...'
-                      : isClassCoursesLoading
-                        ? 'Loading class courses...'
-                        : 'Choose a class course...'}
-                  </option>
-                  {classCourses.map((course) => (
-                    <option key={course.id} value={course.id}>{course.name}</option>
-                  ))}
-                </select>
+                  return (
+                    <div key={classId} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-brand-500 tracking-widest">{classItem?.name || 'Class'} Courses</span>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => selectAllCoursesForClass(classId)}
+                            className="text-[9px] font-black uppercase text-slate-400 hover:text-brand-500 tracking-tighter"
+                          >
+                            Select All
+                          </button>
+                          <button 
+                            onClick={() => clearCoursesForClass(classId)}
+                            className="text-[9px] font-black uppercase text-slate-400 hover:text-rose-500 tracking-tighter"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {coursesForClass.map(course => {
+                          const isSelected = enrollData.selectedClassCourseIds.includes(String(course.id));
+                          return (
+                            <button
+                              key={course.id}
+                              onClick={() => toggleCourse(String(course.id))}
+                              className={`px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tight border-2 transition-all ${
+                                isSelected 
+                                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-md' 
+                                  : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 hover:border-brand-500 hover:text-brand-500'
+                              }`}
+                            >
+                              {course.name}
+                            </button>
+                          );
+                        })}
+                        {coursesForClass.length === 0 && isClassCoursesLoading && (
+                          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                            <i className="fas fa-circle-notch fa-spin"></i>
+                            Loading...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            )}
+          </div>
 
+          {enrollData.type === 'New' && (
+            <>
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Date of Birth</label>
                 <input
@@ -456,7 +513,6 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                   )}
                 </div>
               </div>
-
             </>
           )}
 
@@ -473,7 +529,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
         <div className="p-6 sm:p-8 lg:p-12 bg-slate-50 dark:bg-slate-900/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
           <button 
             onClick={onSubmit} 
-            className="flex-1 py-6 bg-brand-500 text-white font-black rounded-[32px] text-sm uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all"
+            className="flex-1 py-6 bg-brand-500 text-white font-black rounded-[32px] text-sm uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all outline-none"
           >
             Initialize Node
           </button>
