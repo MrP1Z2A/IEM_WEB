@@ -1,0 +1,15 @@
+[
+  {
+    "id": "e79c393c-002e-486d-9795-8e6061086c69",
+    "exam_id": "626dc281-b275-4803-92d5-c18d24680379",
+    "student_id": "NODE-06E5DDF971",
+    "grade": "A+",
+    "note": null,
+    "created_at": "2026-03-20T13:34:13.761915+00:00",
+    "updated_at": "2026-03-21T05:38:05.471761+00:00",
+    "school_id": "f17d2849-bd51-40eb-855d-1cc3a5685c54",
+    "name": "g1",
+    "class_id": "a598ea51-0bc4-490e-a07d-1edcbeeb1a81",
+    "course_name": "cti"
+  }
+]

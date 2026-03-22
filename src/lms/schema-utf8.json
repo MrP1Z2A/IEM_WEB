@@ -1,0 +1,61 @@
+﻿{
+    "required":  [
+                     "id",
+                     "exam_id",
+                     "student_id",
+                     "grade",
+                     "created_at",
+                     "updated_at"
+                 ],
+    "properties":  {
+                       "id":  {
+                                  "default":  "gen_random_uuid()",
+                                  "description":  "Note:\nThis is a Primary Key.\u003cpk/\u003e",
+                                  "format":  "uuid",
+                                  "type":  "string"
+                              },
+                       "exam_id":  {
+                                       "description":  "Note:\nThis is a Foreign Key to `exams.id`.\u003cfk table=\u0027exams\u0027 column=\u0027id\u0027/\u003e",
+                                       "format":  "uuid",
+                                       "type":  "string"
+                                   },
+                       "student_id":  {
+                                          "description":  "Note:\nThis is a Foreign Key to `students.id`.\u003cfk table=\u0027students\u0027 column=\u0027id\u0027/\u003e",
+                                          "format":  "text",
+                                          "type":  "string"
+                                      },
+                       "grade":  {
+                                     "format":  "text",
+                                     "type":  "string"
+                                 },
+                       "note":  {
+                                    "format":  "text",
+                                    "type":  "string"
+                                },
+                       "created_at":  {
+                                          "default":  "now()",
+                                          "format":  "timestamp with time zone",
+                                          "type":  "string"
+                                      },
+                       "updated_at":  {
+                                          "default":  "now()",
+                                          "format":  "timestamp with time zone",
+                                          "type":  "string"
+                                      },
+                       "school_id":  {
+                                         "default":  "public.current_school_id()",
+                                         "description":  "Note:\nThis is a Foreign Key to `schools.id`.\u003cfk table=\u0027schools\u0027 column=\u0027id\u0027/\u003e",
+                                         "format":  "uuid",
+                                         "type":  "string"
+                                     },
+                       "name":  {
+                                    "format":  "text",
+                                    "type":  "string"
+                                },
+                       "class_id":  {
+                                        "format":  "uuid",
+                                        "type":  "string"
+                                    }
+                   },
+    "type":  "object"
+}

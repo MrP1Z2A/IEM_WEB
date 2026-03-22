@@ -1,0 +1,8 @@
+{
+  "name": "EduSphere LMS",
+  "description": "A comprehensive AI-powered learning management system with course management, automated quiz generation, and a freelance teacher marketplace.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "bb0b5f34-02ad-4155-be2d-ed97399ba0e3",
+    "school_id": "f17d2849-bd51-40eb-855d-1cc3a5685c54",
+    "class_id": "3f764d4d-f07a-43bf-9024-4768db119fd6",
+    "class_course_id": "9f60d209-61ca-4874-8942-1657487aee69",
+    "name": "math",
+    "metadata": {
+      "size": 0,
+      "type": "folder"
+    },
+    "created_at": "2026-03-21T07:11:25.937629+00:00",
+    "updated_at": "2026-03-21T07:11:25.937629+00:00"
+  },
+  {
+    "id": "1cdb7878-6cb7-43f6-a5ba-ca6dc492b64a",
+    "school_id": "f17d2849-bd51-40eb-855d-1cc3a5685c54",
+    "class_id": "3f764d4d-f07a-43bf-9024-4768db119fd6",
+    "class_course_id": "9f60d209-61ca-4874-8942-1657487aee69",
+    "name": "elementary-school-report-card-design-template-5355659cd4a057d97311f83c8ba2b68c_screen.jpg",
+    "metadata": {
+      "size": 72098,
+      "type": "file",
+      "folder": "math",
+      "mime_type": "image/jpeg"
+    },
+    "created_at": "2026-03-21T07:11:29.973572+00:00",
+    "updated_at": "2026-03-21T07:11:29.973572+00:00"
+  }
+]

@@ -1,0 +1,1487 @@
+
+import React, { useState, useEffect, useCallback } from 'react';
+import Sidebar from './components/Sidebar';
+import Login from './components/Login';
+import COURSES from './components/ClassandCoursesmanager';
+import LiveCalendar from './components/Livecalender';
+import { Course, User, UserRole, View, Note, Quiz, ReportCard } from './types';
+import { INITIAL_USER, INITIAL_COURSES, SCHOOL_EVENTS, SCHOOL_ACTIVITIES, DETAILED_GRADES, STUDENT_ACHIEVEMENTS, SCHOOL_HIVE_POSTS, SCHOOL_CONTACTS } from './constants';
+import { summarizeNotes, generateQuizFromNotes } from './services/aiService';
+import { supabase, isSupabaseConfigured } from './src/supabaseClient';
+
+type NoticeItem = {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  fileUrl?: string;
+  fileName?: string;
+};
+
+type NoticeBoardRow = {
+  id: string;
+  title: string | null;
+  message: string | null;
+  notice_date: string | null;
+  created_at: string | null;
+  priority: string | null;
+  file_path: string | null;
+  file_name: string | null;
+};
+
+const NOTICE_FILE_BUCKET = import.meta.env.VITE_SUPABASE_NOTICE_BUCKET || 'notice_board';
+
+const formatNoticeDate = (value?: string | null) => {
+  if (!value) return 'N/A';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'N/A';
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+};
+
+const normalizePriority = (value?: string | null): 'Low' | 'Medium' | 'High' | 'Urgent' => {
+  const formatted = (value || '').trim().toLowerCase();
+  if (formatted === 'urgent') return 'Urgent';
+  if (formatted === 'high') return 'High';
+  if (formatted === 'low') return 'Low';
+  if (formatted === 'medium') return 'Medium';
+  return 'Medium';
+};
+
+const getNoticeFileUrl = (filePath?: string | null) => {
+  if (!filePath || !supabase) return undefined;
+  if (/^https?:\/\//i.test(filePath)) return filePath;
+
+  const normalizedPath = filePath.replace(/^\/+/, '');
+
+  if (normalizedPath.startsWith(`${NOTICE_FILE_BUCKET}/`)) {
+    const objectPath = normalizedPath.slice(NOTICE_FILE_BUCKET.length + 1);
+    const { data } = supabase.storage.from(NOTICE_FILE_BUCKET).getPublicUrl(objectPath);
+    return data.publicUrl;
+  }
+
+  const { data } = supabase.storage.from(NOTICE_FILE_BUCKET).getPublicUrl(normalizedPath);
+  return data.publicUrl;
+};
+
+const fetchNoticeBoardData = async (schoolId?: string): Promise<NoticeItem[]> => {
+  if (!supabase || !isSupabaseConfigured) {
+    console.warn('[NoticeBoard] Data fetching skipped: Supabase is not configured. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are valid and the dev server has been restarted.');
+    return [];
+  }
+
+  let query = supabase
+    .from('notice_board')
+    .select('id, title, message, notice_date, created_at, priority, file_path, file_name')
+    .order('notice_date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (schoolId) {
+    query = query.eq('school_id', schoolId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data ?? []) as NoticeBoardRow[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: (row.title || 'Untitled Notice').trim(),
+    content: (row.message || '').trim() || 'No notice details provided.',
+    date: formatNoticeDate(row.notice_date || row.created_at),
+    priority: normalizePriority(row.priority),
+    fileUrl: getNoticeFileUrl(row.file_path),
+    fileName: row.file_name || undefined,
+  }));
+};
+
+const getStudentAvatarUrl = (avatarValue?: string | null) => {
+  if (!avatarValue || !supabase) return null;
+  if (/^https?:\/\//i.test(avatarValue)) return avatarValue;
+  const { data } = supabase.storage.from('student_profile').getPublicUrl(avatarValue);
+  return data.publicUrl;
+};
+
+const formatAttendanceRate = (value?: string | number | null) => {
+  if (value === null || value === undefined || value === '') return 'N/A';
+  const stringValue = String(value).trim();
+  if (stringValue.includes('%')) return stringValue;
+  return `${stringValue}%`;
+};
+
+const LOGIN_STORAGE_KEY = 'edusphere_logged_in';
+const USER_STORAGE_KEY = 'edusphere_user';
+const VIEWED_NOTICES_STORAGE_KEY = 'edusphere_viewed_notice_ids';
+
+const getStoredLoginState = () => {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(LOGIN_STORAGE_KEY) === 'true';
+};
+
+const getStoredUser = () => {
+  if (typeof window === 'undefined') return INITIAL_USER;
+  try {
+    const rawUser = window.localStorage.getItem(USER_STORAGE_KEY);
+    if (!rawUser) return INITIAL_USER;
+    return { ...INITIAL_USER, ...JSON.parse(rawUser) } as User;
+  } catch {
+    return INITIAL_USER;
+  }
+};
+
+const getStoredViewedNoticeIds = () => {
+  if (typeof window === 'undefined') return [] as string[];
+  try {
+    const raw = window.localStorage.getItem(VIEWED_NOTICES_STORAGE_KEY);
+    if (!raw) return [] as string[];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [] as string[];
+    return parsed.filter((value) => typeof value === 'string');
+  } catch {
+    return [] as string[];
+  }
+};
+
+const App: React.FC = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(getStoredLoginState);
+  const [user, setUser] = useState<User>(getStoredUser);
+  const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
+  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
+  const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
+  const [noticeOriginView, setNoticeOriginView] = useState<'notice-board' | 'instruction'>('notice-board');
+  const [viewedNoticeIds, setViewedNoticeIds] = useState<string[]>(getStoredViewedNoticeIds);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date(2025, 3, 1));
+  const [calendarSubView, setCalendarSubView] = useState<'day' | 'week' | 'month'>('month');
+  
+  // Dynamic Data States (Linked to SMS)
+  const [dynamicAnnouncements, setDynamicAnnouncements] = useState<NoticeItem[]>([]);
+  const [dynamicExams, setDynamicExams] = useState<any[]>([]);
+  const [dynamicAssignments, setDynamicAssignments] = useState<any[]>([]);
+  const [examResultsData, setExamResultsData] = useState<any[]>([]);
+  const [reportCard, setReportCard] = useState<ReportCard | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
+  const [studentAttendanceRate, setStudentAttendanceRate] = useState<string>('98%');
+
+  const hasNewNotices = dynamicAnnouncements.some(notice => !viewedNoticeIds.includes(notice.id));
+
+  const performSmsSync = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Debug log for schoolId
+      console.log('[NoticeBoard] Fetching notices for schoolId:', user.schoolId);
+      const notices = await fetchNoticeBoardData(user.schoolId);
+
+      console.log('[NoticeBoard] Notices fetched:', notices);
+      setDynamicAnnouncements(notices);
+
+      if (supabase && isSupabaseConfigured) {
+        const { data: gradesData, error: gradesError } = await supabase.from('exam_grades').select('*');
+        if (!gradesError && gradesData) {
+           const mappedGrades = gradesData.map(g => ({
+             className: g.name || 'Unknown Class',
+             courseName: g.course_name || 'Unknown Course',
+             grade: g.grade ? String(g.grade) : 'Pending'
+           }));
+           setExamResultsData(mappedGrades);
+        } else {
+           console.error("Error fetching grades:", gradesError);
+           setExamResultsData([]);
+        }
+      }
+
+    } catch (err) {
+      console.error("Sync error");
+      setDynamicAnnouncements([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user.schoolId]);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      performSmsSync();
+      if (user.role === UserRole.PARENT) {
+        setCurrentView('parent-portal');
+      }
+    }
+  }, [isLoggedIn, user.role]);
+
+  const loadStudentProfile = useCallback(async () => {
+    if (!isLoggedIn || !supabase || !isSupabaseConfigured) return;
+
+    let studentQuery = supabase
+      .from('students')
+      .select('id, name, avatar, email, attendanceRate, school_id')
+      .or(`email.eq.${user.email},name.eq.${user.email}`);
+
+    if (user.schoolId) {
+      studentQuery = studentQuery.eq('school_id', user.schoolId);
+    }
+
+    const { data: student, error } = await studentQuery.maybeSingle();
+
+    if (error) {
+      console.error('Failed to load student profile', error.message);
+      return;
+    }
+
+    if (!student) return;
+
+    const avatarUrl = getStudentAvatarUrl(student.avatar);
+    const attendanceRate = formatAttendanceRate(student.attendanceRate);
+
+    setStudentAttendanceRate(attendanceRate);
+
+    setUser(prev => ({
+      ...prev,
+      name: student.name || prev.name,
+      email: student.email || prev.email,
+      studentId: student.id ? String(student.id) : prev.studentId,
+      schoolId: student.school_id || prev.schoolId,
+      avatar: avatarUrl || prev.avatar
+    }));
+  }, [isLoggedIn, user.email, user.schoolId]);
+
+  useEffect(() => {
+    void loadStudentProfile();
+  }, [loadStudentProfile]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!isLoggedIn) {
+      window.localStorage.removeItem(LOGIN_STORAGE_KEY);
+      window.localStorage.removeItem(USER_STORAGE_KEY);
+      return;
+    }
+
+    window.localStorage.setItem(LOGIN_STORAGE_KEY, 'true');
+    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  }, [isLoggedIn, user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(VIEWED_NOTICES_STORAGE_KEY, JSON.stringify(viewedNoticeIds));
+  }, [viewedNoticeIds]);
+
+  useEffect(() => {
+    if (currentView !== 'notice-board' || dynamicAnnouncements.length === 0) return;
+
+    const idsToMark = dynamicAnnouncements.map(notice => notice.id);
+    setViewedNoticeIds(prev => Array.from(new Set([...prev, ...idsToMark])));
+  }, [currentView, dynamicAnnouncements]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const refreshInterval = window.setInterval(() => {
+      void performSmsSync();
+      void loadStudentProfile();
+    }, 60000);
+
+    return () => window.clearInterval(refreshInterval);
+  }, [isLoggedIn, performSmsSync, loadStudentProfile]);
+
+  const handleLogin = (role: Exclude<UserRole, UserRole.PARENT>, email: string, schoolId?: string) => {
+    const newUser = { 
+      ...INITIAL_USER, 
+      role, 
+      email,
+      name: INITIAL_USER.name,
+      schoolId,
+      childId: undefined
+    };
+    setUser(newUser);
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUser(INITIAL_USER);
+    setSelectedCourse(null);
+    setSelectedNotice(null);
+    setActiveQuiz(null);
+    setCurrentView('dashboard');
+    setIsSidebarOpen(false);
+  };
+
+  const handleCourseClick = (course: Course) => {
+    setSelectedCourse(course);
+    setCurrentView('course-detail');
+  };
+
+  const handleNoticeOpen = (notice: NoticeItem, origin: 'notice-board' | 'instruction') => {
+    setSelectedNotice(notice);
+    setNoticeOriginView(origin);
+    setCurrentView('notice-detail');
+  };
+
+  const handleSummarize = async (note: Note) => {
+    setIsLoading(true);
+    const summary = await summarizeNotes(note.content);
+    setCourses(prev => prev.map(c => {
+      if (c.id === selectedCourse?.id) {
+        return {
+          ...c,
+          notes: c.notes.map(n => n.id === note.id ? { ...n, summary } : n)
+        };
+      }
+      return c;
+    }));
+    setIsLoading(false);
+  };
+
+  const handleGenerateQuiz = async (note: Note) => {
+    if (!selectedCourse) return;
+    setIsLoading(true);
+    const questions = await generateQuizFromNotes(note.content);
+    const newQuiz: Quiz = {
+      id: `q-${Date.now()}`,
+      title: `Quiz: ${note.title}`,
+      questions,
+      courseId: selectedCourse.id
+    };
+    setCourses(prev => prev.map(c => {
+      if (c.id === selectedCourse.id) {
+        return { ...c, quizzes: [...c.quizzes, newQuiz] };
+      }
+      return c;
+    }));
+    setActiveQuiz(newQuiz);
+    setCurrentView('quiz-player');
+    setIsLoading(false);
+  };
+
+  const renderParentPortal = () => {
+    if (!reportCard) return null;
+    return (
+      <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 border-b border-[#1f4e4a] pb-8">
+          <div className="space-y-2">
+            <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Parental Oversight</h2>
+            <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-full bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d]">
+                 <i className="fa-solid fa-child-reaching"></i>
+               </div>
+               <div>
+                  <p className="text-[#4ea59d] font-black text-[10px] uppercase tracking-[0.2em]">Student Record: {user.name}</p>
+                  <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">{reportCard.term} Academic Session</p>
+               </div>
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <button className="px-6 py-3 bg-[#4ea59d]/10 border border-white/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all">
+              <i className="fa-solid fa-file-pdf mr-2"></i> Download Full Report
+            </button>
+          </div>
+        </header>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 text-center">
+            <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Current GPA</p>
+            <p className="text-4xl font-black text-white">{reportCard.gpa}</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 text-center">
+            <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Class Rank</p>
+            <p className="text-4xl font-black text-white">{reportCard.rank}</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 text-center">
+            <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Attendance</p>
+            <p className="text-4xl font-black text-white">{reportCard.attendance}</p>
+          </div>
+          <div className="bg-[#4ea59d] p-8 rounded-[32px] text-center shadow-xl shadow-[#4ea59d]/20">
+            <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-2">Standing</p>
+            <p className="text-4xl font-black text-white italic uppercase">Elite</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
+          <div className="xl:col-span-2 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[40px] border border-white/20 overflow-hidden shadow-2xl">
+             <div className="p-8 border-b border-[#1f4e4a] bg-[#0a1a19]">
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">Academic Performance breakdown</h3>
+             </div>
+             <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                   <thead className="bg-[#0a1a19]/50">
+                      <tr>
+                         <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Subject</th>
+                         <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Grade</th>
+                         <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Faculty Feedback</th>
+                      </tr>
+                   </thead>
+                   <tbody className="divide-y divide-[#1f4e4a]">
+                      {reportCard.subjects.map((sub, i) => (
+                         <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
+                            <td className="px-8 py-6">
+                               <p className="font-bold text-white text-sm">{sub.name}</p>
+                               <div className="w-32 h-1 bg-[#1f4e4a] rounded-full mt-2 overflow-hidden">
+                                  <div className="h-full bg-[#4ea59d]" style={{ width: `${sub.score}%` }}></div>
+                               </div>
+                            </td>
+                            <td className="px-8 py-6">
+                               <span className="text-xl font-black text-[#4ea59d]">{sub.grade}</span>
+                               <span className="ml-2 text-[9px] text-slate-400 font-bold uppercase">{sub.score}%</span>
+                            </td>
+                            <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed italic max-w-sm">
+                               "{sub.comment}"
+                            </td>
+                         </tr>
+                      ))}
+                   </tbody>
+                </table>
+             </div>
+          </div>
+
+          <div className="space-y-8">
+             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+                <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
+                   <i className="fa-solid fa-wand-magic-sparkles text-[#4ea59d]"></i> AI Insight for Parents
+                </h3>
+                <div className="p-6 bg-[#4ea59d]/5 rounded-[32px] border border-[#4ea59d]/20 italic">
+                   <p className="text-xs text-slate-300 leading-relaxed">
+                      "Alex is demonstrating exceptional mastery in <strong>theoretical sciences</strong>. While their Data Structures performance is strong (88%), our AI analysis suggests focusing on <strong>recursion logic</strong> to reach the top percentile. Overall performance is in the <strong>top 4%</strong> of the cohort."
+                   </p>
+                </div>
+             </section>
+
+             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+                <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Contact Faculty</h3>
+                <div className="space-y-4">
+                   <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xs">
+                         <i className="fa-solid fa-message"></i>
+                      </div>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">Message Head Teacher</span>
+                   </button>
+                   <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-xs">
+                         <i className="fa-solid fa-video"></i>
+                      </div>
+                      <span className="text-[10px] font-black text-white uppercase tracking-widest">Schedule PTM Meeting</span>
+                   </button>
+                </div>
+             </section>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTimetable = () => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthName = calendarDate.toLocaleString('default', { month: 'long' });
+    const year = calendarDate.getFullYear();
+
+    const getEventsForDate = (date: Date) => {
+      const d = date.getDate();
+      const m = date.toLocaleString('default', { month: 'long' });
+      const dateStr = `${m} ${d < 10 ? '0' + d : d}`;
+      return {
+        exams: dynamicExams.filter(ex => ex.date.includes(dateStr)),
+        assignments: dynamicAssignments.filter(ass => ass.dueDate.includes(dateStr))
+      };
+    };
+
+    const handlePrev = () => {
+      const d = new Date(calendarDate);
+      if (calendarSubView === 'month') d.setMonth(d.getMonth() - 1);
+      else if (calendarSubView === 'week') d.setDate(d.getDate() - 7);
+      else d.setDate(d.getDate() - 1);
+      setCalendarDate(d);
+    };
+
+    const handleNext = () => {
+      const d = new Date(calendarDate);
+      if (calendarSubView === 'month') d.setMonth(d.getMonth() + 1);
+      else if (calendarSubView === 'week') d.setDate(d.getDate() + 7);
+      else d.setDate(d.getDate() + 1);
+      setCalendarDate(d);
+    };
+
+    const renderMonthGrid = () => {
+      const daysInMonth = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0).getDate();
+      const firstDay = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1).getDay();
+      const grid = [];
+      for (let i = 0; i < firstDay; i++) grid.push(null);
+      for (let i = 1; i <= daysInMonth; i++) grid.push(new Date(calendarDate.getFullYear(), calendarDate.getMonth(), i));
+
+      return (
+        <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 overflow-hidden shadow-2xl min-w-[700px]">
+          <div className="grid grid-cols-7 border-b border-[#1f4e4a] bg-[#0a1a19]">
+            {days.map(day => <div key={day} className="py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">{day}</div>)}
+          </div>
+          <div className="grid grid-cols-7">
+            {grid.map((date, idx) => {
+              if (!date) return <div key={`empty-${idx}`} className="h-32 border-b border-r border-[#1f4e4a] bg-[#0a1a19]/30"></div>;
+              const { exams, assignments } = getEventsForDate(date);
+              const isToday = date.getDate() === 26 && date.getMonth() === 3;
+              return (
+                <div key={idx} className={`h-32 border-b border-r border-[#1f4e4a] p-3 transition-colors hover:bg-[#4ea59d]/5 relative group ${isToday ? 'bg-[#4ea59d]/5' : ''}`}>
+                  <span className={`text-[10px] font-black ${isToday ? 'bg-[#4ea59d] text-white w-6 h-6 flex items-center justify-center rounded-full' : 'text-slate-400'}`}>{date.getDate()}</span>
+                  <div className="mt-2 space-y-1">
+                    {exams.map((ex, i) => <div key={i} className="px-1.5 py-0.5 bg-orange-500/10 border border-orange-500/20 rounded text-[8px] font-black text-orange-500 truncate uppercase">{ex.subject}</div>)}
+                    {assignments.map((as, i) => <div key={i} className="px-1.5 py-0.5 bg-purple-500/10 border border-purple-500/20 rounded text-[8px] font-black text-purple-500 truncate uppercase">{as.title}</div>)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    const renderWeekGrid = () => {
+      const startOfWeek = new Date(calendarDate);
+      startOfWeek.setDate(calendarDate.getDate() - calendarDate.getDay());
+      const weekDates = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        return d;
+      });
+      const hours = Array.from({ length: 13 }, (_, i) => i + 8);
+
+      return (
+        <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 overflow-hidden shadow-2xl min-w-[800px]">
+          <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b border-[#1f4e4a] bg-[#0a1a19]">
+            <div className="p-4"></div>
+            {weekDates.map((date, i) => (
+              <div key={i} className="py-4 text-center border-l border-[#1f4e4a]">
+                <div className="text-[10px] font-black uppercase text-slate-400">{days[i]}</div>
+                <div className="text-sm font-black text-white">{date.getDate()}</div>
+              </div>
+            ))}
+          </div>
+          <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
+            {hours.map(hour => (
+              <div key={hour} className="grid grid-cols-[80px_repeat(7,1fr)] border-b border-[#1f4e4a]/50">
+                <div className="p-4 text-[10px] font-black text-slate-400 text-right uppercase">{hour > 12 ? hour - 12 : hour} {hour >= 12 ? 'PM' : 'AM'}</div>
+                {weekDates.map((date, i) => {
+                  const { exams } = getEventsForDate(date);
+                  const isToday = date.getDate() === 26 && date.getMonth() === 3;
+                  return (
+                    <div key={i} className={`h-20 border-l border-[#1f4e4a] p-1 relative ${isToday ? 'bg-[#4ea59d]/5' : ''}`}>
+                      {hour === 10 && exams.length > 0 && (
+                        <div className="absolute inset-x-1 top-1 bottom-1 bg-orange-500/20 border-l-4 border-orange-500 p-1 rounded overflow-hidden">
+                           <p className="text-[7px] font-black text-orange-500 uppercase leading-none">Exam</p>
+                           <p className="text-[9px] font-bold text-white truncate mt-1">{exams[0].subject}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    const renderDayGrid = () => {
+      const hours = Array.from({ length: 15 }, (_, i) => i + 7);
+      const { exams, assignments } = getEventsForDate(calendarDate);
+      return (
+        <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 overflow-hidden shadow-2xl max-w-3xl mx-auto">
+          <div className="p-6 bg-[#0a1a19] border-b border-[#1f4e4a] flex justify-between items-center">
+            <h3 className="text-xl font-black uppercase tracking-tighter text-white">{days[calendarDate.getDay()]}, {monthName} {calendarDate.getDate()}</h3>
+            <span className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Today's Focus</span>
+          </div>
+          <div className="p-6 space-y-6">
+            {hours.map(hour => {
+              const hasExam = hour === 10 && exams.length > 0;
+              const hasAssignment = hour === 18 && assignments.length > 0;
+              return (
+                <div key={hour} className="flex gap-6 group">
+                  <div className="w-16 text-right shrink-0 py-1 text-[10px] font-black text-slate-400 uppercase">{hour > 12 ? hour - 12 : hour} {hour >= 12 ? 'PM' : 'AM'}</div>
+                  <div className="flex-1 min-h-[60px] border-l-2 border-[#1f4e4a] pl-6 relative pb-6">
+                    <div className="absolute -left-[5px] top-2 w-2 h-2 rounded-full bg-[#1f4e4a] group-hover:bg-[#4ea59d] transition-colors"></div>
+                    {hasExam && (
+                      <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-2xl animate-slideIn">
+                        <div className="flex justify-between items-start">
+                          <h4 className="text-sm font-black text-orange-500 uppercase">Exam: {exams[0].subject}</h4>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1"><i className="fa-solid fa-location-dot mr-1"></i> {exams[0].venue}</p>
+                      </div>
+                    )}
+                    {hasAssignment && (
+                      <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-2xl animate-slideIn">
+                        <h4 className="text-sm font-black text-purple-500 uppercase">Assignment: {assignments[0].title}</h4>
+                        <p className="text-xs text-slate-400 mt-1"><i className="fa-solid fa-clock mr-1"></i> Submission Deadline</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-8 animate-fadeIn text-slate-100 pb-20">
+        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 border-b border-[#1f4e4a] pb-8">
+          <div className="space-y-2">
+            <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter italic">Calendar Studio</h2>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#4ea59d] animate-pulse"></span>
+              <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Interactive Campus Timeline</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-1 rounded-2xl border border-white/20">
+              {(['day', 'week', 'month'] as const).map(v => (
+                <button 
+                  key={v} 
+                  onClick={() => setCalendarSubView(v)}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${calendarSubView === v ? 'bg-[#4ea59d] text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-2 rounded-2xl border border-white/20">
+              <button onClick={handlePrev} className="w-8 h-8 rounded-lg hover:bg-[#1f4e4a] flex items-center justify-center transition-all"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+              <span className="text-xs font-black uppercase tracking-widest px-2">{calendarSubView === 'day' ? `${monthName} ${calendarDate.getDate()}` : `${monthName} ${year}`}</span>
+              <button onClick={handleNext} className="w-8 h-8 rounded-lg hover:bg-[#1f4e4a] flex items-center justify-center transition-all"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+            </div>
+          </div>
+        </header>
+
+        <div className="overflow-x-auto pb-4 custom-scrollbar">
+          {calendarSubView === 'month' && renderMonthGrid()}
+          {calendarSubView === 'week' && renderWeekGrid()}
+          {calendarSubView === 'day' && renderDayGrid()}
+        </div>
+
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 shadow-xl md:col-span-2">
+             <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+               <i className="fa-solid fa-calendar-check text-[#4ea59d]"></i> Summary of Events
+             </h3>
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {dynamicExams.map((ex, i) => (
+                  <div key={i} className="p-5 bg-[#0a1a19] rounded-3xl border border-white/20 group hover:border-orange-500/50 transition-all">
+                     <div className="flex justify-between items-start mb-3">
+                       <span className="text-[8px] font-black px-2 py-1 bg-orange-500/10 text-orange-500 rounded uppercase tracking-widest">Exam</span>
+                       <span className="text-[9px] font-black text-slate-300 uppercase">{ex.date}</span>
+                     </div>
+                     <h4 className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{ex.subject}</h4>
+                     <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 italic"><i className="fa-solid fa-clock mr-1"></i> {ex.time}</p>
+                  </div>
+                ))}
+             </div>
+          </div>
+          <div className="bg-[#4ea59d]/5 border border-[#4ea59d]/20 p-8 rounded-[32px] flex flex-col items-center justify-center text-center space-y-4">
+             <div className="w-16 h-16 bg-[#4ea59d] rounded-full flex items-center justify-center text-white shadow-2xl shadow-[#4ea59d]/40">
+                <i className="fa-solid fa-plus text-2xl"></i>
+             </div>
+             <h4 className="text-lg font-black text-white uppercase tracking-tight">Sync Schedules</h4>
+             <p className="text-xs text-[#4ea59d] font-bold leading-relaxed">Connect your external calendar to auto-import course modules and assignment deadlines.</p>
+             <button className="w-full py-4 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Link Account</button>
+          </div>
+        </section>
+      </div>
+    );
+  };
+
+  const renderDashboard = () => {
+    let academicScore = 92;
+    let standingText = 'Excellent';
+
+    try {
+      const attendanceNum = parseFloat(studentAttendanceRate.replace('%', '')) || 0;
+      
+      const parsedGrades = examResultsData
+        .map(g => g.grade)
+        .filter(g => g && g !== 'Pending')
+        .map(g => {
+           const str = String(g);
+           if (str.includes('/')) return parseFloat(str.split('/')[0]);
+           return parseFloat(str);
+        })
+        .filter(n => !isNaN(n));
+
+      if (parsedGrades.length > 0) {
+        const avgGrade = parsedGrades.reduce((a, b) => a + b, 0) / parsedGrades.length;
+        academicScore = Math.round((attendanceNum + avgGrade) / 2);
+      } else {
+        academicScore = Math.round(attendanceNum);
+      }
+
+      if (academicScore >= 90) standingText = 'Excellent';
+      else if (academicScore >= 80) standingText = 'Good';
+      else if (academicScore >= 70) standingText = 'Satisfactory';
+      else if (academicScore >= 60) standingText = 'Pass';
+      else standingText = 'Needs Improvement';
+    } catch(e) {
+      console.error('Error calculating academic standing', e);
+    }
+
+    return (
+    <div className="space-y-8 animate-fadeIn text-slate-100 pb-10">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-white uppercase tracking-tight italic">Dashboard Central</h2>
+          <p className="text-[#4ea59d]/60 text-[10px] font-black uppercase tracking-[0.4em]">Academic Overview</p>
+        </div>
+        <div className="flex items-center gap-4">
+           {lastSyncTime && (
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-[8px] font-black uppercase text-[#4ea59d]">SMS System Linked</span>
+                <span className="text-[8px] text-slate-400">Last Sync: {lastSyncTime}</span>
+              </div>
+           )}
+           
+        </div>
+      </header>
+
+      {/* Metric Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-[#4ea59d] p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden md:col-span-2 group">
+          <div className="relative z-10">
+            <h3 className="text-[10px] font-black opacity-80 uppercase tracking-[0.2em] text-white">Academic Standing</h3>
+            <p className="text-5xl font-black my-4 text-white uppercase italic">{standingText}</p>
+            <div className="mt-4 flex items-center gap-4">
+              <div className="h-2 flex-1 bg-[#0a1a19]/20 rounded-full overflow-hidden">
+                 <div className="h-full bg-[#0a1a19]" style={{ width: `${academicScore}%` }}></div>
+              </div>
+              <span className="text-sm font-bold text-white">{academicScore}%</span>
+            </div>
+          </div>
+          <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#0a1a19]/10 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-700"></div>
+        </div>
+        
+        <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 flex flex-col justify-center">
+          <h3 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attendance</h3>
+          <p className="text-4xl font-black text-white my-2">{studentAttendanceRate}</p>
+          <div className="flex items-center gap-2 text-[#4ea59d]/60 text-[10px] font-bold">
+            <i className="fa-solid fa-arrow-up"></i>
+            <span>2% Improvement</span>
+          </div>
+        </div>
+      </div>
+
+      <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-2xl relative overflow-hidden">
+        <div className="flex items-center justify-between mb-8 relative z-10">
+          <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-4">
+            <div className="w-10 h-10 rounded-2xl bg-[#4ea59d]/10 flex items-center justify-center">
+              <i className="fa-solid fa-bell text-[#4ea59d] animate-swing"></i>
+            </div>
+            Recent Notifications
+          </h3>
+          <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#4ea59d] transition-colors">
+            Mark all as read
+          </button>
+        </div>
+        
+        <div className="space-y-4 relative z-10">
+          {[
+            { id: 1, title: 'Exam Approaching', desc: 'Modern Physics final is in 48 hours.', time: 'Just now', icon: 'fa-calendar-check', color: 'text-orange-500', bg: 'bg-orange-500/10' },
+            { id: 2, title: 'New Grade Released', desc: 'Quantum Mechanics Lab report has been graded.', time: '2h ago', icon: 'fa-file-invoice', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+            { id: 3, title: 'School Hive Alert', desc: 'Dr. Sarah Smith posted a new update in the community.', time: '5h ago', icon: 'fa-users', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+          ].map((notif) => (
+            <div key={notif.id} className="p-5 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-6 hover:border-[#4ea59d] transition-all cursor-pointer group">
+              <div className={`w-12 h-12 rounded-2xl ${notif.bg} ${notif.color} flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform`}>
+                <i className={`fa-solid ${notif.icon}`}></i>
+              </div>
+              <div className="flex-1">
+                <div className="flex justify-between items-start">
+                  <h4 className="text-sm font-bold text-white mb-1">{notif.title}</h4>
+                  <span className="text-[9px] font-black text-slate-300 uppercase">{notif.time}</span>
+                </div>
+                <p className="text-xs text-slate-400 font-medium">{notif.desc}</p>
+              </div>
+              <div className="w-2 h-2 rounded-full bg-[#4ea59d] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            </div>
+          ))}
+        </div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#4ea59d]/5 blur-[100px] pointer-events-none"></div>
+      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Recent Grades</h3>
+          <div className="space-y-4">
+             {DETAILED_GRADES.slice(0, 3).map((item, i) => (
+               <div key={i} className="flex items-center justify-between p-6 bg-[#0a1a19] rounded-[32px] border border-white/20">
+                  <div>
+                    <h4 className="text-sm font-bold text-white">{item.assignment}</h4>
+                    <p className="text-[9px] font-black text-slate-300 uppercase mt-1">Academic Session 2025</p>
+                  </div>
+                  <p className="text-2xl font-black text-[#4ea59d]">{item.grade}</p>
+               </div>
+             ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+  };
+
+  const renderNoticeBoard = () => (
+    <div className="space-y-8 animate-fadeIn text-slate-100 pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#1f4e4a] pb-6">
+        <div>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white uppercase tracking-tight">Notice Board</h2>
+          <p className="text-[#4ea59d]/60 text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] sm:tracking-[0.35em]">School Broadcasts</p>
+        </div>
+        <button
+          onClick={performSmsSync}
+          className="w-full md:w-auto px-4 sm:px-6 py-2.5 bg-[#1f4e4a] border border-[#4ea59d]/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] transition-all flex items-center justify-center gap-2"
+        >
+          <i className={`fa-solid fa-rotate ${isLoading ? 'animate-spin' : ''}`}></i> Refresh Notices
+        </button>
+      </header>
+
+      <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-4 sm:p-6 lg:p-8 rounded-[24px] sm:rounded-[32px] lg:rounded-[40px] border border-white/20 shadow-xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          {dynamicAnnouncements.length === 0 && (
+            <div className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 text-center md:col-span-2">
+              <p className="text-sm text-slate-300">No notices available right now.</p>
+            </div>
+          )}
+          {dynamicAnnouncements.map(item => (
+            <button
+              key={item.id}
+              onClick={() => handleNoticeOpen(item, 'notice-board')}
+              className="w-full p-5 sm:p-6 lg:p-8 bg-[#0a1a19] rounded-[24px] sm:rounded-[28px] lg:rounded-[32px] border border-white/20 group hover:border-[#4ea59d] transition-all text-left min-h-[180px] sm:min-h-[210px] lg:min-h-[240px]"
+            >
+              <div className="h-full flex flex-col">
+                <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
+                  <span className="text-[11px] sm:text-sm font-black text-slate-400 uppercase tracking-wider">{item.date}</span>
+                  <span className={`text-[10px] sm:text-xs font-black px-2.5 sm:px-3 py-1 rounded-xl uppercase tracking-wider ${
+                    item.priority === 'Urgent'
+                      ? 'bg-rose-500/15 text-rose-300'
+                      : item.priority === 'High'
+                        ? 'bg-red-500/10 text-red-400'
+                        : item.priority === 'Low'
+                          ? 'bg-blue-500/10 text-blue-400'
+                          : 'bg-orange-500/10 text-orange-400'
+                  }`}>
+                    {item.priority}
+                  </span>
+                </div>
+
+                <h4 className="text-xl sm:text-2xl lg:text-3xl xl:text-[34px] leading-tight font-black text-white line-clamp-4 mb-5 sm:mb-6">
+                  {item.title}
+                </h4>
+
+                <div className="mt-auto flex items-center justify-between gap-4">
+                  <span className="text-[#4ea59d] text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-[0.08em] sm:tracking-[0.12em]">
+                    Click to View Full Announcement
+                  </span>
+                  <i className="fa-solid fa-chevron-right text-[#4ea59d] text-xs sm:text-sm group-hover:translate-x-1 transition-transform shrink-0"></i>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+
+  const renderNoticeDetail = () => {
+    if (!selectedNotice) {
+      return (
+        <div className="space-y-8 animate-fadeIn text-slate-100 pb-20">
+          <button
+            onClick={() => setCurrentView(noticeOriginView)}
+            className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2"
+          >
+            <i className="fa-solid fa-arrow-left"></i> Back
+          </button>
+          <div className="p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20">
+            <p className="text-sm text-slate-300">Notice not found.</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8 animate-fadeIn text-slate-100 pb-20">
+        <button
+          onClick={() => setCurrentView(noticeOriginView)}
+          className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group"
+        >
+          <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Notices
+        </button>
+
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider ${
+              selectedNotice.priority === 'Urgent'
+                ? 'bg-rose-500/15 text-rose-300'
+                : selectedNotice.priority === 'High'
+                  ? 'bg-red-500/10 text-red-400'
+                  : selectedNotice.priority === 'Low'
+                    ? 'bg-blue-500/10 text-blue-400'
+                    : 'bg-orange-500/10 text-orange-400'
+            }`}>
+              {selectedNotice.priority}
+            </span>
+            <span className="text-xs font-black text-slate-400 uppercase">{selectedNotice.date}</span>
+          </div>
+
+          <h2 className="text-3xl font-black text-white mb-4">{selectedNotice.title}</h2>
+          <p className="text-base text-slate-300 leading-relaxed whitespace-pre-wrap">{selectedNotice.content}</p>
+
+          {selectedNotice.fileUrl && (
+            <a
+              href={selectedNotice.fileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 mt-6 text-xs font-black uppercase tracking-wider text-[#4ea59d] hover:underline"
+            >
+              <i className="fa-solid fa-paperclip"></i>
+              {selectedNotice.fileName || 'Open Attachment'}
+            </a>
+          )}
+        </section>
+      </div>
+    );
+  };
+
+  const renderInstruction = () => (
+    <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+      <section className="relative h-72 rounded-[40px] overflow-hidden group">
+        <img src="https://images.unsplash.com/photo-1541339907198-e08759dfc3f0?auto=format&fit=crop&w=1200" className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-1000" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a19] to-transparent"></div>
+        <div className="absolute bottom-10 left-10">
+          <p className="text-[#4ea59d] font-black uppercase tracking-[0.4em] mb-2">About School</p>
+          <h2 className="text-5xl font-black text-white uppercase italic tracking-tighter">EduSphere Academy</h2>
+          <p className="max-w-xl text-slate-400 text-sm mt-4 leading-relaxed font-medium">
+            Pioneering the future of education through AI-integrated curricula and global mentorship. Our mission is to empower every learner to thrive in an era of rapid technological evolution.
+          </p>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className="lg:col-span-2 space-y-12">
+          <section>
+            <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+              <i className="fa-solid fa-bullhorn text-[#4ea59d]"></i> School Announcements
+            </h3>
+            <div className="space-y-4">
+              {dynamicAnnouncements.length === 0 && (
+                <div className="p-6 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-3xl border border-white/20 text-center">
+                  <p className="text-sm text-slate-300">No school announcements published yet.</p>
+                </div>
+              )}
+              {dynamicAnnouncements.map(ann => (
+                <button
+                  key={ann.id}
+                  onClick={() => handleNoticeOpen(ann, 'instruction')}
+                  className="w-full p-6 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-3xl border border-white/20 hover:border-[#4ea59d] transition-all group text-left"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <h4 className="text-xl font-bold text-white truncate">{ann.title}</h4>
+                      <span className="text-xs font-black text-slate-400 uppercase shrink-0">{ann.date}</span>
+                    </div>
+                    <i className="fa-solid fa-chevron-right text-[#4ea59d] text-xs group-hover:translate-x-1 transition-transform shrink-0"></i>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+              <i className="fa-solid fa-masks-theater text-[#4ea59d]"></i> Student Activities
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {SCHOOL_ACTIVITIES.map((act, i) => (
+                <div key={i} className="p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[40px] border border-white/20 group hover:bg-[#4ea59d]/5 transition-all">
+                  <div className="w-14 h-14 bg-[#4ea59d]/10 rounded-2xl flex items-center justify-center text-[#4ea59d] text-2xl mb-6 group-hover:scale-110 transition-transform">
+                    <i className={`fa-solid ${act.icon}`}></i>
+                  </div>
+                  <h4 className="text-lg font-bold text-white mb-2">{act.name}</h4>
+                  <p className="text-xs text-slate-400 leading-relaxed">{act.description}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <section className="space-y-8">
+           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Upcoming Events</h3>
+           <div className="space-y-6">
+              {SCHOOL_EVENTS.map(ev => (
+                <div key={ev.id} className="relative h-48 rounded-[32px] overflow-hidden group cursor-pointer shadow-xl">
+                   <img src={ev.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                   <div className="absolute bottom-6 left-6">
+                      <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-1">{ev.type}</p>
+                      <h4 className="text-sm font-bold text-white uppercase">{ev.name}</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 italic"><i className="fa-solid fa-calendar mr-2"></i> {ev.date}</p>
+                   </div>
+                </div>
+              ))}
+           </div>
+        </section>
+      </div>
+    </div>
+  );
+
+  const renderActivity = () => (
+    <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
+        <div className="space-y-2">
+          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Activity Portal</h2>
+          <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Personal Academic Tracking</p>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
+        <div className="xl:col-span-2 space-y-12">
+           <section>
+              <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+                <i className="fa-solid fa-clipboard-list text-[#4ea59d]"></i> Pending Assignments
+              </h3>
+              <div className="space-y-4">
+                 {dynamicAssignments.map(ass => (
+                   <div key={ass.id} className="p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 flex flex-col sm:flex-row justify-between items-center gap-6 group">
+                      <div className="flex-1">
+                         <div className="flex items-center gap-3 mb-2">
+                           <h4 className="text-lg font-bold text-white">{ass.title}</h4>
+                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${ass.status === 'Submitted' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                             {ass.status}
+                           </span>
+                         </div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{ass.course} • Due {ass.dueDate}</p>
+                      </div>
+                      <button className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Submit Task</button>
+                   </div>
+                 ))}
+              </div>
+           </section>
+
+           <section>
+              <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Grades & AI Feedback</h3>
+              <div className="overflow-hidden rounded-[32px] border border-white/20 shadow-2xl">
+                 <table className="w-full text-left bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+                    <thead className="bg-[#0a1a19]">
+                       <tr>
+                          <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Assessment</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Mark</th>
+                          <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Faculty Insight</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#1f4e4a]">
+                       {DETAILED_GRADES.map((g, i) => (
+                          <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
+                             <td className="px-8 py-6 font-bold text-sm text-white">{g.assignment}</td>
+                             <td className="px-8 py-6 text-xl font-black text-[#4ea59d]">{g.grade}</td>
+                             <td className="px-8 py-6 text-xs text-slate-400 italic font-medium leading-relaxed max-w-sm">{g.feedback}</td>
+                          </tr>
+                       ))}
+                    </tbody>
+                 </table>
+              </div>
+           </section>
+        </div>
+
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl h-fit sticky top-10">
+           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Exam Schedule</h3>
+           <div className="space-y-6">
+              {dynamicExams.map((ex, i) => (
+                <div key={i} className="relative pl-6 border-l-2 border-[#1f4e4a] group">
+                   <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-[#4ea59d] shadow-[0_0_10px_#4ea59d] group-hover:scale-150 transition-transform"></div>
+                   <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">{ex.date} @ {ex.time}</p>
+                   <h4 className="text-sm font-bold text-white my-1">{ex.subject}</h4>
+                   <p className="text-[10px] text-slate-400 font-bold uppercase"><i className="fa-solid fa-location-dot mr-2"></i> {ex.venue}</p>
+                </div>
+              ))}
+           </div>
+           <button className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all">
+              Download Full Schedule
+           </button>
+        </section>
+      </div>
+    </div>
+  );
+
+  const renderCourses = () => (
+    <COURSES
+      schoolId={user.schoolId}
+      notify={(message) => console.log(message)}
+      onOpenCoursePage={({ id }) => {
+        const matchedCourse = courses.find(course => String(course.id) === String(id));
+        if (!matchedCourse) {
+          console.log('Course details page is only available for catalog courses.');
+          return;
+        }
+        handleCourseClick(matchedCourse);
+      }}
+    />
+  );
+
+  const renderStudies = () => (
+    <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
+        <div className="space-y-2">
+          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Academic Records</h2>
+          <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Results & Achievements</p>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Exam Results</h3>
+          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+             {examResultsData.map((ex, i) => (
+               <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center">
+                  <div>
+                    <h4 className="text-sm font-bold text-white">{ex.courseName}</h4>
+                    <p className="text-[9px] font-black text-slate-400 uppercase">{ex.className}</p>
+                  </div>
+                  <span className={`text-lg font-black ${ex.grade === 'Pending' ? 'text-orange-500' : 'text-[#4ea59d]'}`}>{ex.grade}</span>
+               </div>
+             ))}
+             {examResultsData.length === 0 && (
+                <p className="text-sm text-slate-400">No exam results available.</p>
+             )}
+          </div>
+        </section>
+
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Assignment Results</h3>
+          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+             {DETAILED_GRADES.map((g, i) => (
+               <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center">
+                  <h4 className="text-sm font-bold text-white">{g.assignment}</h4>
+                  <span className="text-lg font-black text-[#4ea59d]">{g.grade}</span>
+               </div>
+             ))}
+          </div>
+        </section>
+
+        <section className="lg:col-span-2 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Achievements & Badges</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+             {STUDENT_ACHIEVEMENTS.map(ach => (
+               <div key={ach.id} className="p-8 bg-[#0a1a19] rounded-[40px] border border-white/20 text-center space-y-4 group hover:bg-[#4ea59d]/5 transition-all">
+                  <div className={`w-20 h-20 mx-auto rounded-[28px] bg-[#0a1a19]/5 flex items-center justify-center text-4xl ${ach.color} group-hover:scale-110 transition-transform`}>
+                     <i className={`fa-solid ${ach.icon}`}></i>
+                  </div>
+                  <div>
+                    <h4 className="text-base font-black text-white uppercase">{ach.title}</h4>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{ach.desc}</p>
+                  </div>
+               </div>
+             ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+
+  const renderContact = () => (
+    <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
+        <div className="space-y-2">
+          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Communications</h2>
+          <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Connect with your community</p>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
+        <div className="xl:col-span-2 space-y-12">
+          <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+               <i className="fa-solid fa-hashtag text-[#4ea59d]"></i> School Hive
+            </h3>
+            <div className="space-y-6">
+               {SCHOOL_HIVE_POSTS.map(post => (
+                 <div key={post.id} className="p-8 bg-[#0a1a19] rounded-[32px] border border-white/20">
+                    <div className="flex justify-between items-start mb-4">
+                       <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d]">
+                             <i className="fa-solid fa-user"></i>
+                          </div>
+                          <div>
+                             <h4 className="text-sm font-bold text-white">{post.user}</h4>
+                             <p className="text-[9px] text-slate-300 font-black uppercase">{post.time}</p>
+                          </div>
+                       </div>
+                       <button className="text-slate-300 hover:text-white"><i className="fa-solid fa-ellipsis"></i></button>
+                    </div>
+                    <p className="text-sm text-slate-300 leading-relaxed mb-6">{post.content}</p>
+                    <div className="flex gap-6 border-t border-[#1f4e4a] pt-4">
+                       <button className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest flex items-center gap-2 hover:opacity-80">
+                          <i className="fa-solid fa-heart"></i> {post.likes}
+                       </button>
+                       <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-white">
+                          <i className="fa-solid fa-comment"></i> {post.replies}
+                       </button>
+                    </div>
+                 </div>
+               ))}
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-8">
+          <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+             <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Direct Phone</h3>
+             <div className="space-y-4">
+                {SCHOOL_CONTACTS.phone.map((ph, i) => (
+                  <div key={i} className="p-5 bg-[#0a1a19] rounded-2xl border border-white/20">
+                     <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">{ph.label}</p>
+                     <p className="text-base font-bold text-white">{ph.number}</p>
+                     <p className="text-[8px] text-slate-300 uppercase font-black">{ph.hours}</p>
+                  </div>
+                ))}
+             </div>
+          </section>
+
+          <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+             <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Social Media</h3>
+             <div className="grid grid-cols-2 gap-4">
+                {SCHOOL_CONTACTS.socials.map((soc, i) => (
+                  <a key={i} href={soc.link} className="p-4 bg-[#0a1a19] rounded-2xl border border-white/20 flex flex-col items-center gap-2 group transition-all hover:border-[#4ea59d]">
+                     <div className="text-xl" style={{ color: soc.color }}>
+                        <i className={`fa-brands ${soc.icon}`}></i>
+                     </div>
+                     <span className="text-[9px] font-black text-slate-400 group-hover:text-white uppercase">{soc.brand}</span>
+                  </a>
+                ))}
+             </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderCourseDetail = () => {
+    if (!selectedCourse) return null;
+    return (
+      <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
+          <div className="space-y-4 flex-1">
+            <button onClick={() => setCurrentView('courses')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
+              <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Courses
+            </button>
+            <h2 className="text-5xl font-black text-white uppercase tracking-tight leading-none">{selectedCourse.title}</h2>
+            <div className="flex flex-wrap gap-4 pt-2">
+              <span className="bg-[#4ea59d]/10 text-[#4ea59d] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-[#4ea59d]/20">
+                {selectedCourse.category}
+              </span>
+              <span className="bg-blue-500/10 text-blue-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-500/20 flex items-center gap-2">
+                <i className="fa-solid fa-clock"></i> {selectedCourse.scheduleDescription}
+              </span>
+            </div>
+          </div>
+          {selectedCourse.onlineClassUrl && (
+            <a href={selectedCourse.onlineClassUrl} target="_blank" rel="noopener noreferrer" className="px-8 py-4 bg-[#4ea59d] text-white rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3">
+              <i className="fa-solid fa-video animate-pulse"></i> Join Online Class
+            </a>
+          )}
+        </header>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
+          <div className="xl:col-span-2 space-y-12">
+            <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
+               <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-4">
+                 <i className="fa-solid fa-compass text-[#4ea59d]"></i> Module Introduction
+               </h3>
+               <p className="text-slate-200 text-lg leading-relaxed italic">{selectedCourse.moduleIntro}</p>
+               <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedCourse.topics.map((t, i) => (
+                    <div key={i} className="flex items-center gap-4 p-4 bg-[#0a1a19] rounded-2xl border border-white/20">
+                       <div className="w-8 h-8 rounded-full bg-[#4ea59d]/10 text-[#4ea59d] flex items-center justify-center text-xs font-black">
+                          {i + 1}
+                       </div>
+                       <span className="text-sm font-bold text-white">{t}</span>
+                    </div>
+                  ))}
+               </div>
+            </section>
+
+            <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
+               <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+                 <i className="fa-solid fa-book-open text-[#4ea59d]"></i> Learning Resources
+               </h3>
+               <div className="space-y-8">
+                 {selectedCourse.notes.map(note => (
+                   <div key={note.id} className="p-8 bg-[#0a1a19] rounded-[40px] border border-white/20 space-y-6">
+                      <div className="flex justify-between items-start flex-col sm:flex-row gap-4">
+                        <h4 className="text-xl font-black text-white">{note.title}</h4>
+                        {note.ebookUrl && (
+                          <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2">
+                             <i className="fa-solid fa-download"></i> Download Ebook
+                          </a>
+                        )}
+                      </div>
+                      <p className="text-base text-slate-300 leading-relaxed">{note.content}</p>
+                      <div className="flex flex-wrap gap-4 pt-4 border-t border-[#1f4e4a]">
+                        <button onClick={() => handleSummarize(note)} className="px-6 py-3 bg-[#4ea59d]/10 border border-white/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all">
+                          AI Summary
+                        </button>
+                        <button onClick={() => handleGenerateQuiz(note)} className="px-6 py-3 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all">
+                          Generate Quiz
+                        </button>
+                      </div>
+                      {note.summary && (
+                        <div className="mt-8 p-8 bg-[#4ea59d]/5 border-l-8 border-[#4ea59d] rounded-r-[32px] animate-slideIn">
+                           <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em] mb-4 italic">AI Intelligent Summary</p>
+                           <p className="text-base text-slate-400 leading-relaxed">{note.summary}</p>
+                        </div>
+                      )}
+                   </div>
+                 ))}
+                 {selectedCourse.notes.length === 0 && (
+                   <div className="p-12 text-center bg-[#0a1a19] rounded-[40px] border border-dashed border-[#1f4e4a] text-slate-300 font-black uppercase tracking-widest italic">
+                     No notes uploaded yet.
+                   </div>
+                 )}
+               </div>
+            </section>
+          </div>
+
+          <div className="space-y-8">
+            <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+               <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Faculty Details</h3>
+               <div className="space-y-6">
+                  <div className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-4">
+                     <div className="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl shrink-0">
+                        <i className="fa-solid fa-user-tie"></i>
+                     </div>
+                     <div>
+                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Faculty Lead</p>
+                        <p className="text-base font-bold text-white">{selectedCourse.subTeacherName || "Lead Professor"}</p>
+                     </div>
+                  </div>
+                  <div className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-4">
+                     <div className="w-14 h-14 rounded-2xl bg-[#4ea59d]/10 text-[#4ea59d] flex items-center justify-center text-xl shrink-0">
+                        <i className="fa-solid fa-clock"></i>
+                     </div>
+                     <div>
+                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Class Timetable</p>
+                        <p className="text-sm font-bold text-white leading-snug">{selectedCourse.scheduleDescription}</p>
+                     </div>
+                  </div>
+               </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderQuizPlayer = () => {
+    if (!activeQuiz) return null;
+    return (
+      <div className="space-y-8 animate-fadeIn text-slate-100 pb-20">
+        <header className="flex justify-between items-center">
+          <h2 className="text-3xl font-black text-white uppercase tracking-tight">{activeQuiz.title}</h2>
+          <button onClick={() => setCurrentView('course-detail')} className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-xs font-bold transition-all">Exit Quiz</button>
+        </header>
+        <div className="max-w-3xl mx-auto space-y-6">
+          {activeQuiz.questions.map((q, qIdx) => (
+            <div key={qIdx} className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 shadow-xl">
+              <h4 className="text-lg font-bold text-white mb-6 flex gap-4"><span className="text-[#4ea59d]">Q{qIdx + 1}.</span>{q.question}</h4>
+              <div className="grid grid-cols-1 gap-3">
+                {q.options.map((opt, oIdx) => (
+                  <button key={oIdx} className="p-5 text-left bg-[#0a1a19] border border-white/20 rounded-2xl hover:border-[#4ea59d] transition-all text-sm">{opt}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+          <button onClick={() => { alert('Quiz submitted!'); setCurrentView('course-detail'); }} className="w-full py-5 bg-[#4ea59d] text-white rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl">Submit Answers</button>
+        </div>
+      </div>
+    );
+  };
+
+  if (!isLoggedIn) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  return (
+    <div className="flex flex-col md:flex-row bg-[#0a1a19] min-h-screen text-[#f1f5f9] relative overflow-hidden">
+      {/* Background Ambient Orbs for Glass Effect */}
+      <div className="fixed top-[-10%] left-[-5%] w-[500px] h-[500px] bg-[#4ea59d]/20 rounded-full blur-[120px] pointer-events-none z-[0]"></div>
+      <div className="fixed bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#1f4e4a]/40 rounded-full blur-[150px] pointer-events-none z-0"></div>
+      <header className="md:hidden flex items-center justify-between p-4 bg-[#0a1a19]/40 backdrop-blur-xl shadow-lg border-b border-[#1f4e4a] sticky top-0 z-[50]">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-[#4ea59d] rounded-lg flex items-center justify-center text-white"><i className="fa-solid fa-graduation-cap"></i></div>
+          <h1 className="text-lg font-black tracking-tighter text-white uppercase italic">EduSphere</h1>
+        </div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-white p-2">
+          <i className={`fa-solid ${isSidebarOpen ? 'fa-xmark' : 'fa-bars'} text-xl`}></i>
+        </button>
+      </header>
+
+      <Sidebar 
+        currentView={currentView} 
+        onViewChange={setCurrentView} 
+        onLogout={handleLogout}
+        userRole={user.role}
+        userEmail={user.email}
+        userName={user.name}
+        hasNewNotices={hasNewNotices}
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+      />
+      <main className={`flex-1 md:ml-72 p-6 md:p-8 overflow-x-hidden ${isSidebarOpen ? 'hidden md:block' : 'block'}`}>
+        {currentView === 'dashboard' && renderDashboard()}
+        {currentView === 'notice-board' && renderNoticeBoard()}
+        {currentView === 'notice-detail' && renderNoticeDetail()}
+        {currentView === 'parent-portal' && renderParentPortal()}
+        {currentView === 'instruction' && renderInstruction()}
+        {currentView === 'activity' && renderActivity()}
+        {currentView === 'courses' && renderCourses()}
+        {currentView === 'course-detail' && renderCourseDetail()}
+        {currentView === 'quiz-player' && renderQuizPlayer()}
+        {currentView === 'studies' && renderStudies()}
+        {currentView === 'contact' && renderContact()}
+        {currentView === 'timetable' && <LiveCalendar />}
+        {currentView === 'profile' && (
+           <div className="space-y-8 animate-fadeIn text-slate-100">
+             <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">User Profile</h2>
+             <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-white/20 max-w-2xl shadow-2xl relative overflow-hidden">
+                 <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-center relative z-10">
+                     <img src={user.avatar} className="w-32 h-32 md:w-40 md:h-40 rounded-[24px] md:rounded-[40px] border-4 border-[#4ea59d] p-1 shadow-2xl object-cover" />
+                     <div className="flex-1 space-y-4 text-center sm:text-left">
+                         <div>
+                             <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">Full Name</p>
+                             <h3 className="text-2xl md:text-3xl font-black text-white">{user.name}</h3>
+                         </div>
+                         <div className="grid grid-cols-1 gap-4 pt-4 border-t border-[#1f4e4a]">
+                             <div>
+                                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Email Address</p>
+                                 <p className="text-xs font-bold text-slate-200">{user.email}</p>
+                             </div>
+                             <div>
+                                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Student ID</p>
+                                 <p className="text-xs font-mono font-bold text-[#4ea59d]">{user.studentId || user.childId || 'N/A'}</p>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+           </div>
+        )}
+      </main>
+      
+      {isLoading && (
+        <div className="fixed inset-0 bg-[#0a1a19]/80 backdrop-blur-md flex items-center justify-center z-[200] animate-fadeIn">
+          <div className="flex flex-col items-center">
+            <div className="w-20 h-20 border-4 border-[#4ea59d]/20 border-t-[#4ea59d] rounded-full animate-spin mb-6"></div>
+            
+            <p className="text-[#4ea59d] mt-2 animate-pulse uppercase text-[10px] font-black tracking-widest">Processing request</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
