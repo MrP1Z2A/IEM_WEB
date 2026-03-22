@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { supabase } from '../supabaseClient';
 
 /**
  * Dashboard Component
@@ -27,6 +28,77 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
+  const [classAverages, setClassAverages] = useState<{ grade: string, percentage: number }[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const convertGradeToNumber = (gradeStr: string): number => {
+    if (!gradeStr) return NaN;
+    const raw = String(gradeStr).trim().toUpperCase();
+    const mapping: Record<string, number> = {
+      'A+': 100, 'A': 95, 'A-': 90,
+      'B+': 85,  'B': 80, 'B-': 75,
+      'C+': 70,  'C': 65, 'C-': 60,
+      'D+': 55,  'D': 50, 'D-': 45,
+      'E': 30,   'F': 0
+    };
+    if (mapping[raw] !== undefined) return mapping[raw];
+    const numericRaw = raw.replace(/[^0-9.]/g, '');
+    return parseFloat(numericRaw);
+  };
+
+  useEffect(() => {
+    const fetchGrades = async () => {
+      // Fetch classes first to do manual mapping if join fails
+      const classesRes = await supabase.from('classes').select('id, name');
+      const classMap: Record<string, string> = {};
+      if (classesRes?.data) {
+        classesRes.data.forEach((c: any) => { classMap[c.id] = c.name; });
+      }
+
+      const { data, error } = await supabase
+        .from('exam_grades')
+        .select(`
+          grade,
+          class_id,
+          name
+        `);
+      
+      if (error) {
+        console.error('Error fetching grades:', error);
+        setFetchError(error.message);
+        return;
+      }
+
+      if (data) {
+        const classData: Record<string, { total: number, count: number, name: string }> = {};
+        
+        data.forEach((row: any) => {
+          // If the exact class name is not in the row, use the manual classMap fallback
+          const className = row.name || classMap[row.class_id] || row.class_id || 'Unknown Class';
+          
+          const gradeVal = convertGradeToNumber(row.grade);
+          
+          if (!isNaN(gradeVal)) {
+            if (!classData[className]) {
+              classData[className] = { total: 0, count: 0, name: className };
+            }
+            classData[className].total += gradeVal;
+            classData[className].count += 1;
+          }
+        });
+
+        const averages = Object.values(classData).map(c => ({
+          grade: c.name,
+          percentage: Math.round(c.total / c.count)
+        })).sort((a, b) => a.grade.localeCompare(b.grade));
+
+        setClassAverages(averages);
+      }
+    };
+
+    fetchGrades();
+  }, []);
+
   const formatCompactMMK = (value: number) => {
     const abs = Math.abs(value || 0);
     if (abs >= 1_000_000_000) {
@@ -76,24 +148,14 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
     { name: 'Remaining', value: Math.max(totalTeachers - femaleTeacherValue, 0) },
   ];
 
-  const examResultDemoData = [
-    { grade: 'G1', percentage: 43 },
-    { grade: 'G2', percentage: 65 },
-    { grade: 'G3', percentage: 86 },
-    { grade: 'G4', percentage: 88 },
-    { grade: 'G5', percentage: 100 },
-    { grade: 'G6', percentage: 95 },
-    { grade: 'G7', percentage: 85 },
-    { grade: 'G8', percentage: 58 },
-    { grade: 'G9', percentage: 30 },
-  ];
+
 
   const metricCards = [
     { label: 'Total Students', val: stats.totalStudents, icon: 'fa-user-graduate', color: 'text-brand-500', bg: 'bg-brand-50', layout: 'sm:col-start-1 sm:row-start-1' },
     { label: 'Total Parents', val: stats.totalParents, icon: 'fa-people-roof', color: 'text-sky-600', bg: 'bg-sky-50', layout: 'sm:col-start-1 sm:row-start-2' },
     { label: 'Total Teachers', val: stats.totalTeachers, icon: 'fa-chalkboard-teacher', color: 'text-emerald-500', bg: 'bg-emerald-50', layout: 'sm:col-start-2 sm:row-start-1' },
     { label: 'Student Service', val: stats.totalStudentServices, icon: 'fa-user-gear', color: 'text-cyan-600', bg: 'bg-cyan-50', layout: 'sm:col-start-1 sm:row-start-3' },
-    { label: 'Total Earning', val: formatCompactMMK(stats.totalEarningMMK), icon: 'fa-sack-dollar', color: 'text-amber-600', bg: 'bg-amber-50', layout: 'sm:col-start-2 sm:row-start-2' },
+    { label: 'Total Earning', val: formatCompactMMK(stats.totalEarningMMK), tooltip: `${(stats.totalEarningMMK || 0).toLocaleString()} MMK`, icon: 'fa-sack-dollar', color: 'text-amber-600', bg: 'bg-amber-50', layout: 'sm:col-start-2 sm:row-start-2' },
   ];
 
   return (
@@ -105,7 +167,7 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
           {metricCards.map((card, i) => (
             <div 
               key={i} 
-              className="group w-full min-w-0 p-3 sm:p-3.5 lg:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/70 flex items-center justify-between gap-2 shadow-premium hover:-translate-y-0.5 transition-all"
+              className="relative group w-full min-w-0 p-3 sm:p-3.5 lg:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/70 flex items-center justify-between gap-2 shadow-premium hover:-translate-y-0.5 transition-all"
             >
               <div>
                 <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-1 group-hover:text-brand-500 transition-colors">
@@ -118,6 +180,14 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
               <div className={`w-9 h-9 ${card.bg} ${card.color} rounded-xl flex items-center justify-center text-sm shadow-inner group-hover:scale-105 transition-all`}>
                 <i className={`fas ${card.icon}`}></i>
               </div>
+
+              {/* Custom Tooltip */}
+              {card.tooltip && (
+                <div className="absolute -top-12 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold py-2 px-3 rounded-lg shadow-xl whitespace-nowrap z-50 transform scale-95 group-hover:scale-100">
+                  {card.tooltip}
+                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-800 dark:bg-slate-700 rotate-45 rounded-sm"></div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -244,7 +314,7 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 lg:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-premium lg:col-span-12">
+        <div className="p-4 sm:p-5 lg:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-premium lg:col-span-12 animate-in fade-in duration-700">
           <div className="flex items-center justify-between gap-3 mb-4">
             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
               Average Grade
@@ -253,23 +323,36 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats }) => {
           </div>
 
           <div className="h-64 sm:h-72 lg:h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={examResultDemoData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="grade" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
-                <YAxis
-                  domain={[0, 100]}
-                  tickFormatter={(value) => `${value}%`}
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }}
-                />
-                <Tooltip formatter={(value: number) => [`${value}%`, 'Students']} cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }} />
-                <Bar dataKey="percentage" fill="#5b7be3" radius={[6, 6, 0, 0]} maxBarSize={44} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
+            {fetchError ? (
+               <div className="w-full h-full flex flex-col items-center justify-center text-red-500 text-sm font-semibold p-4 text-center">
+                 <p>Error loading grades:</p>
+                 <p className="text-xs opacity-80 mt-1">{fetchError}</p>
+               </div>
+            ) : classAverages.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={classAverages} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="grade" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} />
+                  <YAxis
+                    domain={[0, 100]}
+                    tickFormatter={(value) => `${value}%`}
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }}
+                  />
+                  <Tooltip formatter={(value: number) => [`${value}%`, 'Average']} cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }} />
+                  <Bar dataKey="percentage" fill="#5b7be3" radius={[6, 6, 0, 0]} maxBarSize={44} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+               <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 text-sm font-semibold">
+                 <p>No numeric grade data available</p>
+                 <p className="font-normal text-xs mt-1">Please ensure grades contain numbers (e.g. "95", "100")</p>
+               </div>
+            )}
           </div>
         </div>
+
       </div>
     </div>
   );

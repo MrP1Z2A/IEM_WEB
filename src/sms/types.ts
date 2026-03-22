@@ -96,7 +96,6 @@ export type PageId =
   | 'payment'
   | 'payment-assign'
   | 'payment-history'
-  | 'late-payment'
   | 'student-finance-status'
   | 'student-service'
   | 'student-service-batch';

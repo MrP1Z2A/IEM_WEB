@@ -26,7 +26,17 @@ type ReportCardRow = {
   created_at: string;
 };
 
-type FormMode = 'upload' | 'create';
+type FormMode = 'upload' | 'create' | 'template';
+
+type TextBox = {
+  id: string;
+  xPct: number;
+  yPct: number;
+  wPct: number;
+  hPct: number;
+  text: string;
+  label: string;
+};
 
 const REPORT_CARD_BUCKET = 'report_cards';
 const MAX_PDF_SIZE_BYTES = 15 * 1024 * 1024;
@@ -121,6 +131,18 @@ export default function ReportCardPage() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const replaceInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Template mode state
+  const [templateFile, setTemplateFile] = useState<File | null>(null);
+  const [templateObjectUrl, setTemplateObjectUrl] = useState<string | null>(null);
+  const [templateFileType, setTemplateFileType] = useState<'image' | 'pdf' | null>(null);
+  const [isAnalyzingTemplate, setIsAnalyzingTemplate] = useState(false);
+  const [naturalDims, setNaturalDims] = useState<{ width: number; height: number } | null>(null);
+  const [textBoxes, setTextBoxes] = useState<TextBox[]>([]);
+  const [draggingBoxId, setDraggingBoxId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const templateContainerRef = useRef<HTMLDivElement | null>(null);
+  const templateFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const studentMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -358,6 +380,139 @@ export default function ReportCardPage() {
     };
   };
 
+  // ── Template helpers ─────────────────────────────────────────────────────
+
+  const analyzeTemplateWhiteSpaces = (img: HTMLImageElement): TextBox[] => {
+    const MAX_DIM = 1000;
+    const scale = Math.min(1, MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+    const W = Math.round(img.naturalWidth * scale);
+    const H = Math.round(img.naturalHeight * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return [];
+    ctx.drawImage(img, 0, 0, W, H);
+    const { data } = ctx.getImageData(0, 0, W, H);
+    const isLight = (px: number, py: number) => {
+      const i = (py * W + px) * 4;
+      return data[i] > 215 && data[i + 1] > 215 && data[i + 2] > 215;
+    };
+    const rowLightRatio = (py: number) => {
+      let w = 0;
+      for (let x = 0; x < W; x += 2) if (isLight(x, py)) w++;
+      return w / Math.ceil(W / 2);
+    };
+    const bands: Array<{ start: number; end: number }> = [];
+    let bs = -1;
+    for (let y = 0; y < H; y++) {
+      if (rowLightRatio(y) >= 0.80) {
+        if (bs === -1) bs = y;
+      } else if (bs !== -1) {
+        if (y - bs >= 16) bands.push({ start: bs, end: y });
+        bs = -1;
+      }
+    }
+    if (bs !== -1 && H - bs >= 16) bands.push({ start: bs, end: H });
+    const found: Array<{ x: number; y: number; w: number; h: number }> = [];
+    for (const band of bands) {
+      const midY = Math.floor((band.start + band.end) / 2);
+      let best = { start: 0, len: 0 }, cur = -1;
+      for (let x = 0; x < W; x++) {
+        if (isLight(x, midY)) {
+          if (cur === -1) cur = x;
+        } else if (cur !== -1) {
+          if (x - cur > best.len) best = { start: cur, len: x - cur };
+          cur = -1;
+        }
+      }
+      if (cur !== -1 && W - cur > best.len) best = { start: cur, len: W - cur };
+      if (best.len < W * 0.10) continue;
+      found.push({ x: best.start, y: band.start, w: best.len, h: band.end - band.start });
+    }
+    return found
+      .sort((a, b) => b.w * b.h - a.w * a.h)
+      .slice(0, 14)
+      .sort((a, b) => a.y - b.y)
+      .map((r, i) => ({
+        id: `tb-auto-${Date.now()}-${i}`,
+        xPct: r.x / W,
+        yPct: r.y / H,
+        wPct: r.w / W,
+        hPct: Math.max(r.h / H, 0.035),
+        text: '',
+        label: `Field ${i + 1}`,
+      }));
+  };
+
+  const handleTemplateFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!file) return;
+    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    const isPdf = file.type === 'application/pdf' || ext === '.pdf';
+    const isImg = /^image\/(jpeg|png)$/i.test(file.type) || ['.jpg', '.jpeg', '.png'].includes(ext);
+    if (!isPdf && !isImg) { setError('Please select a PDF, JPEG, JPG or PNG file.'); return; }
+    if (templateObjectUrl) URL.revokeObjectURL(templateObjectUrl);
+    const url = URL.createObjectURL(file);
+    setTemplateFile(file);
+    setTemplateObjectUrl(url);
+    setTemplateFileType(isPdf ? 'pdf' : 'image');
+    setTextBoxes([]);
+    setNaturalDims(null);
+    setError(null);
+    if (isImg) {
+      setIsAnalyzingTemplate(true);
+      const img = new Image();
+      img.onload = () => {
+        setNaturalDims({ width: img.naturalWidth, height: img.naturalHeight });
+        setTextBoxes(analyzeTemplateWhiteSpaces(img));
+        setIsAnalyzingTemplate(false);
+      };
+      img.onerror = () => setIsAnalyzingTemplate(false);
+      img.src = url;
+    }
+  };
+
+  const renderTemplatePdfBlob = (
+    imgUrl: string,
+    boxes: TextBox[],
+    natW: number,
+    natH: number,
+  ): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_PX = 2048;
+        const sc = Math.min(1, MAX_PX / Math.max(natW, natH));
+        const cvs = document.createElement('canvas');
+        cvs.width = Math.round(natW * sc);
+        cvs.height = Math.round(natH * sc);
+        const ctx2 = cvs.getContext('2d');
+        if (!ctx2) { reject(new Error('Canvas unavailable')); return; }
+        ctx2.drawImage(img, 0, 0, cvs.width, cvs.height);
+        const dataUrl = cvs.toDataURL('image/jpeg', 0.90);
+        const aspect = natW / natH;
+        const ptW = aspect >= 1 ? 841.89 : 595.28;
+        const ptH = aspect >= 1 ? ptW / aspect : 841.89;
+        const doc = new jsPDF({ unit: 'pt', format: [ptW, ptH] });
+        doc.addImage(dataUrl, 'JPEG', 0, 0, ptW, ptH);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        for (const box of boxes) {
+          const txt = box.text.trim();
+          if (!txt) continue;
+          const bx = box.xPct * ptW + 3;
+          const by = (box.yPct + box.hPct * 0.65) * ptH;
+          doc.text(doc.splitTextToSize(txt, box.wPct * ptW - 6), bx, by);
+        }
+        resolve(doc.output('blob'));
+      };
+      img.onerror = () => reject(new Error('Failed to load template image.'));
+      img.src = imgUrl;
+    });
+
   const handleExportDraftPdf = () => {
     if (!formData.student_id) {
       setError('Select a student first.');
@@ -398,6 +553,14 @@ export default function ReportCardPage() {
     setAvailableClasses([]);
     setSelectedFile(null);
     setMode('upload');
+    if (templateObjectUrl) URL.revokeObjectURL(templateObjectUrl);
+    setTemplateFile(null);
+    setTemplateObjectUrl(null);
+    setTemplateFileType(null);
+    setTextBoxes([]);
+    setNaturalDims(null);
+    setIsAnalyzingTemplate(false);
+    setDraggingBoxId(null);
   };
 
   const openConfirmDialog = (message: string, action: () => Promise<void> | void) => {
@@ -442,9 +605,8 @@ export default function ReportCardPage() {
         if (!selectedFile) {
           throw new Error('Please select a PDF file to upload.');
         }
-
         uploadResult = await uploadPdfFile(formData.student_id, selectedFile);
-      } else {
+      } else if (mode === 'create') {
         const generated = await createGeneratedPdfFile();
         uploadResult = {
           filePath: generated.filePath,
@@ -452,6 +614,35 @@ export default function ReportCardPage() {
         };
         reportTitle = generated.reportTitle;
         reportContent = generated.reportContent;
+      } else {
+        // template mode
+        if (!templateFile || !templateObjectUrl) {
+          throw new Error('Please select a template file.');
+        }
+        if (templateFileType === 'image' && naturalDims) {
+          const blob = await renderTemplatePdfBlob(
+            templateObjectUrl, textBoxes, naturalDims.width, naturalDims.height,
+          );
+          const cleanName = sanitizeFileName(
+            templateFile.name.replace(/\.[^.]+$/, '') + '-filled.pdf',
+          );
+          const filePath = `${formData.student_id}/${Date.now()}-${cleanName}`;
+          const { error: uploadErr } = await supabase.storage
+            .from(REPORT_CARD_BUCKET)
+            .upload(filePath, blob, { upsert: false, contentType: 'application/pdf' });
+          if (uploadErr) throw uploadErr;
+          uploadResult = { filePath, fileName: cleanName };
+        } else {
+          if (templateFile.size > MAX_PDF_SIZE_BYTES)
+            throw new Error('Template file is too large. Maximum 15MB.');
+          const cleanName = sanitizeFileName(templateFile.name);
+          const filePath = `${formData.student_id}/${Date.now()}-${cleanName}`;
+          const { error: uploadErr } = await supabase.storage
+            .from(REPORT_CARD_BUCKET)
+            .upload(filePath, templateFile, { upsert: false, contentType: 'application/pdf' });
+          if (uploadErr) throw uploadErr;
+          uploadResult = { filePath, fileName: cleanName };
+        }
       }
 
       const payload = withSchoolId({
@@ -653,7 +844,7 @@ export default function ReportCardPage() {
           </label>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <button
             type="button"
             onClick={() => setMode('upload')}
@@ -668,9 +859,16 @@ export default function ReportCardPage() {
           >
             Create report card
           </button>
+          <button
+            type="button"
+            onClick={() => setMode('template')}
+            className={`px-4 py-3 rounded-2xl text-sm font-black uppercase tracking-wider border ${mode === 'template' ? 'bg-brand-500 text-white border-brand-500' : 'bg-slate-50 text-slate-600 border-slate-200'}`}
+          >
+            Import a template
+          </button>
         </div>
 
-        {mode === 'upload' ? (
+        {mode === 'upload' && (
           <div className="space-y-2">
             <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Upload File (PDF)</span>
             <input
@@ -682,7 +880,9 @@ export default function ReportCardPage() {
             />
             {selectedFile && <p className="text-xs font-semibold text-slate-500">Selected: {selectedFile.name}</p>}
           </div>
-        ) : (
+        )}
+
+        {mode === 'create' && (
           <div className="space-y-4">
             <label className="space-y-2 block">
               <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Report Title</span>
@@ -714,6 +914,213 @@ export default function ReportCardPage() {
             >
               Export Draft PDF
             </button>
+          </div>
+        )}
+
+        {mode === 'template' && (
+          <div className="space-y-4">
+            {/* File picker */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Template File (PDF · JPEG · JPG · PNG)</span>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => templateFileInputRef.current?.click()}
+                  disabled={isSaving}
+                  className="px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-black uppercase tracking-wider"
+                >
+                  {templateFile ? 'Change Template' : 'Select Template'}
+                </button>
+                {templateFile && (
+                  <span className="text-xs font-semibold text-slate-500 truncate max-w-[220px]">{templateFile.name}</span>
+                )}
+              </div>
+              <input
+                ref={templateFileInputRef}
+                type="file"
+                accept="application/pdf,.pdf,image/jpeg,image/png,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={handleTemplateFileChange}
+              />
+            </div>
+
+            {isAnalyzingTemplate && (
+              <p className="text-xs font-semibold text-brand-500 animate-pulse">Scanning template for white spaces…</p>
+            )}
+
+            {/* Image template editor */}
+            {templateFile && templateFileType === 'image' && templateObjectUrl && !isAnalyzingTemplate && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                    Template Editor
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => {
+                        if (!templateObjectUrl) return;
+                        setIsAnalyzingTemplate(true);
+                        const ri = new Image();
+                        ri.onload = () => { setTextBoxes(analyzeTemplateWhiteSpaces(ri)); setIsAnalyzingTemplate(false); };
+                        ri.onerror = () => setIsAnalyzingTemplate(false);
+                        ri.src = templateObjectUrl;
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-brand-50 text-brand-600 text-[10px] font-black uppercase tracking-widest"
+                    >
+                      Re-scan
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => setTextBoxes([])}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400 font-semibold">
+                  Click anywhere on the template to add a text area.
+                </p>
+
+                {/* Template canvas with text box overlays */}
+                <div
+                  ref={templateContainerRef}
+                  className="relative rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden select-none"
+                  onMouseMove={(e) => {
+                    if (!draggingBoxId || !templateContainerRef.current) return;
+                    const r = templateContainerRef.current.getBoundingClientRect();
+                    setTextBoxes(prev => prev.map(b =>
+                      b.id !== draggingBoxId ? b : {
+                        ...b,
+                        xPct: Math.max(0, Math.min(1 - b.wPct, (e.clientX - r.left - dragOffset.x) / r.width)),
+                        yPct: Math.max(0, Math.min(1 - b.hPct, (e.clientY - r.top - dragOffset.y) / r.height)),
+                      }
+                    ));
+                  }}
+                  onMouseUp={() => setDraggingBoxId(null)}
+                  onMouseLeave={() => setDraggingBoxId(null)}
+                >
+                  <img
+                    src={templateObjectUrl}
+                    alt="Report template"
+                    className="w-full h-auto block pointer-events-none"
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      setNaturalDims({ width: img.naturalWidth, height: img.naturalHeight });
+                    }}
+                  />
+                  {/* Transparent click-to-add overlay */}
+                  <div
+                    className="absolute inset-0 cursor-crosshair"
+                    style={{ zIndex: 1 }}
+                    onClick={(e) => {
+                      if (draggingBoxId || !templateContainerRef.current) return;
+                      const r = templateContainerRef.current.getBoundingClientRect();
+                      const xPct = (e.clientX - r.left) / r.width;
+                      const yPct = (e.clientY - r.top) / r.height;
+                      setTextBoxes(prev => [...prev, {
+                        id: `tb-${Date.now()}`,
+                        xPct: Math.max(0, Math.min(0.7, xPct - 0.15)),
+                        yPct: Math.max(0, Math.min(0.95, yPct - 0.025)),
+                        wPct: 0.30,
+                        hPct: 0.05,
+                        text: '',
+                        label: `Field ${prev.length + 1}`,
+                      }]);
+                    }}
+                  />
+                  {/* Text boxes */}
+                  {textBoxes.map(box => (
+                    <div
+                      key={box.id}
+                      style={{
+                        position: 'absolute',
+                        left: `${box.xPct * 100}%`,
+                        top: `${box.yPct * 100}%`,
+                        width: `${box.wPct * 100}%`,
+                        zIndex: 10,
+                      }}
+                      className="overflow-hidden"
+                    >
+                      <textarea
+                        value={box.text}
+                        onChange={e => setTextBoxes(prev => prev.map(b => b.id === box.id ? { ...b, text: e.target.value } : b))}
+                        onClick={e => e.stopPropagation()}
+                        onMouseDown={e => e.stopPropagation()}
+                        rows={2}
+                        className="w-full bg-transparent text-sm font-medium p-1 outline-none resize-none block border-none"
+                        placeholder="Enter text..."
+                        disabled={isSaving}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* PDF template – display-only + manual fields */}
+            {templateFile && templateFileType === 'pdf' && templateObjectUrl && (
+              <div className="space-y-3">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">PDF Template Preview</p>
+                <p className="text-xs text-amber-600 font-semibold bg-amber-50 rounded-xl px-3 py-2">
+                  PDF templates are shown for reference only. Add text fields below — they will be rendered as a separate overlay PDF alongside the original.
+                </p>
+                <iframe
+                  src={templateObjectUrl}
+                  className="w-full rounded-2xl border border-slate-200 dark:border-slate-700"
+                  style={{ height: '560px' }}
+                  title="PDF Template Preview"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">{textBoxes.length} Text Field{textBoxes.length !== 1 ? 's' : ''}</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => setTextBoxes(prev => [...prev, {
+                        id: `tb-${Date.now()}`,
+                        xPct: 0.05, yPct: 0.05 + 0.06 * prev.length,
+                        wPct: 0.6, hPct: 0.04,
+                        text: '', label: `Field ${prev.length + 1}`,
+                      }])}
+                      className="px-3 py-1.5 rounded-xl bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest"
+                    >
+                      Add Field
+                    </button>
+                    {textBoxes.length > 0 && (
+                      <button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => setTextBoxes([])}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {textBoxes.map(box => (
+                  <div key={box.id} className="flex items-center gap-2">
+                    <input
+                      value={box.text}
+                      onChange={e => setTextBoxes(prev => prev.map(b => b.id === box.id ? { ...b, text: e.target.value } : b))}
+                      className="flex-1 px-3 py-2 rounded-xl bg-transparent border-none text-sm font-medium outline-none"
+                      placeholder="Enter text..."
+                      disabled={isSaving}
+                    />
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={() => setTextBoxes(prev => prev.filter(b => b.id !== box.id))}
+                      className="w-8 h-8 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-sm font-bold"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

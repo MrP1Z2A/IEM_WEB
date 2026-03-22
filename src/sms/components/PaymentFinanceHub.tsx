@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import { supabase } from '../supabaseClient';
 import { getCurrentTenantContext, withSchoolId, withSchoolIdRows } from '../services/tenantService';
 
-type FinanceView = 'payment' | 'payment-assign' | 'payment-history' | 'late-payment' | 'student-finance-status';
+type FinanceView = 'payment' | 'payment-assign' | 'payment-history' | 'student-finance-status';
 
 type AppStudent = {
   id: string;
@@ -57,6 +57,58 @@ const formatMMK = (value: number) => {
   return `${Math.round(amount).toLocaleString('en-US')} MMK`;
 };
 
+const amountToWords = (value: number) => {
+  const ones = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const convertBelowThousand = (num: number): string => {
+    const parts: string[] = [];
+    if (num >= 100) {
+      parts.push(`${ones[Math.floor(num / 100)]} Hundred`);
+      num %= 100;
+    }
+    if (num >= 20) {
+      parts.push(tens[Math.floor(num / 10)]);
+      if (num % 10) parts.push(ones[num % 10]);
+      return parts.join(' ');
+    }
+    if (num >= 10) {
+      parts.push(teens[num - 10]);
+      return parts.join(' ');
+    }
+    if (num > 0) {
+      parts.push(ones[num]);
+    }
+    return parts.join(' ');
+  };
+
+  const amount = Math.max(0, Math.round(Number(value || 0)));
+  if (amount === 0) return 'Zero Kyats';
+
+  const groups = [
+    { value: 1_000_000_000, label: 'Billion' },
+    { value: 1_000_000, label: 'Million' },
+    { value: 1_000, label: 'Thousand' },
+    { value: 1, label: '' },
+  ];
+
+  let remaining = amount;
+  const words: string[] = [];
+
+  groups.forEach(group => {
+    if (remaining < group.value) return;
+    const groupValue = Math.floor(remaining / group.value);
+    if (groupValue > 0) {
+      const chunk = convertBelowThousand(groupValue);
+      words.push(group.label ? `${chunk} ${group.label}` : chunk);
+      remaining %= group.value;
+    }
+  });
+
+  return `${words.join(' ')} Kyats`;
+};
+
 const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
   const [students, setStudents] = useState<AppStudent[]>([]);
   const [payments, setPayments] = useState<StudentPayment[]>([]);
@@ -81,7 +133,6 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
     student_id: '',
     amount_mmk: '',
     payment_date: getTodayIso(),
-    due_date: getTodayIso(),
     status: 'paid' as PaymentStatus,
     note: '',
   });
@@ -297,19 +348,6 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
     return due < getTodayIso();
   };
 
-  const isPaidLate = (payment: StudentPayment) => {
-    if (payment.status !== 'paid' || !payment.due_date) return false;
-    const paid = toIsoDate(payment.payment_date);
-    const due = toIsoDate(payment.due_date);
-    if (!paid || !due) return false;
-    return paid > due;
-  };
-
-  const latePayments = useMemo(
-    () => payments.filter(payment => isPaidLate(payment)),
-    [payments]
-  );
-
   const filteredPayments = useMemo(
     () => payments.filter(payment => matchesStudentSearch(payment.student_id)),
     [payments, studentSearchQuery, studentMap]
@@ -320,17 +358,12 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
     [filteredPayments]
   );
 
-  const filteredLatePayments = useMemo(
-    () => latePayments.filter(payment => matchesStudentSearch(payment.student_id)),
-    [latePayments, studentSearchQuery, studentMap]
-  );
-
   const studentFinanceRows = useMemo(() => {
     const map = new Map<string, {
       student: AppStudent;
       totalPaid: number;
-      totalPending: number;
-      totalOverdue: number;
+      rawPending: number;
+      rawOverdue: number;
       status: 'pending' | 'overdue' | 'clear';
     }>();
 
@@ -338,8 +371,8 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
       map.set(student.id, {
         student,
         totalPaid: 0,
-        totalPending: 0,
-        totalOverdue: 0,
+        rawPending: 0,
+        rawOverdue: 0,
         status: 'clear',
       });
     });
@@ -349,8 +382,8 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
       const current = map.get(payment.student_id) || {
         student,
         totalPaid: 0,
-        totalPending: 0,
-        totalOverdue: 0,
+        rawPending: 0,
+        rawOverdue: 0,
         status: 'clear' as const,
       };
 
@@ -358,32 +391,39 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
         current.totalPaid += payment.amount_mmk;
       } else if (payment.status === 'pending') {
         if (isLate(payment)) {
-          current.totalOverdue += payment.amount_mmk;
+          current.rawOverdue += payment.amount_mmk;
         } else {
-          current.totalPending += payment.amount_mmk;
+          current.rawPending += payment.amount_mmk;
         }
       } else {
-        current.totalOverdue += payment.amount_mmk;
+        current.rawOverdue += payment.amount_mmk;
       }
 
       map.set(payment.student_id, current);
     });
 
     const rows = Array.from(map.values()).map(item => {
-      const statusValue: 'pending' | 'overdue' | 'clear' = item.totalOverdue > 0
-        ? 'overdue'
-        : item.totalPending > 0
-          ? 'pending'
+      // Apply paid amounts to overdue dues only. Keep active assigned dues visible in pending.
+      const totalOverdue = Math.max(item.rawOverdue - item.totalPaid, 0);
+      const totalPending = item.rawPending;
+
+      const statusValue: 'pending' | 'overdue' | 'clear' = totalPending > 0
+        ? 'pending'
+        : totalOverdue > 0
+          ? 'overdue'
           : 'clear';
 
       return {
-        ...item,
+        student: item.student,
+        totalPaid: item.totalPaid,
+        totalPending,
+        totalOverdue,
         status: statusValue,
       };
     });
 
     return rows.sort((a, b) => {
-      const order = { overdue: 0, pending: 1, clear: 2 } as const;
+      const order = { pending: 0, overdue: 1, clear: 2 } as const;
       return order[a.status] - order[b.status];
     });
   }, [payments, studentMap, students]);
@@ -490,7 +530,7 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
         student_id: formData.student_id,
         amount_mmk: Math.round(amount),
         payment_date: formData.payment_date || getTodayIso(),
-        due_date: formData.due_date || null,
+        due_date: null,
         status: formData.status,
         note: formData.note.trim() || null,
       }, schoolId);
@@ -503,7 +543,6 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
         student_id: '',
         amount_mmk: '',
         payment_date: getTodayIso(),
-        due_date: getTodayIso(),
         status: 'paid',
         note: '',
       });
@@ -572,6 +611,142 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
     doc.save(`payment-statement-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
+  const downloadPaymentInvoicePdf = (payment: StudentPayment) => {
+    const student = studentMap.get(payment.student_id);
+    const academic = getStudentAcademic(payment.student_id);
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const invoiceNo = `INV-${String(payment.id).slice(0, 8).toUpperCase()}`;
+    const collectedDate = toIsoDate(payment.payment_date) || '-';
+    const dueDate = toIsoDate(payment.due_date) || '-';
+    const description = payment.note?.trim() || `Student fee payment for ${academic.className} / ${academic.courseName}`;
+    const amountInWords = amountToWords(payment.amount_mmk);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const left = 42;
+    const right = pageWidth - 42;
+    const amountColumnX = 415;
+    const amountColumnRight = right;
+    const amountColumnMid = 510;
+    const tableTop = 126;
+    const rowHeight = 25;
+    const rowCount = 6;
+    const tableBottom = tableTop + (rowHeight * (rowCount + 1));
+
+    const drawCheckbox = (x: number, y: number, label: string, checked: boolean) => {
+      doc.rect(x, y - 8, 10, 10);
+      if (checked) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('X', x + 2, y);
+        doc.setFont('helvetica', 'normal');
+      }
+      doc.text(label, x + 16, y);
+    };
+
+    doc.setTextColor(20, 20, 20);
+    doc.setDrawColor(40, 40, 40);
+    doc.setLineWidth(0.8);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('STUDENT PAYMENT VOUCHER', pageWidth / 2, 34, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('Student Invoice Copy', pageWidth / 2, 48, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    drawCheckbox(90, 78, 'Payment Voucher', true);
+    drawCheckbox(250, 78, 'Cash Voucher', false);
+    drawCheckbox(90, 98, 'Petty Cash Voucher', false);
+    drawCheckbox(250, 98, 'Cheque Voucher', false);
+
+    doc.text('Voucher No:', 418, 78);
+    doc.line(482, 82, right, 82);
+    doc.text(invoiceNo, 486, 78);
+    doc.text('Date:', 418, 98);
+    doc.line(452, 102, right, 102);
+    doc.text(collectedDate, 456, 98);
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAY TO', 110, 126);
+    doc.line(155, 129, right, 129);
+    doc.setFont('helvetica', 'normal');
+    doc.text(student?.name || payment.student_id, 160, 126);
+
+    doc.line(left, tableTop, right, tableTop);
+    doc.line(left, tableTop + rowHeight, right, tableTop + rowHeight);
+    doc.line(amountColumnX, tableTop, amountColumnX, tableBottom);
+    doc.line(amountColumnMid, tableTop, amountColumnMid, tableBottom);
+    doc.line(right, tableTop, right, tableBottom);
+    doc.line(left, tableBottom, right, tableBottom);
+
+    for (let index = 1; index <= rowCount; index += 1) {
+      const y = tableTop + (rowHeight * index);
+      doc.line(left, y, right, y);
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('DESCRIPTION', 250, tableTop + 17, { align: 'center' });
+    doc.text('AMOUNT', 462, tableTop + 17, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+
+    const rows = [
+      { label: description, amount: formatMMK(payment.amount_mmk) },
+      { label: `Student ID: ${payment.student_id}`, amount: '' },
+      { label: `Class: ${academic.className}`, amount: '' },
+      { label: `Course: ${academic.courseName}`, amount: '' },
+      { label: `Status: ${String(payment.status).toUpperCase()}`, amount: '' },
+      { label: `Due Date: ${dueDate}`, amount: '' },
+    ];
+
+    rows.forEach((row, index) => {
+      const y = tableTop + rowHeight + 17 + (index * rowHeight);
+      const wrapped = doc.splitTextToSize(row.label, 300);
+      doc.text(wrapped[0] || '', 52, y);
+      if (row.amount) {
+        doc.text(row.amount, amountColumnRight - 10, y, { align: 'right' });
+      }
+    });
+
+    const accountRowTop = tableBottom + 16;
+    const accountRowBottom = accountRowTop + 24;
+
+    doc.line(left, accountRowTop, right, accountRowTop);
+    doc.line(left, accountRowBottom, right, accountRowBottom);
+    doc.line(290, accountRowTop, 290, accountRowBottom);
+    doc.line(430, accountRowTop, 430, accountRowBottom);
+    doc.line(510, accountRowTop, 510, accountRowBottom);
+    doc.line(right, accountRowTop, right, accountRowBottom);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('A/c', 52, accountRowTop + 15);
+    doc.text('Cash/Cheque', 300, accountRowTop + 15);
+    doc.text('MMK', 440, accountRowTop + 15);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatMMK(payment.amount_mmk), amountColumnRight - 10, accountRowTop + 15, { align: 'right' });
+
+    const sumLabelY = accountRowBottom + 26;
+    doc.setFont('helvetica', 'bold');
+    doc.text('The Sum of Kyats', 52, sumLabelY);
+    doc.setFont('helvetica', 'normal');
+    doc.line(148, sumLabelY + 2, right, sumLabelY + 2);
+    const amountWordsLines = doc.splitTextToSize(amountInWords, right - 156);
+    doc.text(amountWordsLines, 154, sumLabelY - 3);
+
+    const metaY = sumLabelY + 34;
+    doc.text(`Collected Date: ${collectedDate}`, 52, metaY);
+    doc.text(`Email: ${student?.email || '-'}`, 260, metaY);
+
+    const footerY = 770;
+    doc.text('Payment Approved by:', 52, footerY);
+    doc.line(148, footerY + 2, 280, footerY + 2);
+    doc.text('Received by:', 392, footerY);
+    doc.line(456, footerY + 2, right, footerY + 2);
+
+    doc.save(`${invoiceNo}-${collectedDate}.pdf`);
+  };
+
   const pageMeta = {
     payment: {
       title: 'Payment Collection Desk',
@@ -584,10 +759,6 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
     'payment-history': {
       title: 'Payment History',
       subtitle: 'Track all recorded student payments.',
-    },
-    'late-payment': {
-      title: 'Late Payment',
-      subtitle: 'Monitor overdue student payments.',
     },
     'student-finance-status': {
       title: 'Student Finance Status',
@@ -610,7 +781,7 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
         </div>
       )}
 
-      {(view === 'payment-history' || view === 'late-payment' || view === 'student-finance-status' || view === 'payment' || view === 'payment-assign') && (
+      {(view === 'payment-history' || view === 'student-finance-status' || view === 'payment' || view === 'payment-assign') && (
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[28px] p-4 sm:p-5 shadow-premium">
           <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Search Student</label>
           <input
@@ -672,18 +843,6 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Due Date (If Any)</label>
-                  <input
-                    type="date"
-                    value={formData.due_date}
-                    onChange={(event) => setFormData(prev => ({ ...prev, due_date: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Status</label>
                   <select
                     value={formData.status}
@@ -696,7 +855,7 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
                   </select>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Note (Optional)</label>
                   <input
                     value={formData.note}
@@ -878,39 +1037,17 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view }) => {
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <button
+                          type="button"
+                          onClick={() => downloadPaymentInvoicePdf(payment)}
+                          className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest"
+                        >
+                          Download Invoice
+                        </button>
                         <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500">{payment.status}</span>
                         <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-[10px] font-black uppercase tracking-widest text-emerald-700">{formatMMK(payment.amount_mmk)}</span>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {view === 'late-payment' && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[36px] p-5 sm:p-6 lg:p-8 shadow-premium space-y-4">
-              <h3 className="text-xl font-black tracking-tight">Late Payment</h3>
-              {filteredLatePayments.length === 0 ? (
-                <p className="text-sm font-semibold text-slate-500">No late-paid student dues found.</p>
-              ) : (
-                <div className="space-y-3">
-                  {filteredLatePayments.map(payment => (
-                    <div key={payment.id} className="rounded-2xl border border-rose-200 bg-rose-50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="space-y-2">
-                        <p className="text-sm font-black text-slate-900">{studentMap.get(payment.student_id)?.name || payment.student_id}</p>
-                        <p className="text-xs text-rose-700">Deadline: {toIsoDate(payment.due_date) || '-'} | Collected: {toIsoDate(payment.payment_date) || '-'} | Status: Paid Late</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="px-3 py-1.5 rounded-xl bg-white text-rose-700 text-xs font-black tracking-wide border border-rose-200">
-                            Class: {getStudentAcademic(payment.student_id).className}
-                          </span>
-                          <span className="px-3 py-1.5 rounded-xl bg-white text-rose-700 text-xs font-black tracking-wide border border-rose-200">
-                            Course: {getStudentAcademic(payment.student_id).courseName}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="px-2.5 py-1 rounded-lg bg-white text-[10px] font-black uppercase tracking-widest text-rose-700">{formatMMK(payment.amount_mmk)}</span>
                     </div>
                   ))}
                 </div>

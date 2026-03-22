@@ -28,6 +28,19 @@ interface StudentDirectoryProps {
   deleteEntity: (id: string, type: string) => void;
 }
 
+type BulkAssignmentTarget = {
+  classId: string;
+  courseId: string;
+  className: string;
+  courseName: string;
+};
+
+type BulkCourse = {
+  id: string;
+  name: string;
+  class_id: string;
+};
+
 const StudentDirectory: React.FC<StudentDirectoryProps> = ({
   students,
   classes,
@@ -49,9 +62,9 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
   const [genderFilter, setGenderFilter] = React.useState<'all' | 'Male' | 'Female'>('all');
   const [isSelectMode, setIsSelectMode] = React.useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = React.useState<string[]>([]);
-  const [bulkClassId, setBulkClassId] = React.useState('');
-  const [bulkCourseId, setBulkCourseId] = React.useState('');
-  const [bulkCourses, setBulkCourses] = React.useState<Array<{ id: string; name: string; class_id: string }>>([]);
+  const [bulkSelectedClassIds, setBulkSelectedClassIds] = React.useState<string[]>([]);
+  const [bulkCoursesByClass, setBulkCoursesByClass] = React.useState<Record<string, BulkCourse[]>>({});
+  const [bulkTargets, setBulkTargets] = React.useState<BulkAssignmentTarget[]>([]);
   const [isBulkCoursesLoading, setIsBulkCoursesLoading] = React.useState(false);
   const [isBulkAssigning, setIsBulkAssigning] = React.useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = React.useState(false);
@@ -113,8 +126,8 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
 
   React.useEffect(() => {
     const loadBulkCourses = async () => {
-      if (!bulkClassId) {
-        setBulkCourses([]);
+      if (!bulkSelectedClassIds.length) {
+        setBulkCoursesByClass({});
         setIsBulkCoursesLoading(false);
         return;
       }
@@ -124,26 +137,38 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
         const { data, error } = await supabase
           .from('class_courses')
           .select('id, name, class_id')
-          .eq('class_id', bulkClassId)
+          .in('class_id', bulkSelectedClassIds)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        setBulkCourses((data || []).map((course: any) => ({
-          id: String(course.id),
-          name: String(course.name || ''),
-          class_id: String(course.class_id || ''),
-        })));
+        const nextCoursesByClass: Record<string, BulkCourse[]> = {};
+        (data || []).forEach((course: any) => {
+          const classId = String(course.class_id || '');
+          if (!classId) return;
+
+          if (!nextCoursesByClass[classId]) {
+            nextCoursesByClass[classId] = [];
+          }
+
+          nextCoursesByClass[classId].push({
+            id: String(course.id),
+            name: String(course.name || ''),
+            class_id: classId,
+          });
+        });
+
+        setBulkCoursesByClass(nextCoursesByClass);
       } catch (error) {
         console.error('Failed to load bulk courses:', error);
-        setBulkCourses([]);
+        setBulkCoursesByClass({});
       } finally {
         setIsBulkCoursesLoading(false);
       }
     };
 
     void loadBulkCourses();
-  }, [bulkClassId]);
+  }, [bulkSelectedClassIds]);
 
   const renderDetailValue = (value: unknown) => {
     if (value === null || value === undefined || value === '') {
@@ -308,14 +333,17 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
 
   const handleBulkAssign = async () => {
     if (!selectedStudentIds.length) return;
-    if (!bulkClassId) return;
+    if (!bulkTargets.length) return;
 
     setIsBulkAssigning(true);
     try {
-      await bulkAssignStudentsToClass(selectedStudentIds, bulkClassId, bulkCourseId || undefined);
+      for (const target of bulkTargets) {
+        await bulkAssignStudentsToClass(selectedStudentIds, target.classId, target.courseId || undefined);
+      }
       setSelectedStudentIds([]);
-      setBulkClassId('');
-      setBulkCourseId('');
+      setBulkSelectedClassIds([]);
+      setBulkCoursesByClass({});
+      setBulkTargets([]);
       setIsSelectMode(false);
     } finally {
       setIsBulkAssigning(false);
@@ -349,12 +377,50 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     try {
       await bulkDeleteStudents(selectedStudentIds);
       setSelectedStudentIds([]);
-      setBulkClassId('');
-      setBulkCourseId('');
+      setBulkSelectedClassIds([]);
+      setBulkCoursesByClass({});
+      setBulkTargets([]);
       setIsSelectMode(false);
     } finally {
       setIsBulkDeleting(false);
     }
+  };
+
+  const toggleBulkClassSelection = (classId: string) => {
+    setBulkSelectedClassIds((prev) => {
+      const exists = prev.includes(classId);
+      const next = exists ? prev.filter((id) => id !== classId) : [...prev, classId];
+
+      if (exists) {
+        setBulkTargets((targets) => targets.filter((target) => target.classId !== classId));
+      }
+
+      return next;
+    });
+  };
+
+  const toggleBulkCourseSelection = (classId: string, course: BulkCourse) => {
+    const selectedClass = classes.find((classItem) => String(classItem.id) === String(classId));
+    if (!selectedClass) return;
+
+    const nextTarget: BulkAssignmentTarget = {
+      classId: String(classId),
+      courseId: String(course.id),
+      className: String(selectedClass.name || selectedClass.class_code || selectedClass.id),
+      courseName: String(course.name || course.id),
+    };
+
+    setBulkTargets((prev) => {
+      const exists = prev.some((target) => target.classId === nextTarget.classId && target.courseId === nextTarget.courseId);
+      if (exists) {
+        return prev.filter((target) => !(target.classId === nextTarget.classId && target.courseId === nextTarget.courseId));
+      }
+      return [...prev, nextTarget];
+    });
+  };
+
+  const removeBulkTarget = (classId: string, courseId: string) => {
+    setBulkTargets((prev) => prev.filter((target) => !(target.classId === classId && target.courseId === courseId)));
   };
 
   const downloadDirectoryPdf = () => {
@@ -475,8 +541,9 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                 const next = !prev;
                 if (!next) {
                   setSelectedStudentIds([]);
-                  setBulkClassId('');
-                  setBulkCourseId('');
+                  setBulkSelectedClassIds([]);
+                  setBulkCoursesByClass({});
+                  setBulkTargets([]);
                 }
                 return next;
               });
@@ -497,53 +564,114 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
 
       {isSelectMode && (
         <div className="bg-white dark:bg-slate-900 rounded-[24px] p-4 sm:p-5 shadow-premium border border-slate-100 dark:border-slate-800">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-xs font-black uppercase tracking-widest text-slate-500">{selectedStudentIds.length} selected</p>
-            <button
-              onClick={toggleSelectAllFiltered}
-              disabled={!filteredStudentIds.length || isBulkDeleting || isBulkAssigning}
-              className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!filteredStudentIds.length || isBulkDeleting || isBulkAssigning ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-700 dark:bg-slate-600'}`}
-            >
-              {areAllFilteredSelected ? 'Unselect All' : 'Select All'}
-            </button>
-            <select
-              value={bulkClassId}
-              onChange={(e) => {
-                setBulkClassId(e.target.value);
-                setBulkCourseId('');
-              }}
-              className="w-full sm:w-auto bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold"
-            >
-              <option value="">Choose Class</option>
-              {classes.map(classItem => (
-                <option key={classItem.id} value={classItem.id}>{classItem.name} ({classItem.class_code || classItem.id})</option>
-              ))}
-            </select>
-            <select
-              value={bulkCourseId}
-              onChange={(e) => setBulkCourseId(e.target.value)}
-              disabled={!bulkClassId || isBulkCoursesLoading}
-              className="w-full sm:w-auto bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold disabled:opacity-60"
-            >
-              <option value="">{!bulkClassId ? 'Choose Course' : isBulkCoursesLoading ? 'Loading Courses...' : 'Choose Course'}</option>
-              {bulkCourses.map(course => (
-                <option key={course.id} value={course.id}>{course.name}</option>
-              ))}
-            </select>
-            <button
-              onClick={() => void handleBulkAssign()}
-              disabled={!selectedStudentIds.length || !bulkClassId || isBulkAssigning || isBulkDeleting}
-              className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!selectedStudentIds.length || !bulkClassId || isBulkAssigning || isBulkDeleting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
-            >
-              {isBulkAssigning ? 'Assigning...' : 'Add To Class/Course'}
-            </button>
-            <button
-              onClick={() => void handleBulkDelete()}
-              disabled={!selectedStudentIds.length || isBulkDeleting || isBulkAssigning}
-              className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!selectedStudentIds.length || isBulkDeleting || isBulkAssigning ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
-            >
-              {isBulkDeleting ? 'Deleting...' : 'Delete Selected'}
-            </button>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-xs font-black uppercase tracking-widest text-slate-500">{selectedStudentIds.length} selected</p>
+              <button
+                onClick={toggleSelectAllFiltered}
+                disabled={!filteredStudentIds.length || isBulkDeleting || isBulkAssigning}
+                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!filteredStudentIds.length || isBulkDeleting || isBulkAssigning ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-700 dark:bg-slate-600'}`}
+              >
+                {areAllFilteredSelected ? 'Unselect All' : 'Select All'}
+              </button>
+              <button
+                onClick={() => void handleBulkAssign()}
+                disabled={!selectedStudentIds.length || !bulkTargets.length || isBulkAssigning || isBulkDeleting}
+                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!selectedStudentIds.length || !bulkTargets.length || isBulkAssigning || isBulkDeleting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
+              >
+                {isBulkAssigning ? 'Assigning...' : `Add To ${bulkTargets.length} Course${bulkTargets.length === 1 ? '' : 's'}`}
+              </button>
+              <button
+                onClick={() => void handleBulkDelete()}
+                disabled={!selectedStudentIds.length || isBulkDeleting || isBulkAssigning}
+                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!selectedStudentIds.length || isBulkDeleting || isBulkAssigning ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
+              >
+                {isBulkDeleting ? 'Deleting...' : 'Delete Selected'}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Choose Classes</p>
+              <div className="flex flex-wrap gap-2">
+                {classes.map((classItem) => {
+                  const isActive = bulkSelectedClassIds.includes(String(classItem.id));
+                  return (
+                    <button
+                      key={String(classItem.id)}
+                      type="button"
+                      onClick={() => toggleBulkClassSelection(String(classItem.id))}
+                      disabled={isBulkAssigning || isBulkDeleting}
+                      className={`px-3 py-2 rounded-xl text-xs font-black transition-all ${isActive ? 'bg-brand-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200'}`}
+                    >
+                      {classItem.name || classItem.class_code || 'Unnamed Class'}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Choose Courses</p>
+              {!bulkSelectedClassIds.length && (
+                <span className="text-xs font-semibold text-slate-400">Select one or more classes first.</span>
+              )}
+              {bulkSelectedClassIds.length > 0 && isBulkCoursesLoading && (
+                <span className="text-xs font-semibold text-slate-400">Loading courses...</span>
+              )}
+              {bulkSelectedClassIds.length > 0 && !isBulkCoursesLoading && (
+                <div className="space-y-3">
+                  {bulkSelectedClassIds.map((classId) => {
+                    const classItem = classes.find((item) => String(item.id) === String(classId));
+                    const classCourses = bulkCoursesByClass[classId] || [];
+
+                    return (
+                      <div key={classId} className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          {classItem?.name || classItem?.class_code || 'Unnamed Class'}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {classCourses.length === 0 ? (
+                            <span className="text-xs font-semibold text-slate-400">No courses found for this class.</span>
+                          ) : classCourses.map((course) => {
+                            const isActive = bulkTargets.some((target) => target.classId === classId && target.courseId === course.id);
+                            return (
+                              <button
+                                key={`${classId}-${course.id}`}
+                                type="button"
+                                onClick={() => toggleBulkCourseSelection(classId, course)}
+                                disabled={isBulkAssigning || isBulkDeleting}
+                                className={`px-3 py-2 rounded-xl text-xs font-black transition-all ${isActive ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-200'}`}
+                              >
+                                {course.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {bulkTargets.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Selected Classes / Courses</p>
+                <div className="flex flex-wrap gap-2">
+                  {bulkTargets.map((target) => (
+                    <button
+                      key={`${target.classId}-${target.courseId}`}
+                      type="button"
+                      onClick={() => removeBulkTarget(target.classId, target.courseId)}
+                      disabled={isBulkAssigning || isBulkDeleting}
+                      className="px-3 py-2 rounded-xl bg-brand-50 text-brand-600 border border-brand-200 text-xs font-black"
+                    >
+                      {target.className} / {target.courseName} ×
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

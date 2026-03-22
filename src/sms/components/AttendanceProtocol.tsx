@@ -119,6 +119,13 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
   const [editCourseName, setEditCourseName] = React.useState('');
   const [editCourseCurrentImageUrl, setEditCourseCurrentImageUrl] = React.useState<string | null>(null);
 
+  const [confirmDialog, setConfirmDialog] = React.useState<{ message: string; onConfirm: () => Promise<void> } | null>(null);
+  const [isConfirmActionSubmitting, setIsConfirmActionSubmitting] = React.useState(false);
+
+  const openConfirmDialog = (message: string, onConfirm: () => Promise<void>) => {
+    setConfirmDialog({ message, onConfirm });
+  };
+
   const guessFileNameFromUrl = React.useCallback((url: string, fallback = 'downloaded-file') => {
     try {
       const parsedUrl = new URL(url);
@@ -579,6 +586,28 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
       if (error) throw error;
 
+      // Log folder creation to resources_buckets
+      let schoolId = selectedClass?.school_id;
+      if (!schoolId && activeClassId) {
+        const { data } = await supabase.from('classes').select('school_id').eq('id', activeClassId).single();
+        schoolId = data?.school_id;
+      }
+
+      const { data: publicUrlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(keepPath);
+
+      const { error: dbError } = await supabase.from('resources_buckets').insert([{
+        school_id: schoolId || undefined,
+        class_id: activeClassId,
+        class_course_id: focusCourse?.id,
+        name: normalizedName,
+        metadata: { type: 'folder', size: 0 },
+        image_url: publicUrlData?.publicUrl || null
+      }]);
+      if (dbError) {
+        console.warn('Failed to log folder creation in resources_buckets:', dbError);
+        throw dbError;
+      }
+
       setNewCourseFolderName('');
       await loadCourseFolders();
     } catch (error: any) {
@@ -624,6 +653,28 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
             contentType: file.type || undefined,
           });
         if (error) throw error;
+
+        // Log file upload to resources_buckets
+        let schoolId = selectedClass?.school_id;
+        if (!schoolId && activeClassId) {
+          const { data } = await supabase.from('classes').select('school_id').eq('id', activeClassId).single();
+          schoolId = data?.school_id;
+        }
+
+        const { data: publicUrlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(path);
+
+        const { error: dbError } = await supabase.from('resources_buckets').insert([{
+          school_id: schoolId || undefined,
+          class_id: activeClassId,
+          class_course_id: focusCourse?.id,
+          name: file.name,
+          metadata: { type: 'file', size: file.size, mime_type: file.type, folder: folderName },
+          image_url: publicUrlData?.publicUrl || null
+        }]);
+        if (dbError) {
+          console.warn('Failed to log file upload in resources_buckets:', dbError);
+          throw dbError;
+        }
       }
 
       await loadFilesForCourseFolder(folderName);
@@ -634,7 +685,73 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     } finally {
       setUploadingCourseFolderName(null);
     }
-  }, [courseFolderBasePath, loadFilesForCourseFolder, loadCourseFolders, notify]);
+  }, [courseFolderBasePath, loadFilesForCourseFolder, loadCourseFolders, notify, activeClassId, focusCourse]);
+
+  const deleteCourseFolder = async (folderName: string) => {
+    openConfirmDialog(`Are you sure you want to delete folder "${folderName}" and all its contents?`, async () => {
+      setIsConfirmActionSubmitting(true);
+      try {
+        const folderPath = `${courseFolderBasePath}/${folderName}`;
+        const listResult = await supabase.storage.from(COURSE_RESOURCES_BUCKET).list(folderPath, { limit: 1000 });
+        const filesToDelete = (listResult.data || []).map(f => `${folderPath}/${f.name}`);
+        if (filesToDelete.length > 0) {
+          const { error: storageError } = await supabase.storage.from(COURSE_RESOURCES_BUCKET).remove(filesToDelete);
+          if (storageError) throw storageError;
+        }
+
+        if (activeClassId && focusCourse) {
+          await supabase.from('resources_buckets').delete()
+            .eq('class_id', activeClassId)
+            .eq('class_course_id', focusCourse.id)
+            .eq('name', folderName)
+            .eq('metadata->>type', 'folder');
+
+          await supabase.from('resources_buckets').delete()
+            .eq('class_id', activeClassId)
+            .eq('class_course_id', focusCourse.id)
+            .eq('metadata->>folder', folderName);
+        }
+
+        await loadCourseFolders();
+        notify(`Deleted folder "${folderName}"`);
+      } catch (error: any) {
+        console.error('Failed to delete folder:', error);
+        notify(`Failed to delete folder: ${error?.message || 'Unknown error'}`);
+      } finally {
+        setIsConfirmActionSubmitting(false);
+        setConfirmDialog(null);
+      }
+    });
+  };
+
+  const deleteCourseFile = async (folderName: string, file: any) => {
+    openConfirmDialog(`Are you sure you want to delete file "${file.name}"?`, async () => {
+      setIsConfirmActionSubmitting(true);
+      try {
+        const { error: storageError } = await supabase.storage.from(COURSE_RESOURCES_BUCKET).remove([file.path]);
+        if (storageError) throw storageError;
+
+        if (activeClassId && focusCourse) {
+          await supabase.from('resources_buckets').delete()
+            .eq('class_id', activeClassId)
+            .eq('class_course_id', focusCourse.id)
+            .eq('name', file.name)
+            .eq('metadata->>type', 'file')
+            .eq('metadata->>folder', folderName);
+        }
+
+        await loadFilesForCourseFolder(folderName);
+        await loadCourseFolders();
+        notify(`Deleted file "${file.name}"`);
+      } catch (error: any) {
+        console.error('Failed to delete file:', error);
+        notify(`Failed to delete file: ${error?.message || 'Unknown error'}`);
+      } finally {
+        setIsConfirmActionSubmitting(false);
+        setConfirmDialog(null);
+      }
+    });
+  };
 
   React.useEffect(() => {
     void loadCourseFolders();
@@ -1766,6 +1883,12 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                                   <span className="text-xs font-black truncate">{folder.name}</span>
                                   <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{folder.filesCount}</span>
                                 </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); void deleteCourseFolder(folder.name); }}
+                                  className="mx-2 px-2 py-1 rounded-md bg-rose-50 text-rose-500 hover:bg-rose-100 text-[10px] font-black uppercase tracking-widest transition-colors"
+                                >
+                                  Del
+                                </button>
 
                                 <button
                                   onClick={() => courseFolderUploadRefs.current[inputId]?.click()}
@@ -1797,17 +1920,29 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                                     <p className="text-[11px] font-semibold text-slate-500">No files yet.</p>
                                   ) : (
                                     files.map(file => (
-                                      <button
-                                        type="button"
+                                      <div
                                         key={file.path}
-                                        onClick={() => void downloadFileDirectly(file.url, file.name)}
-                                        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900"
+                                        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 group"
                                       >
-                                        <span className="text-[11px] font-black text-brand-500 truncate">{file.name}</span>
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                          {file.size > 0 ? `${Math.max(1, Math.round(file.size / 1024))}KB` : 'File'}
-                                        </span>
-                                      </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => void downloadFileDirectly(file.url, file.name)}
+                                          className="flex-1 text-left min-w-0 flex items-center gap-2"
+                                        >
+                                          <span className="text-[11px] font-black text-brand-500 truncate hover:underline">{file.name}</span>
+                                        </button>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                            {file.size > 0 ? `${Math.max(1, Math.round(file.size / 1024))}KB` : 'File'}
+                                          </span>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); void deleteCourseFile(folder.name, file); }}
+                                            className="px-2 py-1 rounded-md bg-rose-50 text-rose-500 hover:bg-rose-100 text-[10px] font-black uppercase transition-colors opacity-0 group-hover:opacity-100"
+                                          >
+                                            Del
+                                          </button>
+                                        </div>
+                                      </div>
                                     ))
                                   )}
                                 </div>
@@ -2241,8 +2376,38 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               </div>
             </div>
           )}
+          {(process.env.NODE_ENV === 'development') && (
+            <div className="absolute top-4 right-4 text-[10px] font-black uppercase text-brand-500 opacity-50">Attendance Protocol Mount OK</div>
+          )}
         </div>
       )}
+
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 sm:p-6 shadow-premium">
+            <h5 className="text-sm font-black uppercase tracking-widest text-slate-500">Confirm Action</h5>
+            <p className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-300">{confirmDialog.message}</p>
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                disabled={isConfirmActionSubmitting}
+                className="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-100 text-xs font-black uppercase tracking-widest disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void confirmDialog.onConfirm()}
+                disabled={isConfirmActionSubmitting}
+                className="px-4 py-2.5 rounded-xl bg-rose-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-60 transition-colors hover:bg-rose-600"
+              >
+                {isConfirmActionSubmitting ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

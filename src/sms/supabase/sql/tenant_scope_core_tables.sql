@@ -40,7 +40,8 @@ begin
     return;
   end if;
 
-  execute format('alter table public.%I add column if not exists school_id uuid', target_table);
+  execute format('alter table public.%I add column if not exists school_id uuid default public.current_school_id()', target_table);
+  execute format('alter table public.%I alter column school_id set default public.current_school_id()', target_table);
 
   select exists (
     select 1

@@ -925,35 +925,51 @@ const App: React.FC = () => {
       return;
     }
 
-    const existingIds = (targetClass.student_ids || []).map((id: any) => String(id));
+    const existingClassIds = (targetClass.student_ids || []).map((id: any) => String(id));
     const uniqueIncomingIds = Array.from(new Set(studentIds.map(id => String(id))));
-    const idsToInsert = uniqueIncomingIds.filter(id => !existingIds.includes(id));
-
-    if (!idsToInsert.length) {
-      notify('All selected students are already in this class/batch.');
-      return;
-    }
 
     if (!classCourseId) {
       notify('Please select a class course when assigning students.');
       return;
     }
 
-    setClasses(prev => prev.map(classItem => {
-      if (String(classItem.id) !== String(classId)) return classItem;
-      const prevIds = (classItem.student_ids || []).map((id: any) => String(id));
-      const merged = Array.from(new Set([...prevIds, ...idsToInsert]));
-      return {
-        ...classItem,
-        student_ids: merged,
-        student_count: merged.length,
-      };
-    }));
+    // Check which students are ALREADY in this specific course
+    const { data: existingCourseStudents } = await supabase
+      .from('class_course_students')
+      .select('student_id')
+      .eq('class_course_id', classCourseId);
 
-    const coursePayload = idsToInsert.map(studentId => ({
+    const studentsInCourse = new Set((existingCourseStudents || []).map(r => String(r.student_id)));
+    
+    const idsToInsertToCourse = uniqueIncomingIds.filter(id => !studentsInCourse.has(id));
+
+    if (!idsToInsertToCourse.length) {
+      notify('All selected students are already in this specific course.');
+      return;
+    }
+
+    const schoolId = await requireSchoolId();
+
+    const idsToInsertToClass = idsToInsertToCourse.filter(id => !existingClassIds.includes(id));
+
+    if (idsToInsertToClass.length > 0) {
+      setClasses(prev => prev.map(classItem => {
+        if (String(classItem.id) !== String(classId)) return classItem;
+        const prevIds = (classItem.student_ids || []).map((id: any) => String(id));
+        const merged = Array.from(new Set([...prevIds, ...idsToInsertToClass]));
+        return {
+          ...classItem,
+          student_ids: merged,
+          student_count: merged.length,
+        };
+      }));
+    }
+
+    const coursePayload = idsToInsertToCourse.map(studentId => ({
       class_id: classId,
       class_course_id: classCourseId,
       student_id: studentId,
+      school_id: schoolId,
     }));
 
     const primaryCourseAssign = await supabase
@@ -961,9 +977,10 @@ const App: React.FC = () => {
       .insert(coursePayload);
 
     if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
-      const fallbackCoursePayload = idsToInsert.map(studentId => ({
+      const fallbackCoursePayload = idsToInsertToCourse.map(studentId => ({
         course_id: classCourseId,
         student_id: studentId,
+        school_id: schoolId,
       }));
 
       const fallbackCourseAssign = await supabase
@@ -983,7 +1000,7 @@ const App: React.FC = () => {
       return;
     }
 
-    notify(`${idsToInsert.length} student(s) added to ${targetClass.name || targetClass.class_code || 'selected class'}${classCourseId ? ' and selected course' : ''}.`);
+    notify(`${idsToInsertToCourse.length} student(s) added to the selected course.`);
   };
 
   const bulkDeleteStudents = async (studentIds: string[]) => {
@@ -2704,13 +2721,15 @@ const App: React.FC = () => {
     status: 'P' | 'A' | 'L',
     contextName?: string
   ) => {
-    const basePayload = {
+    const schoolId = await requireSchoolId();
+
+    const basePayload = withSchoolId({
       context_type: contextType,
       context_id: contextId,
       attendance_date: date,
       student_id: studentId,
       status,
-    };
+    }, schoolId);
 
     let error: any = null;
 
@@ -2762,7 +2781,7 @@ const App: React.FC = () => {
         },
       };
     });
-  }, [getAttendanceStoreKey, notify, syncStudentAttendanceRates]);
+  }, [getAttendanceStoreKey, notify, requireSchoolId, syncStudentAttendanceRates]);
 
   const bulkMarkSubjectPresent = useCallback(async (
     contextType: AttendanceContextType,
@@ -2776,13 +2795,15 @@ const App: React.FC = () => {
       return;
     }
 
-    const basePayload = studentIds.map(studentId => ({
+    const schoolId = await requireSchoolId();
+
+    const basePayload = studentIds.map(studentId => withSchoolId({
       context_type: contextType,
       context_id: contextId,
       attendance_date: date,
       student_id: studentId,
       status: 'P' as const,
-    }));
+    }, schoolId));
 
     let error: any = null;
 
@@ -2826,7 +2847,7 @@ const App: React.FC = () => {
 
     setAttendanceForDate(getAttendanceStoreKey(contextType, contextId), date, nextDateData);
     notify(`All students marked Present for ${contextName || 'selected attendance context'}.`);
-  }, [getAttendanceStoreKey, notify, setAttendanceForDate, syncStudentAttendanceRates]);
+  }, [getAttendanceStoreKey, notify, requireSchoolId, setAttendanceForDate, syncStudentAttendanceRates]);
 
   useEffect(() => {
     void syncAllStudentsToCloud(false);
@@ -3476,10 +3497,6 @@ const App: React.FC = () => {
             <PaymentFinanceHub view="payment-history" />
           )}
 
-          {currentPage === 'late-payment' && (
-            <PaymentFinanceHub view="late-payment" />
-          )}
-
           {currentPage === 'student-finance-status' && (
             <PaymentFinanceHub view="student-finance-status" />
           )}
@@ -3564,7 +3581,7 @@ const App: React.FC = () => {
           )}
 
           {/* FALLBACK HUB */}
-          {![ 'dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'payment', 'payment-assign', 'payment-history', 'late-payment', 'student-finance-status', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail' ].includes(currentPage) && (
+          {![ 'dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail' ].includes(currentPage) && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>

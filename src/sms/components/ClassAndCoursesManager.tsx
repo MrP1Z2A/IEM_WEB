@@ -541,13 +541,15 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
 
     setIsAttendanceSaving(true);
 
-    const payload = {
+    const { schoolId } = await getCurrentTenantContext();
+
+    const payload = withSchoolId({
       context_type: contextType,
       context_id: selectedAttendanceContextId,
       attendance_date: attendanceDate,
       student_id: String(studentId),
       status,
-    };
+    }, schoolId);
 
     const upsertResult = await supabase
       .from('attendance_records')
@@ -571,13 +573,15 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
 
     setIsAttendanceSaving(true);
 
-    const payload = activeAttendanceStudents.map(student => ({
+    const { schoolId } = await getCurrentTenantContext();
+
+    const payload = activeAttendanceStudents.map(student => withSchoolId({
       context_type: contextType,
       context_id: selectedAttendanceContextId,
       attendance_date: attendanceDate,
       student_id: String(student.id),
       status: 'P' as const,
-    }));
+    }, schoolId));
 
     const upsertResult = await supabase
       .from('attendance_records')

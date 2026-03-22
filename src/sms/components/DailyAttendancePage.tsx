@@ -1,6 +1,7 @@
 import React from 'react';
 import { Student } from '../types';
 import { supabase } from '../supabaseClient';
+import { getCurrentTenantContext, withSchoolId } from '../services/tenantService';
 
 type AttendanceContextType = 'class' | 'subject';
 type AttendanceStatus = 'P' | 'A' | 'L';
@@ -109,13 +110,15 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
     setIsSaving(true);
 
-    const payload = {
+    const { schoolId } = await getCurrentTenantContext();
+
+    const payload = withSchoolId({
       context_type: contextType,
       context_id: selectedContextId,
       attendance_date: attendanceDate,
       student_id: String(studentId),
       status,
-    };
+    }, schoolId);
 
     const upsertResult = await supabase
       .from('attendance_records')
@@ -139,13 +142,15 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
     setIsSaving(true);
 
-    const payload = activeStudents.map(student => ({
+    const { schoolId } = await getCurrentTenantContext();
+
+    const payload = activeStudents.map(student => withSchoolId({
       context_type: contextType,
       context_id: selectedContextId,
       attendance_date: attendanceDate,
       student_id: String(student.id),
       status: 'P' as const,
-    }));
+    }, schoolId));
 
     const upsertResult = await supabase
       .from('attendance_records')

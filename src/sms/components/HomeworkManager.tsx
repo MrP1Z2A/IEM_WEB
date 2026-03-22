@@ -4,13 +4,14 @@ import { supabase } from '../supabaseClient';
 type AppClass = {
   id: string;
   name: string;
-  class_code?: string | null;
-  image_url?: string | null;
-  avatar?: string | null;
-  avatar_url?: string | null;
-  profile_image_url?: string | null;
-  color?: string | null;
-  outer_color?: string | null;
+  school_id?: string | null;
+  class_code: string | null;
+  image_url: string | null;
+  avatar: string | null;
+  avatar_url: string | null;
+  profile_image_url: string | null;
+  color: string | null;
+  outer_color: string | null;
 };
 type AppCourse = {
   id: string;
@@ -339,6 +340,7 @@ export default function HomeworkManager() {
       setClasses(
         classRows.map((row: any) => ({
           id: String(row.id),
+          school_id: row.school_id ? String(row.school_id) : null,
           name: String(row.name || ''),
           class_code: row.class_code ? String(row.class_code) : null,
           image_url: row.image_url ? String(row.image_url) : null,
@@ -526,6 +528,25 @@ export default function HomeworkManager() {
         throw uploadResult.error;
       }
 
+      const activeClass = classes.find(c => c.id === selectedClassId);
+      const schoolId = activeClass?.school_id || undefined;
+
+      const { data: publicUrlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(keepPath);
+
+      const { error: dbError } = await supabase.from('resources_buckets').insert([{
+        school_id: schoolId,
+        class_id: selectedClassId,
+        class_course_id: selectedCourseId,
+        name: normalizedName,
+        metadata: { type: 'folder', size: 0 },
+        image_url: publicUrlData?.publicUrl || null
+      }]);
+
+      if (dbError) {
+        console.warn('Failed to log folder creation in resources_buckets:', dbError);
+        throw dbError;
+      }
+
       setNewFolderName('');
       await loadCourseFolders();
     } catch (createError: any) {
@@ -608,6 +629,25 @@ export default function HomeworkManager() {
 
         if (result.error) {
           throw result.error;
+        }
+
+        const activeClass = classes.find(c => c.id === selectedClassId);
+        const schoolId = activeClass?.school_id || undefined;
+
+        const { data: publicUrlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(path);
+
+        const { error: dbError } = await supabase.from('resources_buckets').insert([{
+          school_id: schoolId,
+          class_id: selectedClassId,
+          class_course_id: selectedCourseId,
+          name: file.name,
+          metadata: { type: 'file', size: file.size, mime_type: file.type, folder: folderName },
+          image_url: publicUrlData?.publicUrl || null
+        }]);
+
+        if (dbError) {
+          console.warn('Failed to log file upload in resources_buckets:', dbError);
+          throw dbError;
         }
       }
 
