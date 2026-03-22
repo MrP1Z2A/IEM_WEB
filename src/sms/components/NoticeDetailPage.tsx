@@ -71,7 +71,7 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
         .from('notice_board')
         .select('id, title, message, notice_date, priority, file_path, file_name, created_at')
         .eq('id', noticeId)
-        .single();
+        .maybeSingle();
 
       if (loadError || !data) {
         setNotice(null);

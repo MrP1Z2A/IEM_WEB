@@ -29,6 +29,7 @@ type HomeworkItem = {
   title: string;
   description: string;
   attachment_url: string | null;
+  due_date: string | null;
   created_at?: string;
 };
 
@@ -77,6 +78,7 @@ export default function HomeworkManager() {
   const [editingHomeworkId, setEditingHomeworkId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
   const [existingAttachmentPath, setExistingAttachmentPath] = useState<string | null>(null);
@@ -218,6 +220,7 @@ export default function HomeworkManager() {
     setEditingHomeworkId(null);
     setTitle('');
     setBody('');
+    setDueDate('');
     setSelectedFile(null);
     setExistingAttachmentUrl(null);
     setExistingAttachmentPath(null);
@@ -434,6 +437,7 @@ export default function HomeworkManager() {
           title: String(row.title || ''),
           description: String(row.description || ''),
           attachment_url: dbAttachment || bucketAttachment,
+          due_date: row.due_date ? String(row.due_date) : null,
           created_at: row.created_at ? String(row.created_at) : undefined,
         };
       });
@@ -725,6 +729,9 @@ export default function HomeworkManager() {
         const payload: any = {
           title: title.trim(),
           description: body.trim(),
+          due_date: dueDate || null,
+          class_name: selectedClass?.name || null,
+          course_name: selectedCourse?.name || null,
         };
 
         if (uploadedUrl !== undefined) {
@@ -766,6 +773,9 @@ export default function HomeworkManager() {
           title: title.trim(),
           description: body.trim(),
           attachment_url: uploadedUrl || null,
+          due_date: dueDate || null,
+          class_name: selectedClass?.name || null,
+          course_name: selectedCourse?.name || null,
         };
 
         let insertError: any = null;
@@ -1091,6 +1101,16 @@ export default function HomeworkManager() {
                   rows={6}
                   className="w-full bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-sm font-semibold"
                 />
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Due Date (Optional)</p>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
 
                 <div className="space-y-2">
                   <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Attach PDF / DOC / DOCX</label>

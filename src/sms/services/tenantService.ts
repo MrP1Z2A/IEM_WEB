@@ -17,28 +17,51 @@ export const getCurrentTenantContext = async (): Promise<TenantContext> => {
   }
 
   if (!user?.id) {
-    throw new Error('You must be signed in to modify school data.');
+    throw new Error('You must be signed in to access school data.');
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('school_id, role')
-    .eq('id', user.id)
-    .single();
+  let profile: any = null;
+  let profileError: any = null;
+  let attempts = 0;
+  const maxAttempts = 2;
+
+  while (attempts < maxAttempts) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('school_id, role')
+      .eq('id', user.id)
+      .maybeSingle();
+      
+    profile = data;
+    profileError = error;
+
+    if (!error && data) break;
+    
+    attempts++;
+    if (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+    }
+  }
 
   if (profileError) {
-    throw new Error(profileError.message || 'Failed to load tenant profile.');
+    console.error(`Tenant profile error (Attempt ${attempts}):`, profileError);
+    throw new Error(`Cloud Sync Error: ${profileError.message || 'Failed to load profile'}`);
   }
 
-  const schoolId = String(profile?.school_id || '').trim();
+  if (!profile) {
+    console.warn(`No profile found for user ${user.id} after ${attempts} attempts`);
+    throw new Error('Sync Failed: No profile found for this account. Please refresh or contact admin.');
+  }
+
+  const schoolId = String(profile.school_id || '').trim();
   if (!schoolId) {
-    throw new Error('No school is assigned to this account. Complete school setup first.');
+    throw new Error('Sync Failed: No school is assigned to this account. Complete school setup first.');
   }
 
   return {
     userId: user.id,
     schoolId,
-    role: String(profile?.role || ''),
+    role: String(profile.role || ''),
   };
 };
 

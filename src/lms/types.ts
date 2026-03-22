@@ -97,6 +97,7 @@ export type View =
   | 'profile'
   | 'instruction'
   | 'activity'
+  | 'homework'
   | 'timetable'
   | 'studies'
   | 'contact'

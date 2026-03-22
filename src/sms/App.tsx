@@ -261,23 +261,36 @@ const App: React.FC = () => {
           return;
         }
 
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('school_id')
-          .eq('id', user.id)
-          .maybeSingle();
+        let profile: any = null;
+        let profileError: any = null;
+        let attempts = 0;
+        const maxAttempts = 3;
 
-        if (profileError) {
-          setOnboardingStatus('needs-school');
-          return;
+        while (attempts < maxAttempts) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('school_id')
+            .eq('id', user.id)
+            .maybeSingle();
+          
+          profile = data;
+          profileError = error;
+
+          if (!error && data) break;
+          
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 800 * attempts)); // Exponential backoff
+          }
         }
 
-        if (!profile?.school_id) {
+        if (profileError || !profile?.school_id) {
           setOnboardingStatus('needs-school');
         } else {
           setOnboardingStatus('ready');
         }
-      } catch {
+      } catch (err) {
+        console.error('Onboarding check failed:', err);
         setOnboardingStatus('needs-school');
       }
     };
@@ -534,7 +547,7 @@ const App: React.FC = () => {
           .from('classes')
           .insert([insertPayload])
           .select()
-          .single();
+          .maybeSingle();
         classData = result.data;
         classError = result.error;
       }
@@ -545,14 +558,16 @@ const App: React.FC = () => {
           .from('classes')
           .insert([{ name: className, image_url: imageUrl, color: classOuterColor }])
           .select()
-          .single();
+          .maybeSingle();
         classData = fallbackResult.data;
         classError = fallbackResult.error;
       }
 
       if (classError) throw classError;
 
-      setClasses(prev => [{ ...classData, class_code: classData.class_code || (isClassCodeSupported ? nextClassCode : null), color: classOuterColor, outer_color: classOuterColor, student_ids: [], student_count: 0 }, ...prev]);
+      const createdClass = classData || { ...insertPayload, id: 'temp-' + Date.now() };
+
+      setClasses(prev => [{ ...createdClass, class_code: createdClass.class_code || (isClassCodeSupported ? nextClassCode : null), color: classOuterColor, outer_color: classOuterColor, student_ids: [], student_count: 0 }, ...prev]);
       notify('Class created successfully!');
       setClassName('');
       setClassImage(null);
@@ -1286,7 +1301,7 @@ const App: React.FC = () => {
             .from('students')
             .insert([payload])
             .select()
-            .single();
+            .maybeSingle();
           createdRow = result.data;
           insertError = result.error;
         }
@@ -1297,7 +1312,7 @@ const App: React.FC = () => {
             .from('students')
             .insert([payloadWithoutId])
             .select()
-            .single();
+            .maybeSingle();
           createdRow = retryResult.data;
           insertError = retryResult.error;
         }
@@ -1434,7 +1449,7 @@ const App: React.FC = () => {
             .from('teachers')
             .insert([payload])
             .select()
-            .single();
+            .maybeSingle();
           createdRow = result.data;
           insertError = result.error;
         }
@@ -1445,7 +1460,7 @@ const App: React.FC = () => {
             .from('teachers')
             .insert([payloadWithoutId])
             .select()
-            .single();
+            .maybeSingle();
           createdRow = retryResult.data;
           insertError = retryResult.error;
         }
@@ -1504,69 +1519,71 @@ const App: React.FC = () => {
     if (!editTarget) return;
     const { type, data } = editTarget;
     
-    // Sync with Supabase if it's a student
-    if (type === 'student') {
-      const schoolId = await requireSchoolId();
-      const existingStudent = students.find(student => student.id === data.id);
-      const studentPayload = withSchoolId({
-        ...data,
-        role: data.role ?? existingStudent?.role ?? 'student',
-        status: data.status ?? existingStudent?.status ?? Status.PENDING,
-        attendanceRate: data.attendanceRate ?? existingStudent?.attendanceRate ?? 0,
-      }, schoolId);
+    try {
+      let finalData = { ...data };
 
-      const { error } = await supabase.from('students').upsert(studentPayload);
-      if (error) {
-        console.error('Supabase Update Error:', error);
-        notify(`Student sync failed: ${error.message}`);
-        return;
+      // Sync with Supabase if it's a student
+      if (type === 'student') {
+        const schoolId = await requireSchoolId();
+        const existingStudent = students.find(student => student.id === data.id);
+        const studentPayload = withSchoolId({
+          ...data,
+          role: data.role ?? existingStudent?.role ?? 'student',
+          status: data.status ?? existingStudent?.status ?? Status.PENDING,
+          attendanceRate: data.attendanceRate ?? existingStudent?.attendanceRate ?? 0,
+        }, schoolId);
+
+        const { error } = await supabase.from('students').upsert(studentPayload);
+        if (error) {
+          console.error('Supabase Update Error:', error);
+          notify(`Student sync failed: ${error.message}`);
+          return;
+        }
+        finalData = studentPayload;
       }
 
-      if (studentPayload !== data) {
-        setEditTarget({ ...editTarget, data: studentPayload });
+      if (type === 'teacher') {
+        const schoolId = await requireSchoolId();
+        const existingTeacher = teachers.find(teacher => teacher.id === data.id);
+        const teacherPayload = withSchoolId({
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          role: 'teacher',
+          gender: data.gender ?? existingTeacher?.gender ?? 'Male',
+          status: data.status ?? existingTeacher?.status ?? Status.PENDING,
+          type: data.type ?? existingTeacher?.type ?? 'New',
+          avatar: data.avatar ?? existingTeacher?.avatar ?? null,
+        }, schoolId);
+
+        const { error } = await supabase.from('teachers').upsert(teacherPayload);
+        if (error) {
+          console.error('Supabase Teacher Update Error:', error);
+          notify(`Teacher sync failed: ${error.message}`);
+          return;
+        }
+        finalData = teacherPayload;
       }
+
+      switch (type) {
+        case 'student':
+          setStudents(prev => prev.map(s => s.id === finalData.id ? finalData : s));
+          break;
+        case 'teacher': setTeachers(prev => prev.map(t => t.id === finalData.id ? finalData : t)); break;
+        case 'subject': setSubjects(prev => prev.map(s => s.id === finalData.id ? finalData : s)); break;
+        case 'library': setLibraryItems(prev => prev.map(i => i.id === finalData.id ? finalData : i)); break;
+        case 'exam': setExams(prev => prev.map(e => e.id === finalData.id ? finalData : e)); break;
+        case 'homework': setHomeworks(prev => prev.map(h => h.id === finalData.id ? finalData : h)); break;
+        case 'program': setPrograms(prev => prev.map(p => p.id === finalData.id ? finalData : p)); break;
+      }
+      
+      notify(`${type.charAt(0).toUpperCase() + type.slice(1)} synchronized.`);
+      setIsEditModalOpen(false);
+      setEditTarget(null);
+    } catch (err: any) {
+      console.error('Update operation failed:', err);
+      notify(err.message || `Failed to update ${type}.`);
     }
-
-    if (type === 'teacher') {
-      const schoolId = await requireSchoolId();
-      const existingTeacher = teachers.find(teacher => teacher.id === data.id);
-      const teacherPayload = withSchoolId({
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        role: 'teacher',
-        gender: data.gender ?? existingTeacher?.gender ?? 'Male',
-        status: data.status ?? existingTeacher?.status ?? Status.PENDING,
-        type: data.type ?? existingTeacher?.type ?? 'New',
-        avatar: data.avatar ?? existingTeacher?.avatar ?? null,
-      }, schoolId);
-
-      const { error } = await supabase.from('teachers').upsert(teacherPayload);
-      if (error) {
-        console.error('Supabase Teacher Update Error:', error);
-        notify(`Teacher sync failed: ${error.message}`);
-        return;
-      }
-
-      if (teacherPayload !== data) {
-        setEditTarget({ ...editTarget, data: teacherPayload });
-      }
-    }
-
-    switch (type) {
-      case 'student':
-        setStudents(prev => prev.map(s => s.id === data.id ? data : s));
-        break;
-      case 'teacher': setTeachers(prev => prev.map(t => t.id === data.id ? data : t)); break;
-      case 'subject': setSubjects(prev => prev.map(s => s.id === data.id ? data : s)); break;
-      case 'library': setLibraryItems(prev => prev.map(i => i.id === data.id ? data : i)); break;
-      case 'exam': setExams(prev => prev.map(e => e.id === data.id ? data : e)); break;
-      case 'homework': setHomeworks(prev => prev.map(h => h.id === data.id ? data : h)); break;
-      case 'program': setPrograms(prev => prev.map(p => p.id === data.id ? data : p)); break;
-    }
-    notify(`${type.charAt(0).toUpperCase() + type.slice(1)} synchronized.`);
-    setIsEditModalOpen(false);
-    setEditTarget(null);
   };
 
   const updateStudentProfilePhoto = async (studentId: string, file: File): Promise<Student> => {
@@ -2116,14 +2133,14 @@ const App: React.FC = () => {
       let dbError: any = null;
 
       {
-        const result = await supabase.from('students').insert([insertPayload]).select().single();
+        const result = await supabase.from('students').insert([insertPayload]).select().maybeSingle();
         createdStudentRecord = result.data;
         dbError = result.error;
       }
 
       if (dbError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(dbError.message || '')) {
         const { id, ...payloadWithoutId } = insertPayload;
-        const retryResult = await supabase.from('students').insert([payloadWithoutId]).select().single();
+        const retryResult = await supabase.from('students').insert([payloadWithoutId]).select().maybeSingle();
         createdStudentRecord = retryResult.data;
         dbError = retryResult.error;
       }
@@ -2247,14 +2264,14 @@ const App: React.FC = () => {
       let dbError: any = null;
 
       {
-        const result = await supabase.from('teachers').insert([insertPayload]).select().single();
+        const result = await supabase.from('teachers').insert([insertPayload]).select().maybeSingle();
         createdTeacherRecord = result.data;
         dbError = result.error;
       }
 
       if (dbError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(dbError.message || '')) {
         const { id, ...payloadWithoutId } = insertPayload;
-        const retryResult = await supabase.from('teachers').insert([payloadWithoutId]).select().single();
+        const retryResult = await supabase.from('teachers').insert([payloadWithoutId]).select().maybeSingle();
         createdTeacherRecord = retryResult.data;
         dbError = retryResult.error;
       }
@@ -2328,14 +2345,14 @@ const App: React.FC = () => {
       let dbError: any = null;
 
       {
-        const result = await supabase.schema('public').from('student_services').insert([insertPayload]).select().single();
+        const result = await supabase.schema('public').from('student_services').insert([insertPayload]).select().maybeSingle();
         createdRecord = result.data;
         dbError = result.error;
       }
 
       if (dbError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(dbError.message || '')) {
         const { id, ...payloadWithoutId } = insertPayload;
-        const retryResult = await supabase.schema('public').from('student_services').insert([payloadWithoutId]).select().single();
+        const retryResult = await supabase.schema('public').from('student_services').insert([payloadWithoutId]).select().maybeSingle();
         createdRecord = retryResult.data;
         dbError = retryResult.error;
       }
@@ -2452,14 +2469,14 @@ const App: React.FC = () => {
         let insertError: any = null;
 
         {
-          const result = await supabase.schema('public').from('student_services').insert([payload]).select().single();
+          const result = await supabase.schema('public').from('student_services').insert([payload]).select().maybeSingle();
           createdRow = result.data;
           insertError = result.error;
         }
 
         if (insertError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(insertError.message || '')) {
           const { id, ...payloadWithoutId } = payload;
-          const retryResult = await supabase.schema('public').from('student_services').insert([payloadWithoutId]).select().single();
+          const retryResult = await supabase.schema('public').from('student_services').insert([payloadWithoutId]).select().maybeSingle();
           createdRow = retryResult.data;
           insertError = retryResult.error;
         }
@@ -2894,14 +2911,14 @@ const App: React.FC = () => {
   return (
     <div className="flex min-h-screen bg-[#f8fafc] dark:bg-slate-950 transition-colors duration-500 relative">
 
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[110] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-2">
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9998] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-2">
         <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
           {`Updating to cloud in ${isCloudSyncRunning ? '00:00' : cloudSyncTimeText}second`}
         </p>
       </div>
 
       {notification && (
-        <div className="fixed top-4 right-4 z-[100] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-3 min-w-[220px] max-w-[90vw]">
+        <div className="fixed top-4 right-4 z-[9999] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-3 min-w-[220px] max-w-[90vw]">
           <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{notification.message}</p>
         </div>
       )}

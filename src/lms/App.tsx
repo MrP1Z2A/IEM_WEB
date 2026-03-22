@@ -165,6 +165,11 @@ const App: React.FC = () => {
   const [dynamicAnnouncements, setDynamicAnnouncements] = useState<NoticeItem[]>([]);
   const [dynamicExams, setDynamicExams] = useState<any[]>([]);
   const [dynamicAssignments, setDynamicAssignments] = useState<any[]>([]);
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [submissionComment, setSubmissionComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [examResultsData, setExamResultsData] = useState<any[]>([]);
   const [reportCard, setReportCard] = useState<ReportCard | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
@@ -183,27 +188,105 @@ const App: React.FC = () => {
       setDynamicAnnouncements(notices);
 
       if (supabase && isSupabaseConfigured) {
-        const { data: gradesData, error: gradesError } = await supabase.from('exam_grades').select('*');
+        // Fetch grades
+        const { data: gradesData, error: gradesError } = await supabase
+          .from('exam_grades')
+          .select('*')
+          .eq('student_id', user.studentId);
         if (!gradesError && gradesData) {
            const mappedGrades = gradesData.map(g => ({
              className: g.name || 'Unknown Class',
              courseName: g.course_name || 'Unknown Course',
-             grade: g.grade ? String(g.grade) : 'Pending'
+             grade: g.grade ? String(g.grade) : 'Pending',
+             percentage: g.percentage ? String(g.percentage) : null
            }));
            setExamResultsData(mappedGrades);
         } else {
            console.error("Error fetching grades:", gradesError);
            setExamResultsData([]);
         }
+
+        // Fetch student's enrolled courses to get exams and homework
+        const { data: enrolledData, error: enrolledError } = await supabase
+          .from('class_course_students')
+          .select('class_course_id, class_id')
+          .eq('student_id', user.studentId);
+
+        if (!enrolledError && enrolledData) {
+          const courseIds = enrolledData.map(d => d.class_course_id);
+          
+          if (courseIds.length > 0) {
+            // Fetch Exams
+            const { data: examsData, error: examsError } = await supabase
+              .from('exams')
+              .select('*')
+              .in('class_course_id', courseIds)
+              .order('created_at', { ascending: false });
+            
+            if (!examsError && examsData) {
+              const mappedExams = examsData.map(ex => {
+                const dateSource = ex.exam_date || ex.created_at;
+                const date = new Date(dateSource);
+                const month = date.toLocaleString('default', { month: 'long' });
+                const dayStr = date.getDate().toString().padStart(2, '0');
+                return {
+                  id: ex.id,
+                  subject: ex.title,
+                  date: `${month} ${dayStr}`,
+                  time: ex.exam_time || '10:00 AM',
+                  venue: 'Main Hall',
+                  originalDate: dateSource
+                };
+              });
+              setDynamicExams(mappedExams);
+            }
+
+            // Fetch Homework/Assignments
+            const { data: homeworkData, error: homeworkError } = await supabase
+              .from('homework_assignments')
+              .select('*')
+              .in('class_course_id', courseIds)
+              .order('created_at', { ascending: false });
+
+            if (!homeworkError && homeworkData) {
+              // Now fetch submissions for this student to show correct status
+              const { data: submissionsData } = await supabase
+                .from('homework_submissions')
+                .select('assignment_id, status, submission_url')
+                .eq('student_id', user.studentId);
+
+              const mappedAssignments = homeworkData.map(hw => {
+                const dateSource = hw.due_date || hw.created_at;
+                const date = new Date(dateSource);
+                const month = date.toLocaleString('default', { month: 'long' });
+                const dayStr = date.getDate().toString().padStart(2, '0');
+                
+                const submission = submissionsData?.find(s => s.assignment_id === hw.id);
+                
+                return {
+                  id: hw.id,
+                  title: hw.title,
+                  dueDate: `${month} ${dayStr}`,
+                  status: submission ? (submission.status || 'Active') : 'Pending',
+                  course: hw.course_name ? `${hw.class_name || ''} - ${hw.course_name}` : 'General',
+                  fileUrl: hw.file_url, // Assignment instructions
+                  submissionUrl: submission?.submission_url, // Their submitted file
+                  originalDate: dateSource
+                };
+              });
+              setDynamicAssignments(mappedAssignments);
+            }
+          }
+        }
       }
 
     } catch (err) {
-      console.error("Sync error");
+      console.error("Sync error", err);
       setDynamicAnnouncements([]);
     } finally {
       setIsLoading(false);
     }
-  }, [user.schoolId]);
+  }, [user.schoolId, user.studentId]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -299,6 +382,49 @@ const App: React.FC = () => {
     };
     setUser(newUser);
     setIsLoggedIn(true);
+  };
+
+  const handleHomeworkSubmission = async () => {
+    if (!selectedAssignment || !user.studentId) return;
+    setIsSubmitting(true);
+    try {
+      let submissionUrl = '';
+      if (submissionFile && supabase) {
+        const fileExt = submissionFile.name.split('.').pop();
+        const fileName = `${user.studentId}/${selectedAssignment.id}_${Date.now()}.${fileExt}`;
+        const { data, error: uploadError } = await supabase.storage
+          .from('homework-submissions')
+          .upload(fileName, submissionFile);
+        
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from('homework-submissions').getPublicUrl(fileName);
+        submissionUrl = publicUrl;
+      }
+
+      if (supabase) {
+        const { error: submitError } = await supabase
+          .from('homework_submissions')
+          .upsert({
+            assignment_id: selectedAssignment.id,
+            student_id: user.studentId,
+            submission_url: submissionUrl,
+            comment: submissionComment,
+            school_id: user.schoolId
+          });
+
+        if (submitError) throw submitError;
+      }
+      
+      alert('Homework submitted successfully!');
+      setIsSubmissionModalOpen(false);
+      setSubmissionFile(null);
+      setSubmissionComment('');
+    } catch (err: any) {
+      console.error('Submission error:', err);
+      alert('Failed to submit homework: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleLogout = () => {
@@ -697,18 +823,14 @@ const App: React.FC = () => {
     try {
       const attendanceNum = parseFloat(studentAttendanceRate.replace('%', '')) || 0;
       
-      const parsedGrades = examResultsData
-        .map(g => g.grade)
-        .filter(g => g && g !== 'Pending')
-        .map(g => {
-           const str = String(g);
-           if (str.includes('/')) return parseFloat(str.split('/')[0]);
-           return parseFloat(str);
-        })
+      const parsedPercentages = examResultsData
+        .map(g => g.percentage)
+        .filter(p => p !== null && p !== undefined && p !== '')
+        .map(p => parseFloat(String(p)))
         .filter(n => !isNaN(n));
 
-      if (parsedGrades.length > 0) {
-        const avgGrade = parsedGrades.reduce((a, b) => a + b, 0) / parsedGrades.length;
+      if (parsedPercentages.length > 0) {
+        const avgGrade = parsedPercentages.reduce((a, b) => a + b, 0) / parsedPercentages.length;
         academicScore = Math.round((attendanceNum + avgGrade) / 2);
       } else {
         academicScore = Math.round(attendanceNum);
@@ -782,9 +904,33 @@ const App: React.FC = () => {
         
         <div className="space-y-4 relative z-10">
           {[
-            { id: 1, title: 'Exam Approaching', desc: 'Modern Physics final is in 48 hours.', time: 'Just now', icon: 'fa-calendar-check', color: 'text-orange-500', bg: 'bg-orange-500/10' },
-            { id: 2, title: 'New Grade Released', desc: 'Quantum Mechanics Lab report has been graded.', time: '2h ago', icon: 'fa-file-invoice', color: 'text-blue-500', bg: 'bg-blue-500/10' },
-            { id: 3, title: 'School Hive Alert', desc: 'Dr. Sarah Smith posted a new update in the community.', time: '5h ago', icon: 'fa-users', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+            ...dynamicExams.slice(0, 1).map(ex => ({
+              id: `ex-${ex.id}`,
+              title: 'Exam Assigned',
+              desc: `${ex.subject} exam on ${ex.date}.`,
+              time: 'Recent',
+              icon: 'fa-calendar-check',
+              color: 'text-orange-500',
+              bg: 'bg-orange-500/10'
+            })),
+            ...examResultsData.slice(0, 1).map(res => ({
+              id: `res-${res.courseName}`,
+              title: 'Grade Released',
+              desc: `Your grade for ${res.courseName} is ${res.grade}.`,
+              time: 'New',
+              icon: 'fa-file-invoice',
+              color: 'text-blue-500',
+              bg: 'bg-blue-500/10'
+            })),
+            ...dynamicAssignments.slice(0, 1).map(ass => ({
+              id: `ass-${ass.id}`,
+              title: 'Homework Assigned',
+              desc: `${ass.title} due ${ass.dueDate}.`,
+              time: 'Pending',
+              icon: 'fa-tasks',
+              color: 'text-purple-500',
+              bg: 'bg-purple-500/10'
+            })),
           ].map((notif) => (
             <div key={notif.id} className="p-5 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-6 hover:border-[#4ea59d] transition-all cursor-pointer group">
               <div className={`w-12 h-12 rounded-2xl ${notif.bg} ${notif.color} flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform`}>
@@ -800,6 +946,9 @@ const App: React.FC = () => {
               <div className="w-2 h-2 rounded-full bg-[#4ea59d] opacity-0 group-hover:opacity-100 transition-opacity"></div>
             </div>
           ))}
+          {dynamicExams.length === 0 && examResultsData.length === 0 && dynamicAssignments.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-10">No recent notifications.</p>
+          )}
         </div>
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#4ea59d]/5 blur-[100px] pointer-events-none"></div>
       </section>
@@ -808,13 +957,16 @@ const App: React.FC = () => {
         <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Recent Grades</h3>
           <div className="space-y-4">
-             {DETAILED_GRADES.slice(0, 3).map((item, i) => (
+             {(examResultsData.length > 0 ? examResultsData : DETAILED_GRADES).slice(0, 3).map((item, i) => (
                <div key={i} className="flex items-center justify-between p-6 bg-[#0a1a19] rounded-[32px] border border-white/20">
                   <div>
-                    <h4 className="text-sm font-bold text-white">{item.assignment}</h4>
+                    <h4 className="text-sm font-bold text-white">{item.courseName || item.assignment}</h4>
                     <p className="text-[9px] font-black text-slate-300 uppercase mt-1">Academic Session 2025</p>
                   </div>
-                  <p className="text-2xl font-black text-[#4ea59d]">{item.grade}</p>
+                  <div className="text-right">
+                    <p className="text-2xl font-black text-[#4ea59d]">{item.grade}</p>
+                    {item.percentage && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.percentage}%</p>}
+                  </div>
                </div>
              ))}
           </div>
@@ -1029,6 +1181,106 @@ const App: React.FC = () => {
     </div>
   );
 
+  const renderHomework = () => (
+    <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
+        <div className="space-y-2">
+          <h2 className="text-4xl font-black text-white uppercase tracking-tighter italic">Homework Hub</h2>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#4ea59d] animate-pulse"></span>
+            <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Submission Portal & Assignment Tracking</p>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+        <div className="xl:col-span-3 space-y-10">
+          <section>
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+              <i className="fa-solid fa-list-check text-[#4ea59d]"></i> Assigned Homework
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {dynamicAssignments.length === 0 ? (
+                <div className="md:col-span-2 p-10 bg-white/5 border border-white/10 rounded-[40px] text-center">
+                  <p className="text-slate-400 text-sm">No homework assigned yet. Keep up the good work!</p>
+                </div>
+              ) : (
+                dynamicAssignments.map((ass) => (
+                  <div key={ass.id} className="bg-white/10 backdrop-blur-2xl shadow-xl p-8 rounded-[40px] border border-white/20 group hover:border-[#4ea59d]/50 transition-all flex flex-col h-full">
+                    <div className="flex justify-between items-start mb-6">
+                      <div className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${ass.status === 'Submitted' ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                        {ass.status}
+                      </div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{ass.dueDate}</span>
+                    </div>
+                    
+                    <h4 className="text-xl font-black text-white mb-2 group-hover:text-[#4ea59d] transition-colors line-clamp-2">{ass.title}</h4>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">{ass.course || 'Core Curriculum'}</p>
+                    
+                    <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between gap-4">
+                      <button 
+                         onClick={() => {
+                           setSelectedAssignment(ass);
+                           setIsSubmissionModalOpen(true);
+                         }}
+                         className="flex-1 px-6 py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
+                      >
+                        {ass.status === 'Active' ? 'Resubmit task' : 'Submit Homework'}
+                      </button>
+                      <div className="flex gap-2">
+                        {ass.fileUrl && (
+                          <button 
+                            onClick={() => window.open(ass.fileUrl, '_blank')}
+                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] transition-colors border border-white/10"
+                            title="Download Instructions"
+                          >
+                            <i className="fa-solid fa-file-pdf"></i>
+                          </button>
+                        )}
+                        {ass.submissionUrl && (
+                          <button 
+                            onClick={() => window.open(ass.submissionUrl, '_blank')}
+                            className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] hover:bg-[#4ea59d] hover:text-white transition-all border border-[#4ea59d]/30"
+                            title="View Submission"
+                          >
+                            <i className="fa-solid fa-cloud-arrow-down"></i>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-8">
+          <section className="bg-white/10 backdrop-blur-2xl p-8 rounded-[40px] border border-white/20 shadow-2xl">
+            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Performance Insight</h3>
+            <div className="space-y-6">
+              <div className="text-center p-6 bg-[#4ea59d]/10 rounded-3xl border border-[#4ea59d]/20">
+                <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Completion Rate</p>
+                <div className="text-4xl font-black text-white italic">84%</div>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed font-medium italic">
+                "You've completed 5/6 assignments this week. Only 1 pending task remaining to maintain your 'Elite' standing."
+              </p>
+            </div>
+          </section>
+
+          <section className="bg-gradient-to-br from-[#4ea59d] to-[#3d8c85] p-8 rounded-[40px] shadow-2xl text-white relative overflow-hidden group">
+             <div className="relative z-10">
+                <h4 className="font-black text-xs uppercase tracking-[0.2em] opacity-80 mb-2">Study Tip</h4>
+                <p className="font-bold text-sm leading-relaxed">Break your assignments into 25-minute Pomodoro sessions for maximum focus.</p>
+             </div>
+             <i className="fa-solid fa-lightbulb absolute -right-4 -bottom-4 text-8xl opacity-10 group-hover:scale-110 transition-transform"></i>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderActivity = () => (
     <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
@@ -1050,13 +1302,41 @@ const App: React.FC = () => {
                       <div className="flex-1">
                          <div className="flex items-center gap-3 mb-2">
                            <h4 className="text-lg font-bold text-white">{ass.title}</h4>
-                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${ass.status === 'Submitted' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${ass.status === 'Active' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
                              {ass.status}
                            </span>
                          </div>
                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{ass.course} • Due {ass.dueDate}</p>
                       </div>
-                      <button className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">Submit Task</button>
+                      <div className="flex items-center gap-3">
+                        <button 
+                           onClick={() => {
+                             setSelectedAssignment(ass);
+                             setIsSubmissionModalOpen(true);
+                           }}
+                           className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          {ass.status === 'Active' ? 'Resubmit task' : 'Submit Task'}
+                        </button>
+                        {ass.fileUrl && (
+                          <button 
+                            onClick={() => window.open(ass.fileUrl, '_blank')}
+                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all font-bold"
+                            title="Download Instructions"
+                          >
+                            <i className="fa-solid fa-download"></i>
+                          </button>
+                        )}
+                        {ass.submissionUrl && (
+                          <button 
+                            onClick={() => window.open(ass.submissionUrl, '_blank')}
+                            className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 transition-all font-bold"
+                            title="View Submission"
+                          >
+                            <i className="fa-solid fa-cloud-arrow-down"></i>
+                          </button>
+                        )}
+                      </div>
                    </div>
                  ))}
               </div>
@@ -1141,7 +1421,10 @@ const App: React.FC = () => {
                     <h4 className="text-sm font-bold text-white">{ex.courseName}</h4>
                     <p className="text-[9px] font-black text-slate-400 uppercase">{ex.className}</p>
                   </div>
-                  <span className={`text-lg font-black ${ex.grade === 'Pending' ? 'text-orange-500' : 'text-[#4ea59d]'}`}>{ex.grade}</span>
+                <div className="text-right">
+                  <span className={`text-lg font-black block ${ex.grade === 'Pending' ? 'text-orange-500' : 'text-[#4ea59d]'}`}>{ex.grade}</span>
+                  {ex.percentage && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ex.percentage}%</span>}
+                </div>
                </div>
              ))}
              {examResultsData.length === 0 && (
@@ -1437,6 +1720,7 @@ const App: React.FC = () => {
         {currentView === 'parent-portal' && renderParentPortal()}
         {currentView === 'instruction' && renderInstruction()}
         {currentView === 'activity' && renderActivity()}
+        {currentView === 'homework' && renderHomework()}
         {currentView === 'courses' && renderCourses()}
         {currentView === 'course-detail' && renderCourseDetail()}
         {currentView === 'quiz-player' && renderQuizPlayer()}
@@ -1477,6 +1761,58 @@ const App: React.FC = () => {
             <div className="w-20 h-20 border-4 border-[#4ea59d]/20 border-t-[#4ea59d] rounded-full animate-spin mb-6"></div>
             
             <p className="text-[#4ea59d] mt-2 animate-pulse uppercase text-[10px] font-black tracking-widest">Processing request</p>
+          </div>
+        </div>
+      )}
+      {/* Homework Submission Modal */}
+      {isSubmissionModalOpen && selectedAssignment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-xl bg-[#0a1a19] rounded-[40px] border border-white/20 p-8 shadow-2xl animate-in zoom-in duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase underline decoration-[#4ea59d] decoration-4 underline-offset-8">Submit Homework</h3>
+              <button 
+                onClick={() => setIsSubmissionModalOpen(false)}
+                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Assignment</label>
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-white font-bold">
+                  {selectedAssignment.title}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Upload Solution</label>
+                <input 
+                  type="file" 
+                  onChange={(e) => setSubmissionFile(e.target.files?.[0] || null)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-[#4ea59d] file:text-white hover:file:bg-[#3d8c85]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Comments (Optional)</label>
+                <textarea 
+                  value={submissionComment}
+                  onChange={(e) => setSubmissionComment(e.target.value)}
+                  placeholder="Add any notes here..."
+                  className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-[#4ea59d] transition-colors resize-none"
+                />
+              </div>
+
+              <button 
+                onClick={handleHomeworkSubmission}
+                disabled={isSubmitting || !submissionFile}
+                className="w-full py-4 bg-[#4ea59d] hover:bg-[#3d8c85] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-[#4ea59d]/20"
+              >
+                {isSubmitting ? 'Uploading...' : 'Complete Submission'}
+              </button>
+            </div>
           </div>
         </div>
       )}

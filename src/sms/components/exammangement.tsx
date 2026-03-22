@@ -20,7 +20,10 @@ type ExamItem = {
   class_course_id: string;
   title: string;
   description: string;
+  exam_date: string | null;
+  exam_time: string | null;
   file_url: string | null;
+  location: string | null;
   created_at: string;
 };
 
@@ -79,7 +82,10 @@ export default function ExamManagementPage() {
   const [editingExamId, setEditingExamId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [examDate, setExamDate] = useState('');
+  const [examTime, setExamTime] = useState('');
   const [fileUrl, setFileUrl] = useState('');
+  const [location, setLocation] = useState('');
   const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
   const [originalFileUrl, setOriginalFileUrl] = useState<string | null>(null);
   const [shouldRemoveExistingFile, setShouldRemoveExistingFile] = useState(false);
@@ -88,6 +94,7 @@ export default function ExamManagementPage() {
   const [selectedExamForGrading, setSelectedExamForGrading] = useState<ExamItem | null>(null);
   const [gradingStudents, setGradingStudents] = useState<GradingStudent[]>([]);
   const [grades, setGrades] = useState<Record<string, string>>({});
+  const [percentages, setPercentages] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [savingNoteStudentId, setSavingNoteStudentId] = useState<string | null>(null);
   const [isLoadingGrading, setIsLoadingGrading] = useState(false);
@@ -198,7 +205,10 @@ export default function ExamManagementPage() {
         class_course_id: String(row.class_course_id || ''),
         title: String(row.title || ''),
         description: String(row.description || ''),
+        exam_date: row.exam_date ? String(row.exam_date) : null,
+        exam_time: row.exam_time ? String(row.exam_time) : null,
         file_url: row.file_url ? String(row.file_url) : null,
+        location: row.location ? String(row.location) : null,
         created_at: String(row.created_at || new Date().toISOString()),
       }));
 
@@ -216,10 +226,9 @@ export default function ExamManagementPage() {
     void loadExams();
   }, []);
 
-  useEffect(() => {
-    setSelectedCourseId('');
-    setExams([]);
-  }, [selectedClassId]);
+  // Removed the useEffect that resettled selectedCourseId on selectedClassId change
+  // to avoid issues when programmatically setting both IDs (e.g. when editing).
+  // Reset logic is now handled in the Class dropdown's onChange.
 
   useEffect(() => {
     void loadExams(selectedClassId || undefined, selectedCourseId || undefined);
@@ -350,7 +359,7 @@ export default function ExamManagementPage() {
     try {
       let result: any = await supabase
         .from('exam_grades')
-        .select('student_id, grade, note')
+        .select('student_id, grade, note, percentage')
         .eq('exam_id', examId);
 
       if (result.error && isSchemaMissingError(result.error.message)) {
@@ -369,17 +378,20 @@ export default function ExamManagementPage() {
       }
 
       const nextGrades: Record<string, string> = {};
+      const nextPercentages: Record<string, string> = {};
       const nextNotes: Record<string, string> = {};
       (result.data || []).forEach((row: any) => {
         const studentId = String(row.student_id || '');
         if (!studentId) return;
         nextGrades[studentId] = String(row.grade || '');
+        nextPercentages[studentId] = String(row.percentage || '');
         if (typeof row.note === 'string') {
           nextNotes[studentId] = row.note;
         }
       });
 
       setGrades(nextGrades);
+      setPercentages(nextPercentages);
       setNotes(nextNotes);
     } catch (loadGradesError: any) {
       setError(loadGradesError?.message || 'Failed to load grades.');
@@ -392,7 +404,10 @@ export default function ExamManagementPage() {
     setEditingExamId(null);
     setTitle('');
     setDescription('');
+    setExamDate('');
+    setExamTime('');
     setFileUrl('');
+    setLocation('');
     setOriginalFileUrl(null);
     setShouldRemoveExistingFile(false);
     setSelectedPdfFile(null);
@@ -403,9 +418,14 @@ export default function ExamManagementPage() {
 
   const openEditEditor = (exam: ExamItem) => {
     setEditingExamId(exam.id);
+    setSelectedClassId(exam.class_id);
+    setSelectedCourseId(exam.class_course_id);
     setTitle(exam.title);
     setDescription(exam.description || '');
+    setExamDate(exam.exam_date || '');
+    setExamTime(exam.exam_time || '');
     setFileUrl(exam.file_url || '');
+    setLocation(exam.location || '');
     setOriginalFileUrl(exam.file_url || null);
     setShouldRemoveExistingFile(false);
     setSelectedPdfFile(null);
@@ -427,7 +447,12 @@ export default function ExamManagementPage() {
     setSelectedExamForGrading(null);
     setGradingStudents([]);
     setGrades({});
+    setPercentages({});
     setNotes({});
+  };
+
+  const handlePercentageChange = (studentId: string, percentage: string) => {
+    setPercentages(prev => ({ ...prev, [studentId]: percentage }));
   };
 
   const handleGrade = async (studentId: string, grade: string) => {
@@ -442,7 +467,10 @@ export default function ExamManagementPage() {
           exam_id: selectedExamForGrading.id,
           student_id: studentId,
           grade,
+          percentage: percentages[studentId] || null,
           note: notes[studentId] || null,
+          name: classNameMap.get(selectedExamForGrading.class_id) || '',
+          course_name: courseNameMap.get(selectedExamForGrading.class_course_id) || '',
         }],
         { onConflict: 'exam_id,student_id' }
       );
@@ -485,7 +513,10 @@ export default function ExamManagementPage() {
             exam_id: selectedExamForGrading.id,
             student_id: studentId,
             grade,
+            percentage: percentages[studentId] || null,
             note,
+            name: classNameMap.get(selectedExamForGrading.class_id) || '',
+            course_name: courseNameMap.get(selectedExamForGrading.class_course_id) || '',
           }],
           { onConflict: 'exam_id,student_id' }
         );
@@ -513,7 +544,10 @@ export default function ExamManagementPage() {
     setEditingExamId(null);
     setTitle('');
     setDescription('');
+    setExamDate('');
+    setExamTime('');
     setFileUrl('');
+    setLocation('');
     setOriginalFileUrl(null);
     setShouldRemoveExistingFile(false);
     setSelectedPdfFile(null);
@@ -557,7 +591,10 @@ export default function ExamManagementPage() {
   };
 
   const saveExam = async () => {
-    if (!selectedClassId || !selectedCourseId) {
+    const finalClassId = selectedClassId || (editingExamId ? exams.find(e => e.id === editingExamId)?.class_id : '');
+    const finalCourseId = selectedCourseId || (editingExamId ? exams.find(e => e.id === editingExamId)?.class_course_id : '');
+
+    if (!finalClassId || !finalCourseId) {
       setError('Select both class and course first.');
       return;
     }
@@ -575,17 +612,20 @@ export default function ExamManagementPage() {
       let nextFileUrl = fileUrl.trim() || null;
 
       if (selectedPdfFile) {
-        nextFileUrl = await uploadPdfToStorage(selectedClassId, selectedCourseId, selectedPdfFile);
+        nextFileUrl = await uploadPdfToStorage(finalClassId, finalCourseId, selectedPdfFile);
       } else if (shouldRemoveExistingFile) {
         nextFileUrl = null;
       }
 
       const payload = withSchoolId({
-        class_id: selectedClassId,
-        class_course_id: selectedCourseId,
+        class_id: finalClassId,
+        class_course_id: finalCourseId,
         title: title.trim(),
         description: description.trim(),
+        exam_date: examDate || null,
+        exam_time: examTime || null,
         file_url: nextFileUrl,
+        location: location.trim() || null,
       }, schoolId);
 
       if (editingExamId) {
@@ -605,7 +645,7 @@ export default function ExamManagementPage() {
       }
 
       closeEditor();
-      await loadExams(selectedClassId, selectedCourseId);
+      await loadExams(finalClassId, finalCourseId);
     } catch (saveError: any) {
       setError(saveError?.message || 'Failed to save exam.');
     } finally {
@@ -655,7 +695,11 @@ export default function ExamManagementPage() {
             <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Class</label>
             <select
               value={selectedClassId}
-              onChange={(event) => setSelectedClassId(event.target.value)}
+              onChange={(event) => {
+                setSelectedClassId(event.target.value);
+                setSelectedCourseId('');
+                setExams([]);
+              }}
               className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-400"
             >
               <option value="">Select class</option>
@@ -723,11 +767,13 @@ export default function ExamManagementPage() {
           className={classNameMap.get(selectedExamForGrading.class_id) || ''}
           students={gradingStudents}
           grades={grades}
+          percentages={percentages}
           notes={notes}
           onBack={closeGradingPage}
           onGrade={(studentId, grade) => {
             void handleGrade(studentId, grade);
           }}
+          onPercentageChange={handlePercentageChange}
           onNoteChange={handleNoteChange}
           onSaveNote={(studentId) => {
             void saveStudentNote(studentId);
@@ -763,6 +809,12 @@ export default function ExamManagementPage() {
                 <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500">
                   {courseNameMap.get(exam.class_course_id) || exam.class_course_id || 'Course'}
                 </span>
+                {exam.location && (
+                  <span className="px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                    <i className="fas fa-location-dot"></i>
+                    {exam.location}
+                  </span>
+                )}
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
@@ -840,6 +892,42 @@ export default function ExamManagementPage() {
                   className="w-full h-32 resize-none rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-400"
                   placeholder="Scope, chapters, duration..."
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Exam Date</label>
+                  <input
+                    type="date"
+                    value={examDate}
+                    onChange={(event) => setExamDate(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Exam Time</label>
+                  <input
+                    type="time"
+                    value={examTime}
+                    onChange={(event) => setExamTime(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-widest text-slate-400 mb-2">Location</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-brand-500 transition-colors">
+                    <i className="fas fa-location-dot text-xs"></i>
+                  </div>
+                  <input
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 pl-10 pr-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-brand-400 transition-all"
+                    placeholder="e.g. Hall A, Online (Zoom), Room 302..."
+                  />
+                </div>
               </div>
 
               <div>

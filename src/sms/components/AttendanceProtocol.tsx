@@ -589,7 +589,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
       // Log folder creation to resources_buckets
       let schoolId = selectedClass?.school_id;
       if (!schoolId && activeClassId) {
-        const { data } = await supabase.from('classes').select('school_id').eq('id', activeClassId).single();
+        const { data } = await supabase.from('classes').select('school_id').eq('id', activeClassId).maybeSingle();
         schoolId = data?.school_id;
       }
 
@@ -657,7 +657,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
         // Log file upload to resources_buckets
         let schoolId = selectedClass?.school_id;
         if (!schoolId && activeClassId) {
-          const { data } = await supabase.from('classes').select('school_id').eq('id', activeClassId).single();
+          const { data } = await supabase.from('classes').select('school_id').eq('id', activeClassId).maybeSingle();
           schoolId = data?.school_id;
         }
 
@@ -1043,7 +1043,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
             },
           ])
           .select('id, name, class_id, image_url')
-          .single();
+          .maybeSingle();
         data = result.data;
         error = result.error;
 
@@ -1058,7 +1058,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               },
             ])
             .select('id, name, class_id')
-            .single();
+            .maybeSingle();
           data = fallbackResult.data;
           error = fallbackResult.error;
         }
@@ -1072,18 +1072,19 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
             },
           ])
           .select('id, name, class_id')
-          .single();
+          .maybeSingle();
         data = result.data;
         error = result.error;
       }
 
       if (error) throw error;
 
+      const createdCourseData = data || { id: 'temp-' + Date.now(), name: newCourseName.trim(), class_id: activeClassId };
       const createdCourse = {
-        id: String(data.id),
-        name: String(data.name || ''),
-        class_id: String(data.class_id),
-        image_url: data.image_url || imageUrl || null,
+        id: String(createdCourseData.id),
+        name: String(createdCourseData.name || ''),
+        class_id: String(createdCourseData.class_id),
+        image_url: createdCourseData.image_url || imageUrl || null,
       };
 
       setClassCourses(prev => [createdCourse, ...prev]);

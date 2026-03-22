@@ -15,9 +15,11 @@ type GradingModalProps = {
   className?: string;
   students: Student[];
   grades: Record<string, string>;
+  percentages: Record<string, string>;
   notes: Record<string, string>;
   onBack: () => void;
   onGrade: (studentId: string, grade: string) => void;
+  onPercentageChange: (studentId: string, percentage: string) => void;
   onNoteChange: (studentId: string, note: string) => void;
   onSaveNote: (studentId: string) => void;
   savingNoteStudentId?: string | null;
@@ -31,9 +33,11 @@ export default function GradingModal({
   className,
   students,
   grades,
+  percentages,
   notes,
   onBack,
   onGrade,
+  onPercentageChange,
   onNoteChange,
   onSaveNote,
   savingNoteStudentId = null,
@@ -98,20 +102,31 @@ export default function GradingModal({
                       ))}
                     </div>
 
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row items-center">
+                      <div className="relative w-full sm:w-24">
+                        <input
+                          type="text"
+                          value={percentages[student.id] || ''}
+                          onChange={(event) => onPercentageChange(student.id, event.target.value)}
+                          placeholder="0"
+                          className="w-full rounded-xl border border-zinc-200 bg-white pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
+                      </div>
+
                       <input
                         type="text"
                         value={notes[student.id] || ''}
                         onChange={(event) => onNoteChange(student.id, event.target.value)}
                         placeholder="Add teacher comment for this student"
-                        className="w-full sm:min-w-[280px] rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+                        className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
                       />
                       <button
                         type="button"
                         onClick={() => onSaveNote(student.id)}
-                        className="rounded-xl bg-brand-500 px-3 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-brand-600"
+                        className="whitespace-nowrap rounded-xl bg-brand-500 px-3 py-2 text-xs font-black uppercase tracking-widest text-white hover:bg-brand-600"
                       >
-                        {savingNoteStudentId === student.id ? 'Saving...' : 'Save Note'}
+                        {savingNoteStudentId === student.id ? 'Saving...' : 'Save All'}
                       </button>
                     </div>
                   </div>
