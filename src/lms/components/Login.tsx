@@ -118,8 +118,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="w-20 h-20 bg-[#4ea59d] rounded-[28px] flex items-center justify-center shadow-2xl mb-6">
             <i className="fa-solid fa-graduation-cap text-4xl text-white"></i>
           </div>
-          <h1 className="text-5xl font-black tracking-tighter text-white uppercase italic">
-            EduSphere
+          <h1 className="text-5xl font-black tracking-tighter text-white uppercase ">
+            IEM
           </h1>
           <p className="text-[#4ea59d] text-sm font-bold uppercase tracking-[0.3em] mt-2">
             NextGen Learning Portal
@@ -186,7 +186,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         {/* Bottom copyright notice */}
         <p className="mt-10 text-center text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">
-          © 2025 EduSphere Global Academy
+          © 2025 IEM Global Academy
         </p>
       </div>
     </div>

@@ -51,7 +51,7 @@ interface CoursesProps {
 
 const CLASS_IMAGE_BUCKET = 'class_image';
 const COURSE_PROFILE_BUCKET = 'course_profile';
-const USER_STORAGE_KEY = 'edusphere_user';
+const USER_STORAGE_KEY = 'iem_user';
 const ALLOW_CLASS_CREATION = true;
 const ALLOW_COURSE_CREATION = true;
 const getTodayIsoDate = () => {

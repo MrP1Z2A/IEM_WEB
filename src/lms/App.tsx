@@ -113,9 +113,9 @@ const formatAttendanceRate = (value?: string | number | null) => {
   return `${stringValue}%`;
 };
 
-const LOGIN_STORAGE_KEY = 'edusphere_logged_in';
-const USER_STORAGE_KEY = 'edusphere_user';
-const VIEWED_NOTICES_STORAGE_KEY = 'edusphere_viewed_notice_ids';
+const LOGIN_STORAGE_KEY = 'iem_logged_in';
+const USER_STORAGE_KEY = 'iem_user';
+const VIEWED_NOTICES_STORAGE_KEY = 'iem_viewed_notice_ids';
 
 const getStoredLoginState = () => {
   if (typeof window === 'undefined') return false;
@@ -158,6 +158,7 @@ const App: React.FC = () => {
   const [noticeOriginView, setNoticeOriginView] = useState<'notice-board' | 'instruction'>('notice-board');
   const [viewedNoticeIds, setViewedNoticeIds] = useState<string[]>(getStoredViewedNoticeIds);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date(2025, 3, 1));
   const [calendarSubView, setCalendarSubView] = useState<'day' | 'week' | 'month'>('month');
   
@@ -174,6 +175,11 @@ const App: React.FC = () => {
   const [reportCard, setReportCard] = useState<ReportCard | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [studentAttendanceRate, setStudentAttendanceRate] = useState<string>('98%');
+
+  // New Submission Feedback States
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState('');
 
   const hasNewNotices = dynamicAnnouncements.some(notice => !viewedNoticeIds.includes(notice.id));
 
@@ -234,7 +240,7 @@ const App: React.FC = () => {
                   subject: ex.title,
                   date: `${month} ${dayStr}`,
                   time: ex.exam_time || '10:00 AM',
-                  venue: 'Main Hall',
+                  venue: ex.location || 'TBA',
                   originalDate: dateSource
                 };
               });
@@ -263,14 +269,19 @@ const App: React.FC = () => {
                 
                 const submission = submissionsData?.find(s => s.assignment_id === hw.id);
                 
+                const rawUrl = hw.attachment_url || hw.file_url || '';
+                const fileName = rawUrl ? decodeURIComponent(rawUrl.split('/').pop()?.split('?')[0] || '') : '';
                 return {
                   id: hw.id,
                   title: hw.title,
+                  description: hw.description || '',
                   dueDate: `${month} ${dayStr}`,
                   status: submission ? (submission.status || 'Active') : 'Pending',
                   course: hw.course_name ? `${hw.class_name || ''} - ${hw.course_name}` : 'General',
-                  fileUrl: hw.file_url, // Assignment instructions
-                  submissionUrl: submission?.submission_url, // Their submitted file
+                  location: hw.location || 'TBA',
+                  fileUrl: rawUrl,
+                  fileName,
+                  submissionUrl: submission?.submission_url,
                   originalDate: dateSource
                 };
               });
@@ -384,9 +395,10 @@ const App: React.FC = () => {
     setIsLoggedIn(true);
   };
 
-  const handleHomeworkSubmission = async () => {
+  const executeHomeworkSubmission = async () => {
     if (!selectedAssignment || !user.studentId) return;
     setIsSubmitting(true);
+    setShowSubmitConfirm(false);
     try {
       let submissionUrl = '';
       if (submissionFile && supabase) {
@@ -415,13 +427,21 @@ const App: React.FC = () => {
         if (submitError) throw submitError;
       }
       
-      alert('Homework submitted successfully!');
-      setIsSubmissionModalOpen(false);
-      setSubmissionFile(null);
-      setSubmissionComment('');
+      setSubmissionStatus('success');
+      setStatusMessage('Homework submitted successfully!');
+      setTimeout(() => {
+        setIsSubmissionModalOpen(false);
+        setSubmissionStatus('idle');
+        setSubmissionFile(null);
+        setSubmissionComment('');
+      }, 2000);
+      
+      void performSmsSync();
     } catch (err: any) {
       console.error('Submission error:', err);
-      alert('Failed to submit homework: ' + err.message);
+      setSubmissionStatus('error');
+      setStatusMessage('Failed to submit homework: ' + err.message);
+      setTimeout(() => setSubmissionStatus('idle'), 4000);
     } finally {
       setIsSubmitting(false);
     }
@@ -502,8 +522,8 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-4">
-            <button className="px-6 py-3 bg-[#4ea59d]/10 border border-white/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all">
-              <i className="fa-solid fa-file-pdf mr-2"></i> Download Full Report
+            <button className="px-6 py-3 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all">
+              <i className="fa-solid fa-cloud-arrow-down mr-2"></i> Download Full Report
             </button>
           </div>
         </header>
@@ -523,7 +543,7 @@ const App: React.FC = () => {
           </div>
           <div className="bg-[#4ea59d] p-8 rounded-[32px] text-center shadow-xl shadow-[#4ea59d]/20">
             <p className="text-[10px] font-black text-white/70 uppercase tracking-widest mb-2">Standing</p>
-            <p className="text-4xl font-black text-white italic uppercase">Elite</p>
+            <p className="text-4xl font-black text-white uppercase">Elite</p>
           </div>
         </div>
 
@@ -554,7 +574,7 @@ const App: React.FC = () => {
                                <span className="text-xl font-black text-[#4ea59d]">{sub.grade}</span>
                                <span className="ml-2 text-[9px] text-slate-400 font-bold uppercase">{sub.score}%</span>
                             </td>
-                            <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed italic max-w-sm">
+                            <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">
                                "{sub.comment}"
                             </td>
                          </tr>
@@ -569,7 +589,7 @@ const App: React.FC = () => {
                 <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
                    <i className="fa-solid fa-wand-magic-sparkles text-[#4ea59d]"></i> AI Insight for Parents
                 </h3>
-                <div className="p-6 bg-[#4ea59d]/5 rounded-[32px] border border-[#4ea59d]/20 italic">
+                <div className="p-6 bg-[#4ea59d]/5 rounded-[32px] border border-[#4ea59d]/20 ">
                    <p className="text-xs text-slate-300 leading-relaxed">
                       "Alex is demonstrating exceptional mastery in <strong>theoretical sciences</strong>. While their Data Structures performance is strong (88%), our AI analysis suggests focusing on <strong>recursion logic</strong> to reach the top percentile. Overall performance is in the <strong>top 4%</strong> of the cohort."
                    </p>
@@ -753,7 +773,7 @@ const App: React.FC = () => {
       <div className="space-y-8 animate-fadeIn text-slate-100 pb-20">
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 border-b border-[#1f4e4a] pb-8">
           <div className="space-y-2">
-            <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter italic">Calendar Studio</h2>
+            <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter ">Calendar Studio</h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#4ea59d] animate-pulse"></span>
               <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Interactive Campus Timeline</p>
@@ -798,7 +818,7 @@ const App: React.FC = () => {
                        <span className="text-[9px] font-black text-slate-300 uppercase">{ex.date}</span>
                      </div>
                      <h4 className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{ex.subject}</h4>
-                     <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 italic"><i className="fa-solid fa-clock mr-1"></i> {ex.time}</p>
+                     <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 "><i className="fa-solid fa-clock mr-1"></i> {ex.time}</p>
                   </div>
                 ))}
              </div>
@@ -849,7 +869,7 @@ const App: React.FC = () => {
     <div className="space-y-8 animate-fadeIn text-slate-100 pb-10">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-black text-white uppercase tracking-tight italic">Dashboard Central</h2>
+          <h2 className="text-3xl font-black text-white uppercase tracking-tight ">Dashboard Central</h2>
           <p className="text-[#4ea59d]/60 text-[10px] font-black uppercase tracking-[0.4em]">Academic Overview</p>
         </div>
         <div className="flex items-center gap-4">
@@ -868,7 +888,7 @@ const App: React.FC = () => {
         <div className="bg-[#4ea59d] p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden md:col-span-2 group">
           <div className="relative z-10">
             <h3 className="text-[10px] font-black opacity-80 uppercase tracking-[0.2em] text-white">Academic Standing</h3>
-            <p className="text-5xl font-black my-4 text-white uppercase italic">{standingText}</p>
+            <p className="text-5xl font-black my-4 text-white uppercase ">{standingText}</p>
             <div className="mt-4 flex items-center gap-4">
               <div className="h-2 flex-1 bg-[#0a1a19]/20 rounded-full overflow-hidden">
                  <div className="h-full bg-[#0a1a19]" style={{ width: `${academicScore}%` }}></div>
@@ -1106,7 +1126,7 @@ const App: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a19] to-transparent"></div>
         <div className="absolute bottom-10 left-10">
           <p className="text-[#4ea59d] font-black uppercase tracking-[0.4em] mb-2">About School</p>
-          <h2 className="text-5xl font-black text-white uppercase italic tracking-tighter">EduSphere Academy</h2>
+          <h2 className="text-5xl font-black text-white uppercase tracking-tighter">IEM Academy</h2>
           <p className="max-w-xl text-slate-400 text-sm mt-4 leading-relaxed font-medium">
             Pioneering the future of education through AI-integrated curricula and global mentorship. Our mission is to empower every learner to thrive in an era of rapid technological evolution.
           </p>
@@ -1171,7 +1191,7 @@ const App: React.FC = () => {
                    <div className="absolute bottom-6 left-6">
                       <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-1">{ev.type}</p>
                       <h4 className="text-sm font-bold text-white uppercase">{ev.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 italic"><i className="fa-solid fa-calendar mr-2"></i> {ev.date}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 "><i className="fa-solid fa-calendar mr-2"></i> {ev.date}</p>
                    </div>
                 </div>
               ))}
@@ -1185,7 +1205,7 @@ const App: React.FC = () => {
     <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
         <div className="space-y-2">
-          <h2 className="text-4xl font-black text-white uppercase tracking-tighter italic">Homework Hub</h2>
+          <h2 className="text-4xl font-black text-white uppercase tracking-tighter ">Homework Hub</h2>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#4ea59d] animate-pulse"></span>
             <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Submission Portal & Assignment Tracking</p>
@@ -1208,44 +1228,58 @@ const App: React.FC = () => {
                 dynamicAssignments.map((ass) => (
                   <div key={ass.id} className="bg-white/10 backdrop-blur-2xl shadow-xl p-8 rounded-[40px] border border-white/20 group hover:border-[#4ea59d]/50 transition-all flex flex-col h-full">
                     <div className="flex justify-between items-start mb-6">
-                      <div className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${ass.status === 'Submitted' ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                      <div className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${ass.status === 'Active' || ass.status === 'Submitted' ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400'}`}>
                         {ass.status}
                       </div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{ass.dueDate}</span>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ">{ass.dueDate}</span>
                     </div>
                     
                     <h4 className="text-xl font-black text-white mb-2 group-hover:text-[#4ea59d] transition-colors line-clamp-2">{ass.title}</h4>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">{ass.course || 'Core Curriculum'}</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{ass.course || 'Core Curriculum'}</p>
+                    {ass.description && (
+                      <p className="text-xs text-slate-400 leading-relaxed mb-4 line-clamp-3">{ass.description}</p>
+                    )}
+                    {ass.fileName && (
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="flex items-center gap-2">
+                          <i className="fa-solid fa-paperclip text-[#4ea59d] text-[10px]"></i>
+                          <span className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest truncate max-w-[120px]" title={ass.fileName}>{ass.fileName}</span>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between gap-4">
-                      <button 
-                         onClick={() => {
-                           setSelectedAssignment(ass);
-                           setIsSubmissionModalOpen(true);
-                         }}
-                         className="flex-1 px-6 py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
-                      >
-                        {ass.status === 'Active' ? 'Resubmit task' : 'Submit Homework'}
-                      </button>
+                      {ass.status === 'Active' || ass.status === 'Submitted' ? (
+                        <div className="flex-1 px-6 py-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center">
+                          <i className="fa-solid fa-check mr-2"></i>Submitted
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
+                          className="flex-1 px-6 py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
+                        >
+                          Submit Homework
+                        </button>
+                      )}
                       <div className="flex gap-2">
-                        {ass.fileUrl && (
-                          <button 
-                            onClick={() => window.open(ass.fileUrl, '_blank')}
-                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] transition-colors border border-white/10"
-                            title="Download Instructions"
-                          >
-                            <i className="fa-solid fa-file-pdf"></i>
-                          </button>
-                        )}
-                        {ass.submissionUrl && (
+                        {/* Standardized Download Buttons */}
+                        {ass.submissionUrl ? (
                           <button 
                             onClick={() => window.open(ass.submissionUrl, '_blank')}
-                            className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] hover:bg-[#4ea59d] hover:text-white transition-all border border-[#4ea59d]/30"
+                            className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
                             title="View Submission"
                           >
-                            <i className="fa-solid fa-cloud-arrow-down"></i>
+                            <i className="fa-solid fa-cloud-arrow-down shadow-sm"></i>
                           </button>
-                        )}
+                        ) : ass.fileUrl ? (
+                          <button 
+                            onClick={() => window.open(ass.fileUrl, '_blank')}
+                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
+                            title="Download Instructions"
+                          >
+                            <i className="fa-solid fa-download"></i>
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1255,28 +1289,7 @@ const App: React.FC = () => {
           </section>
         </div>
 
-        <div className="space-y-8">
-          <section className="bg-white/10 backdrop-blur-2xl p-8 rounded-[40px] border border-white/20 shadow-2xl">
-            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Performance Insight</h3>
-            <div className="space-y-6">
-              <div className="text-center p-6 bg-[#4ea59d]/10 rounded-3xl border border-[#4ea59d]/20">
-                <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Completion Rate</p>
-                <div className="text-4xl font-black text-white italic">84%</div>
-              </div>
-              <p className="text-xs text-slate-400 leading-relaxed font-medium italic">
-                "You've completed 5/6 assignments this week. Only 1 pending task remaining to maintain your 'Elite' standing."
-              </p>
-            </div>
-          </section>
 
-          <section className="bg-gradient-to-br from-[#4ea59d] to-[#3d8c85] p-8 rounded-[40px] shadow-2xl text-white relative overflow-hidden group">
-             <div className="relative z-10">
-                <h4 className="font-black text-xs uppercase tracking-[0.2em] opacity-80 mb-2">Study Tip</h4>
-                <p className="font-bold text-sm leading-relaxed">Break your assignments into 25-minute Pomodoro sessions for maximum focus.</p>
-             </div>
-             <i className="fa-solid fa-lightbulb absolute -right-4 -bottom-4 text-8xl opacity-10 group-hover:scale-110 transition-transform"></i>
-          </section>
-        </div>
       </div>
     </div>
   );
@@ -1298,7 +1311,7 @@ const App: React.FC = () => {
               </h3>
               <div className="space-y-4">
                  {dynamicAssignments.map(ass => (
-                   <div key={ass.id} className="p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 flex flex-col sm:flex-row justify-between items-center gap-6 group">
+                   <div key={ass.id} className="p-6 md:p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 flex flex-col sm:flex-row justify-between items-center gap-6 group scale-[0.98] sm:scale-100 origin-center">
                       <div className="flex-1">
                          <div className="flex items-center gap-3 mb-2">
                            <h4 className="text-lg font-bold text-white">{ass.title}</h4>
@@ -1309,33 +1322,40 @@ const App: React.FC = () => {
                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{ass.course} • Due {ass.dueDate}</p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <button 
-                           onClick={() => {
-                             setSelectedAssignment(ass);
-                             setIsSubmissionModalOpen(true);
-                           }}
-                           className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
-                        >
-                          {ass.status === 'Active' ? 'Resubmit task' : 'Submit Task'}
-                        </button>
-                        {ass.fileUrl && (
+                         {ass.status === 'Active' || ass.status === 'Submitted' ? (
+                           <div className="px-6 py-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center flex items-center gap-2">
+                             <i className="fa-solid fa-check"></i> Submitted
+                           </div>
+                         ) : (
+                           <button 
+                            onClick={() => {
+                              setSelectedAssignment(ass);
+                              setIsSubmissionModalOpen(true);
+                            }}
+                            className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                           >
+                            Submit Task
+                           </button>
+                         )}
+
+                         {/* Standardized Download Buttons */}
+                        {ass.submissionUrl ? (
                           <button 
-                            onClick={() => window.open(ass.fileUrl, '_blank')}
-                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all font-bold"
-                            title="Download Instructions"
+                             onClick={() => window.open(ass.submissionUrl, '_blank')}
+                             className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
+                             title="View Submission"
                           >
-                            <i className="fa-solid fa-download"></i>
+                             <i className="fa-solid fa-cloud-arrow-down shadow-sm"></i>
                           </button>
-                        )}
-                        {ass.submissionUrl && (
+                        ) : ass.fileUrl ? (
                           <button 
-                            onClick={() => window.open(ass.submissionUrl, '_blank')}
-                            className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 transition-all font-bold"
-                            title="View Submission"
+                             onClick={() => window.open(ass.fileUrl, '_blank')}
+                             className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
+                             title="Download Instructions"
                           >
-                            <i className="fa-solid fa-cloud-arrow-down"></i>
+                             <i className="fa-solid fa-download"></i>
                           </button>
-                        )}
+                        ) : null}
                       </div>
                    </div>
                  ))}
@@ -1358,7 +1378,7 @@ const App: React.FC = () => {
                           <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
                              <td className="px-8 py-6 font-bold text-sm text-white">{g.assignment}</td>
                              <td className="px-8 py-6 text-xl font-black text-[#4ea59d]">{g.grade}</td>
-                             <td className="px-8 py-6 text-xs text-slate-400 italic font-medium leading-relaxed max-w-sm">{g.feedback}</td>
+                             <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">{g.feedback}</td>
                           </tr>
                        ))}
                     </tbody>
@@ -1379,8 +1399,8 @@ const App: React.FC = () => {
                 </div>
               ))}
            </div>
-           <button className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all">
-              Download Full Schedule
+           <button className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center justify-center gap-2">
+              <i className="fa-solid fa-cloud-arrow-down"></i> Download Full Schedule
            </button>
         </section>
       </div>
@@ -1574,7 +1594,7 @@ const App: React.FC = () => {
                <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-4">
                  <i className="fa-solid fa-compass text-[#4ea59d]"></i> Module Introduction
                </h3>
-               <p className="text-slate-200 text-lg leading-relaxed italic">{selectedCourse.moduleIntro}</p>
+               <p className="text-slate-200 text-lg leading-relaxed ">{selectedCourse.moduleIntro}</p>
                <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
                   {selectedCourse.topics.map((t, i) => (
                     <div key={i} className="flex items-center gap-4 p-4 bg-[#0a1a19] rounded-2xl border border-white/20">
@@ -1597,7 +1617,7 @@ const App: React.FC = () => {
                       <div className="flex justify-between items-start flex-col sm:flex-row gap-4">
                         <h4 className="text-xl font-black text-white">{note.title}</h4>
                         {note.ebookUrl && (
-                          <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2">
+                          <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center gap-2">
                              <i className="fa-solid fa-download"></i> Download Ebook
                           </a>
                         )}
@@ -1613,14 +1633,14 @@ const App: React.FC = () => {
                       </div>
                       {note.summary && (
                         <div className="mt-8 p-8 bg-[#4ea59d]/5 border-l-8 border-[#4ea59d] rounded-r-[32px] animate-slideIn">
-                           <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em] mb-4 italic">AI Intelligent Summary</p>
+                           <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em] mb-4 ">AI Intelligent Summary</p>
                            <p className="text-base text-slate-400 leading-relaxed">{note.summary}</p>
                         </div>
                       )}
                    </div>
                  ))}
                  {selectedCourse.notes.length === 0 && (
-                   <div className="p-12 text-center bg-[#0a1a19] rounded-[40px] border border-dashed border-[#1f4e4a] text-slate-300 font-black uppercase tracking-widest italic">
+                   <div className="p-12 text-center bg-[#0a1a19] rounded-[40px] border border-dashed border-[#1f4e4a] text-slate-300 font-black uppercase tracking-widest ">
                      No notes uploaded yet.
                    </div>
                  )}
@@ -1695,7 +1715,7 @@ const App: React.FC = () => {
       <header className="md:hidden flex items-center justify-between p-4 bg-[#0a1a19]/40 backdrop-blur-xl shadow-lg border-b border-[#1f4e4a] sticky top-0 z-[50]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-[#4ea59d] rounded-lg flex items-center justify-center text-white"><i className="fa-solid fa-graduation-cap"></i></div>
-          <h1 className="text-lg font-black tracking-tighter text-white uppercase italic">EduSphere</h1>
+          <h1 className="text-lg font-black tracking-tighter text-white uppercase ">IEM</h1>
         </div>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-white p-2">
           <i className={`fa-solid ${isSidebarOpen ? 'fa-xmark' : 'fa-bars'} text-xl`}></i>
@@ -1712,8 +1732,10 @@ const App: React.FC = () => {
         hasNewNotices={hasNewNotices}
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+        isCollapsed={isSidebarCollapsed}
+        onCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
       />
-      <main className={`flex-1 md:ml-72 p-6 md:p-8 overflow-x-hidden ${isSidebarOpen ? 'hidden md:block' : 'block'}`}>
+      <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-72'} p-6 md:p-8 overflow-x-hidden ${isSidebarOpen ? 'hidden md:block' : 'block'}`}>
         {currentView === 'dashboard' && renderDashboard()}
         {currentView === 'notice-board' && renderNoticeBoard()}
         {currentView === 'notice-detail' && renderNoticeDetail()}
@@ -1766,10 +1788,10 @@ const App: React.FC = () => {
       )}
       {/* Homework Submission Modal */}
       {isSubmissionModalOpen && selectedAssignment && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-xl bg-[#0a1a19] rounded-[40px] border border-white/20 p-8 shadow-2xl animate-in zoom-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-xl bg-[#0a1a19] rounded-[32px] sm:rounded-[40px] border border-white/20 p-5 sm:p-8 shadow-2xl animate-in zoom-in duration-300 max-h-[95vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-black text-white italic tracking-tighter uppercase underline decoration-[#4ea59d] decoration-4 underline-offset-8">Submit Homework</h3>
+              <h3 className="text-2xl font-black text-white tracking-tighter uppercase underline decoration-[#4ea59d] decoration-4 underline-offset-8">Submit Homework</h3>
               <button 
                 onClick={() => setIsSubmissionModalOpen(false)}
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
@@ -1806,11 +1828,50 @@ const App: React.FC = () => {
               </div>
 
               <button 
-                onClick={handleHomeworkSubmission}
-                disabled={isSubmitting || !submissionFile}
+                onClick={() => setShowSubmitConfirm(true)}
+                disabled={isSubmitting || !submissionFile || submissionStatus === 'success'}
                 className="w-full py-4 bg-[#4ea59d] hover:bg-[#3d8c85] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-[#4ea59d]/20"
               >
                 {isSubmitting ? 'Uploading...' : 'Complete Submission'}
+              </button>
+            </div>
+            
+            {/* Inner Notification Overlay */}
+            {submissionStatus !== 'idle' && (
+              <div className={`mt-6 p-4 rounded-2xl border flex items-center gap-3 animate-in slide-in-from-top duration-300 ${
+                submissionStatus === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+              }`}>
+                <i className={`fa-solid ${submissionStatus === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}`}></i>
+                <p className="text-[10px] font-black uppercase tracking-wider">{statusMessage}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Are You Sure Confirmation Modal */}
+      {showSubmitConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-full max-w-sm bg-[#0a1a19] rounded-[32px] border border-white/20 p-8 shadow-2xl text-center">
+            <div className="w-16 h-16 bg-[#4ea59d]/10 rounded-full flex items-center justify-center text-[#4ea59d] text-2xl mx-auto mb-6">
+              <i className="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-4">Confirm Submission</h3>
+            <p className="text-xs text-slate-400 leading-relaxed mb-8">
+              Are you sure you want to submit your homework? This action will register your solution in the SMS records.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <button 
+                onClick={() => setShowSubmitConfirm(false)}
+                className="py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={executeHomeworkSubmission}
+                className="py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
+              >
+                Confirm
               </button>
             </div>
           </div>

@@ -7,13 +7,17 @@ interface SidebarProps {
   setCurrentPage: (page: PageId) => void;
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (open: boolean) => void;
+  isCollapsed?: boolean;
+  onCollapse?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
   currentPage, 
   setCurrentPage, 
   isMobileMenuOpen, 
-  setIsMobileMenuOpen 
+  setIsMobileMenuOpen,
+  isCollapsed,
+  onCollapse
 }) => {
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
   const navRef = useRef<HTMLElement | null>(null);
@@ -41,13 +45,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           className={`w-full flex items-center justify-between px-8 py-3.5 transition-all duration-300 group
             ${(isActive || (hasDropdown && isParentActive && !isOpen)) ? 'bg-brand-500/10 text-white border-r-4 border-brand-500' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
         >
-          <div className="flex items-center gap-4">
+          <div className={`flex items-center ${isCollapsed ? 'justify-center w-full' : 'gap-4'}`}>
             {icon && <i className={`fas ${icon} w-5 text-sm transition-colors ${isActive || isParentActive ? 'text-brand-400' : 'opacity-60 group-hover:opacity-100'}`}></i>}
-            <span className="text-[13px] font-bold tracking-tight">{label}</span>
+            {!isCollapsed && <span className="text-[13px] font-bold tracking-tight">{label}</span>}
           </div>
-          {hasDropdown && <i className={`fas fa-chevron-down text-[10px] transition-transform duration-300 ${isOpen ? 'rotate-180 text-brand-400' : 'opacity-40 group-hover:opacity-100'}`}></i>}
+          {!isCollapsed && hasDropdown && <i className={`fas fa-chevron-down text-[10px] transition-transform duration-300 ${isOpen ? 'rotate-180 text-brand-400' : 'opacity-40 group-hover:opacity-100'}`}></i>}
         </button>
-        {hasDropdown && isOpen && <div className="bg-black/10 py-1 animate-in slide-in-from-top-2 duration-300">{children}</div>}
+        {hasDropdown && isOpen && !isCollapsed && <div className="bg-black/10 py-1 animate-in slide-in-from-top-2 duration-300">{children}</div>}
       </div>
     );
   };
@@ -64,12 +68,22 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   return (
-    <aside className={`w-64 fixed h-full bg-[#0f172a] text-white z-50 flex flex-col transition-transform lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
-      <div className="p-8 pb-10 flex items-center gap-3">
-        <div className="w-10 h-10 bg-brand-500 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/30 overflow-hidden">
+    <aside className={`fixed h-full bg-[#0f172a] text-white z-50 flex flex-col transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl w-64' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}>
+      <div className={`p-8 pb-10 flex items-center shrink-0 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+        <div className="w-10 h-10 bg-brand-500 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/30 overflow-hidden shrink-0">
           <img src={logoIem} alt="IEM" className="w-full h-full object-cover" />
         </div>
-        <span className="text-xl font-black tracking-tighter">IEM</span>
+        {!isCollapsed && <span className="text-xl font-black tracking-tighter">IEM</span>}
+      </div>
+
+      <div className="hidden lg:flex justify-end px-4 mb-2">
+        <button 
+          onClick={onCollapse}
+          className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-brand-500 transition-all hover:scale-110"
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        >
+          <i className="fas fa-bars text-[10px]"></i>
+        </button>
       </div>
       <nav
         ref={navRef}
