@@ -30,6 +30,16 @@ type NoticeBoardRow = {
   file_name: string | null;
 };
 
+type DynamicReportCard = {
+  id: string;
+  title: string | null;
+  reportDate: string | null;
+  reportType: string | null;
+  filePath: string | null;
+  fileName: string | null;
+  fileUrl?: string;
+};
+
 const NOTICE_FILE_BUCKET = import.meta.env.VITE_SUPABASE_NOTICE_BUCKET || 'notice_board';
 
 const formatNoticeDate = (value?: string | null) => {
@@ -171,7 +181,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date(2025, 3, 1));
   const [calendarSubView, setCalendarSubView] = useState<'day' | 'week' | 'month'>('month');
-  
+
   // Dynamic Data States (Linked to SMS)
   const [dynamicAnnouncements, setDynamicAnnouncements] = useState<NoticeItem[]>([]);
   const [dynamicExams, setDynamicExams] = useState<any[]>([]);
@@ -183,6 +193,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [examResultsData, setExamResultsData] = useState<any[]>([]);
   const [reportCard, setReportCard] = useState<ReportCard | null>(null);
+  const [dynamicReportCards, setDynamicReportCards] = useState<DynamicReportCard[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [studentAttendanceRate, setStudentAttendanceRate] = useState<string>('98%');
 
@@ -193,8 +204,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   const hasNewNotices = dynamicAnnouncements.some(notice => !viewedNoticeIds.includes(notice.id));
 
-  const performSmsSync = useCallback(async () => {
-    setIsLoading(true);
+  const performSmsSync = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       // Debug log for schoolId
       console.log('[NoticeBoard] Fetching notices for schoolId:', schoolId);
@@ -211,16 +222,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           .eq('student_id', user.studentId)
           .eq('school_id', schoolId);
         if (!gradesError && gradesData) {
-           const mappedGrades = gradesData.map(g => ({
-             className: g.name || 'Unknown Class',
-             courseName: g.course_name || 'Unknown Course',
-             grade: g.grade ? String(g.grade) : 'Pending',
-             percentage: g.percentage ? String(g.percentage) : null
-           }));
-           setExamResultsData(mappedGrades);
+          const mappedGrades = gradesData.map(g => ({
+            className: g.name || 'Unknown Class',
+            courseName: g.course_name || 'Unknown Course',
+            grade: g.grade ? String(g.grade) : 'Pending',
+            percentage: g.percentage ? String(g.percentage) : null
+          }));
+          setExamResultsData(mappedGrades);
         } else {
-           console.error("Error fetching grades:", gradesError);
-           setExamResultsData([]);
+          console.error("Error fetching grades:", gradesError);
+          setExamResultsData([]);
         }
 
         // Fetch student's enrolled courses to get exams and homework
@@ -232,7 +243,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         if (!enrolledError && enrolledData) {
           const courseIds = enrolledData.map(d => d.class_course_id);
-          
+
           if (courseIds.length > 0) {
             // Fetch Exams
             const { data: examsData, error: examsError } = await supabase
@@ -241,7 +252,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               .in('class_course_id', courseIds)
               .eq('school_id', schoolId)
               .order('created_at', { ascending: false });
-            
+
             if (!examsError && examsData) {
               const mappedExams = examsData.map(ex => {
                 const dateSource = ex.exam_date || ex.created_at;
@@ -281,9 +292,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 const date = new Date(dateSource);
                 const month = date.toLocaleString('default', { month: 'long' });
                 const dayStr = date.getDate().toString().padStart(2, '0');
-                
+
                 const submission = submissionsData?.find(s => s.assignment_id === hw.id);
-                
+
                 const rawUrl = hw.attachment_url || hw.file_url || '';
                 const fileName = rawUrl ? decodeURIComponent(rawUrl.split('/').pop()?.split('?')[0] || '') : '';
                 return {
@@ -302,6 +313,39 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               });
               setDynamicAssignments(mappedAssignments);
             }
+
+            // Fetch Report Cards
+            const client = supabase;
+            if (!client) return;
+            const { data: reportCardsData, error: reportCardsError } = await client
+              .from('report_cards')
+              .select('*')
+              .eq('student_id', user.studentId)
+              .eq('school_id', schoolId)
+              .order('report_date', { ascending: false });
+
+            if (!reportCardsError && reportCardsData) {
+              const mappedReportCards = reportCardsData.map(rc => {
+                let fileUrl = '';
+                if (rc.file_path && supabase) {
+                  const { data } = supabase.storage.from('report_cards').getPublicUrl(rc.file_path);
+                  fileUrl = data.publicUrl;
+                }
+                return {
+                  id: rc.id,
+                  title: rc.title || 'Official Report Card',
+                  reportDate: rc.report_date ? new Date(rc.report_date).toLocaleDateString() : 'N/A',
+                  reportType: rc.report_type,
+                  filePath: rc.file_path,
+                  fileName: rc.file_name,
+                  fileUrl
+                };
+              });
+              setDynamicReportCards(mappedReportCards);
+            } else {
+              console.error("Error fetching report cards:", reportCardsError);
+              setDynamicReportCards([]);
+            }
           }
         }
       }
@@ -310,13 +354,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       console.error("Sync error", err);
       setDynamicAnnouncements([]);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   }, [schoolId, user.studentId]);
 
   useEffect(() => {
     if (isLoggedIn) {
-      performSmsSync();
+      performSmsSync(true);
       if (user.role === UserRole.PARENT) {
         setCurrentView('parent-portal');
       }
@@ -395,17 +439,17 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   useEffect(() => {
     if (!isLoggedIn) return;
     const refreshInterval = window.setInterval(() => {
-      void performSmsSync();
+      void performSmsSync(true);
       void loadStudentProfile();
-    }, 60000);
+    }, 10000);
 
     return () => window.clearInterval(refreshInterval);
   }, [isLoggedIn, performSmsSync, loadStudentProfile]);
 
   const handleLogin = (role: Exclude<UserRole, UserRole.PARENT>, email: string, loginSchoolId?: string) => {
-    const newUser = { 
-      ...INITIAL_USER, 
-      role, 
+    const newUser = {
+      ...INITIAL_USER,
+      role,
       email,
       name: INITIAL_USER.name,
       schoolId: loginSchoolId,
@@ -430,7 +474,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         const { data, error: uploadError } = await supabase.storage
           .from('homework-submissions')
           .upload(fileName, submissionFile);
-        
+
         if (uploadError) throw uploadError;
         const { data: { publicUrl } } = supabase.storage.from('homework-submissions').getPublicUrl(fileName);
         submissionUrl = publicUrl;
@@ -449,7 +493,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         if (submitError) throw submitError;
       }
-      
+
       setSubmissionStatus('success');
       setStatusMessage('Homework submitted successfully!');
       setTimeout(() => {
@@ -458,7 +502,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         setSubmissionFile(null);
         setSubmissionComment('');
       }, 2000);
-      
+
       void performSmsSync();
     } catch (err: any) {
       console.error('Submission error:', err);
@@ -535,13 +579,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <div className="space-y-2">
             <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Parental Oversight</h2>
             <div className="flex items-center gap-3">
-               <div className="w-10 h-10 rounded-full bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d]">
-                 <i className="fa-solid fa-child-reaching"></i>
-               </div>
-               <div>
-                  <p className="text-[#4ea59d] font-black text-[10px] uppercase tracking-[0.2em]">Student Record: {user.name}</p>
-                  <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">{reportCard.term} Academic Session</p>
-               </div>
+              <div className="w-10 h-10 rounded-full bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d]">
+                <i className="fa-solid fa-child-reaching"></i>
+              </div>
+              <div>
+                <p className="text-[#4ea59d] font-black text-[10px] uppercase tracking-[0.2em]">Student Record: {user.name}</p>
+                <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">{reportCard.term} Academic Session</p>
+              </div>
             </div>
           </div>
           <div className="flex gap-4">
@@ -572,70 +616,70 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
           <div className="xl:col-span-2 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[40px] border border-white/20 overflow-hidden shadow-2xl">
-             <div className="p-8 border-b border-[#1f4e4a] bg-[#0a1a19]">
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">Academic Performance breakdown</h3>
-             </div>
-             <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                   <thead className="bg-[#0a1a19]/50">
-                      <tr>
-                         <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Subject</th>
-                         <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Grade</th>
-                         <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Faculty Feedback</th>
-                      </tr>
-                   </thead>
-                   <tbody className="divide-y divide-[#1f4e4a]">
-                      {reportCard.subjects.map((sub, i) => (
-                         <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
-                            <td className="px-8 py-6">
-                               <p className="font-bold text-white text-sm">{sub.name}</p>
-                               <div className="w-32 h-1 bg-[#1f4e4a] rounded-full mt-2 overflow-hidden">
-                                  <div className="h-full bg-[#4ea59d]" style={{ width: `${sub.score}%` }}></div>
-                               </div>
-                            </td>
-                            <td className="px-8 py-6">
-                               <span className="text-xl font-black text-[#4ea59d]">{sub.grade}</span>
-                               <span className="ml-2 text-[9px] text-slate-400 font-bold uppercase">{sub.score}%</span>
-                            </td>
-                            <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">
-                               "{sub.comment}"
-                            </td>
-                         </tr>
-                      ))}
-                   </tbody>
-                </table>
-             </div>
+            <div className="p-8 border-b border-[#1f4e4a] bg-[#0a1a19]">
+              <h3 className="text-xl font-black text-white uppercase tracking-tight">Academic Performance breakdown</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-[#0a1a19]/50">
+                  <tr>
+                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Subject</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Grade</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Faculty Feedback</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1f4e4a]">
+                  {reportCard.subjects.map((sub, i) => (
+                    <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
+                      <td className="px-8 py-6">
+                        <p className="font-bold text-white text-sm">{sub.name}</p>
+                        <div className="w-32 h-1 bg-[#1f4e4a] rounded-full mt-2 overflow-hidden">
+                          <div className="h-full bg-[#4ea59d]" style={{ width: `${sub.score}%` }}></div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className="text-xl font-black text-[#4ea59d]">{sub.grade}</span>
+                        <span className="ml-2 text-[9px] text-slate-400 font-bold uppercase">{sub.score}%</span>
+                      </td>
+                      <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">
+                        "{sub.comment}"
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="space-y-8">
-             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-                <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
-                   <i className="fa-solid fa-wand-magic-sparkles text-[#4ea59d]"></i> AI Insight for Parents
-                </h3>
-                <div className="p-6 bg-[#4ea59d]/5 rounded-[32px] border border-[#4ea59d]/20 ">
-                   <p className="text-xs text-slate-300 leading-relaxed">
-                      "Alex is demonstrating exceptional mastery in <strong>theoretical sciences</strong>. While their Data Structures performance is strong (88%), our AI analysis suggests focusing on <strong>recursion logic</strong> to reach the top percentile. Overall performance is in the <strong>top 4%</strong> of the cohort."
-                   </p>
-                </div>
-             </section>
+            <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+              <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8 flex items-center gap-3">
+                <i className="fa-solid fa-wand-magic-sparkles text-[#4ea59d]"></i> AI Insight for Parents
+              </h3>
+              <div className="p-6 bg-[#4ea59d]/5 rounded-[32px] border border-[#4ea59d]/20 ">
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  "Alex is demonstrating exceptional mastery in <strong>theoretical sciences</strong>. While their Data Structures performance is strong (88%), our AI analysis suggests focusing on <strong>recursion logic</strong> to reach the top percentile. Overall performance is in the <strong>top 4%</strong> of the cohort."
+                </p>
+              </div>
+            </section>
 
-             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-                <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Contact Faculty</h3>
-                <div className="space-y-4">
-                   <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all">
-                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xs">
-                         <i className="fa-solid fa-message"></i>
-                      </div>
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest">Message Head Teacher</span>
-                   </button>
-                   <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all">
-                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-xs">
-                         <i className="fa-solid fa-video"></i>
-                      </div>
-                      <span className="text-[10px] font-black text-white uppercase tracking-widest">Schedule PTM Meeting</span>
-                   </button>
-                </div>
-             </section>
+            <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+              <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Contact Faculty</h3>
+              <div className="space-y-4">
+                <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xs">
+                    <i className="fa-solid fa-message"></i>
+                  </div>
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Message Head Teacher</span>
+                </button>
+                <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-xs">
+                    <i className="fa-solid fa-video"></i>
+                  </div>
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest">Schedule PTM Meeting</span>
+                </button>
+              </div>
+            </section>
           </div>
         </div>
       </div>
@@ -737,8 +781,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     <div key={i} className={`h-20 border-l border-[#1f4e4a] p-1 relative ${isToday ? 'bg-[#4ea59d]/5' : ''}`}>
                       {hour === 10 && exams.length > 0 && (
                         <div className="absolute inset-x-1 top-1 bottom-1 bg-orange-500/20 border-l-4 border-orange-500 p-1 rounded overflow-hidden">
-                           <p className="text-[7px] font-black text-orange-500 uppercase leading-none">Exam</p>
-                           <p className="text-[9px] font-bold text-white truncate mt-1">{exams[0].subject}</p>
+                          <p className="text-[7px] font-black text-orange-500 uppercase leading-none">Exam</p>
+                          <p className="text-[9px] font-bold text-white truncate mt-1">{exams[0].subject}</p>
                         </div>
                       )}
                     </div>
@@ -805,8 +849,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-1 rounded-2xl border border-white/20">
               {(['day', 'week', 'month'] as const).map(v => (
-                <button 
-                  key={v} 
+                <button
+                  key={v}
                   onClick={() => setCalendarSubView(v)}
                   className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${calendarSubView === v ? 'bg-[#4ea59d] text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
                 >
@@ -830,29 +874,29 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 shadow-xl md:col-span-2">
-             <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
-               <i className="fa-solid fa-calendar-check text-[#4ea59d]"></i> Summary of Events
-             </h3>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {dynamicExams.map((ex, i) => (
-                  <div key={i} className="p-5 bg-[#0a1a19] rounded-3xl border border-white/20 group hover:border-orange-500/50 transition-all">
-                     <div className="flex justify-between items-start mb-3">
-                       <span className="text-[8px] font-black px-2 py-1 bg-orange-500/10 text-orange-500 rounded uppercase tracking-widest">Exam</span>
-                       <span className="text-[9px] font-black text-slate-300 uppercase">{ex.date}</span>
-                     </div>
-                     <h4 className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{ex.subject}</h4>
-                     <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 "><i className="fa-solid fa-clock mr-1"></i> {ex.time}</p>
+            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+              <i className="fa-solid fa-calendar-check text-[#4ea59d]"></i> Summary of Events
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {dynamicExams.map((ex, i) => (
+                <div key={i} className="p-5 bg-[#0a1a19] rounded-3xl border border-white/20 group hover:border-orange-500/50 transition-all">
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-[8px] font-black px-2 py-1 bg-orange-500/10 text-orange-500 rounded uppercase tracking-widest">Exam</span>
+                    <span className="text-[9px] font-black text-slate-300 uppercase">{ex.date}</span>
                   </div>
-                ))}
-             </div>
+                  <h4 className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{ex.subject}</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 "><i className="fa-solid fa-clock mr-1"></i> {ex.time}</p>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="bg-[#4ea59d]/5 border border-[#4ea59d]/20 p-8 rounded-[32px] flex flex-col items-center justify-center text-center space-y-4">
-             <div className="w-16 h-16 bg-[#4ea59d] rounded-full flex items-center justify-center text-white shadow-2xl shadow-[#4ea59d]/40">
-                <i className="fa-solid fa-plus text-2xl"></i>
-             </div>
-             <h4 className="text-lg font-black text-white uppercase tracking-tight">Sync Schedules</h4>
-             <p className="text-xs text-[#4ea59d] font-bold leading-relaxed">Connect your external calendar to auto-import course modules and assignment deadlines.</p>
-             <button className="w-full py-4 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Link Account</button>
+            <div className="w-16 h-16 bg-[#4ea59d] rounded-full flex items-center justify-center text-white shadow-2xl shadow-[#4ea59d]/40">
+              <i className="fa-solid fa-plus text-2xl"></i>
+            </div>
+            <h4 className="text-lg font-black text-white uppercase tracking-tight">Sync Schedules</h4>
+            <p className="text-xs text-[#4ea59d] font-bold leading-relaxed">Connect your external calendar to auto-import course modules and assignment deadlines.</p>
+            <button className="w-full py-4 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Link Account</button>
           </div>
         </section>
       </div>
@@ -865,7 +909,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
     try {
       const attendanceNum = parseFloat(studentAttendanceRate.replace('%', '')) || 0;
-      
+
       const parsedPercentages = examResultsData
         .map(g => g.percentage)
         .filter(p => p !== null && p !== undefined && p !== '')
@@ -884,124 +928,124 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       else if (academicScore >= 70) standingText = 'Satisfactory';
       else if (academicScore >= 60) standingText = 'Pass';
       else standingText = 'Needs Improvement';
-    } catch(e) {
+    } catch (e) {
       console.error('Error calculating academic standing', e);
     }
 
     return (
-    <div className="space-y-8 animate-fadeIn text-slate-100 pb-10">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-black text-white uppercase tracking-tight ">Dashboard Central</h2>
-          <p className="text-[#4ea59d]/60 text-[10px] font-black uppercase tracking-[0.4em]">Academic Overview</p>
-        </div>
-        <div className="flex items-center gap-4">
-           {lastSyncTime && (
+      <div className="space-y-8 animate-fadeIn text-slate-100 pb-10">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-black text-white uppercase tracking-tight ">Dashboard Central</h2>
+            <p className="text-[#4ea59d]/60 text-[10px] font-black uppercase tracking-[0.4em]">Academic Overview</p>
+          </div>
+          <div className="flex items-center gap-4">
+            {lastSyncTime && (
               <div className="hidden sm:flex flex-col items-end">
                 <span className="text-[8px] font-black uppercase text-[#4ea59d]">SMS System Linked</span>
                 <span className="text-[8px] text-slate-400">Last Sync: {lastSyncTime}</span>
               </div>
-           )}
-           
-        </div>
-      </header>
+            )}
 
-      {/* Metric Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-[#4ea59d] p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden md:col-span-2 group">
-          <div className="relative z-10">
-            <h3 className="text-[10px] font-black opacity-80 uppercase tracking-[0.2em] text-white">Academic Standing</h3>
-            <p className="text-5xl font-black my-4 text-white uppercase ">{standingText}</p>
-            <div className="mt-4 flex items-center gap-4">
-              <div className="h-2 flex-1 bg-[#0a1a19]/20 rounded-full overflow-hidden">
-                 <div className="h-full bg-[#0a1a19]" style={{ width: `${academicScore}%` }}></div>
-              </div>
-              <span className="text-sm font-bold text-white">{academicScore}%</span>
-            </div>
           </div>
-          <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#0a1a19]/10 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-700"></div>
-        </div>
-        
-        <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 flex flex-col justify-center">
-          <h3 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attendance</h3>
-          <p className="text-4xl font-black text-white my-2">{studentAttendanceRate}</p>
-          <div className="flex items-center gap-2 text-[#4ea59d]/60 text-[10px] font-bold">
-            <i className="fa-solid fa-arrow-up"></i>
-            <span>2% Improvement</span>
-          </div>
-        </div>
-      </div>
+        </header>
 
-      <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-2xl relative overflow-hidden">
-        <div className="flex items-center justify-between mb-8 relative z-10">
-          <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-4">
-            <div className="w-10 h-10 rounded-2xl bg-[#4ea59d]/10 flex items-center justify-center">
-              <i className="fa-solid fa-bell text-[#4ea59d] animate-swing"></i>
-            </div>
-            Recent Notifications
-          </h3>
-          <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#4ea59d] transition-colors">
-            Mark all as read
-          </button>
-        </div>
-        
-        <div className="space-y-4 relative z-10">
-          {[
-            ...dynamicExams.slice(0, 1).map(ex => ({
-              id: `ex-${ex.id}`,
-              title: 'Exam Assigned',
-              desc: `${ex.subject} exam on ${ex.date}.`,
-              time: 'Recent',
-              icon: 'fa-calendar-check',
-              color: 'text-orange-500',
-              bg: 'bg-orange-500/10'
-            })),
-            ...examResultsData.slice(0, 1).map(res => ({
-              id: `res-${res.courseName}`,
-              title: 'Grade Released',
-              desc: `Your grade for ${res.courseName} is ${res.grade}.`,
-              time: 'New',
-              icon: 'fa-file-invoice',
-              color: 'text-blue-500',
-              bg: 'bg-blue-500/10'
-            })),
-            ...dynamicAssignments.slice(0, 1).map(ass => ({
-              id: `ass-${ass.id}`,
-              title: 'Homework Assigned',
-              desc: `${ass.title} due ${ass.dueDate}.`,
-              time: 'Pending',
-              icon: 'fa-tasks',
-              color: 'text-purple-500',
-              bg: 'bg-purple-500/10'
-            })),
-          ].map((notif) => (
-            <div key={notif.id} className="p-5 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-6 hover:border-[#4ea59d] transition-all cursor-pointer group">
-              <div className={`w-12 h-12 rounded-2xl ${notif.bg} ${notif.color} flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform`}>
-                <i className={`fa-solid ${notif.icon}`}></i>
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-start">
-                  <h4 className="text-sm font-bold text-white mb-1">{notif.title}</h4>
-                  <span className="text-[9px] font-black text-slate-300 uppercase">{notif.time}</span>
+        {/* Metric Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-[#4ea59d] p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden md:col-span-2 group">
+            <div className="relative z-10">
+              <h3 className="text-[10px] font-black opacity-80 uppercase tracking-[0.2em] text-white">Academic Standing</h3>
+              <p className="text-5xl font-black my-4 text-white uppercase ">{standingText}</p>
+              <div className="mt-4 flex items-center gap-4">
+                <div className="h-2 flex-1 bg-[#0a1a19]/20 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#0a1a19]" style={{ width: `${academicScore}%` }}></div>
                 </div>
-                <p className="text-xs text-slate-400 font-medium">{notif.desc}</p>
+                <span className="text-sm font-bold text-white">{academicScore}%</span>
               </div>
-              <div className="w-2 h-2 rounded-full bg-[#4ea59d] opacity-0 group-hover:opacity-100 transition-opacity"></div>
             </div>
-          ))}
-          {dynamicExams.length === 0 && examResultsData.length === 0 && dynamicAssignments.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-10">No recent notifications.</p>
-          )}
-        </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[#4ea59d]/5 blur-[100px] pointer-events-none"></div>
-      </section>
+            <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#0a1a19]/10 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-700"></div>
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Recent Grades</h3>
-          <div className="space-y-4">
-             {(examResultsData.length > 0 ? examResultsData : DETAILED_GRADES).slice(0, 3).map((item, i) => (
-               <div key={i} className="flex items-center justify-between p-6 bg-[#0a1a19] rounded-[32px] border border-white/20">
+          <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 flex flex-col justify-center">
+            <h3 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attendance</h3>
+            <p className="text-4xl font-black text-white my-2">{studentAttendanceRate}</p>
+            <div className="flex items-center gap-2 text-[#4ea59d]/60 text-[10px] font-bold">
+              <i className="fa-solid fa-arrow-up"></i>
+              <span>2% Improvement</span>
+            </div>
+          </div>
+        </div>
+
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-2xl relative overflow-hidden">
+          <div className="flex items-center justify-between mb-8 relative z-10">
+            <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-4">
+              <div className="w-10 h-10 rounded-2xl bg-[#4ea59d]/10 flex items-center justify-center">
+                <i className="fa-solid fa-bell text-[#4ea59d] animate-swing"></i>
+              </div>
+              Recent Notifications
+            </h3>
+            <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#4ea59d] transition-colors">
+              Mark all as read
+            </button>
+          </div>
+
+          <div className="space-y-4 relative z-10">
+            {[
+              ...dynamicExams.slice(0, 1).map(ex => ({
+                id: `ex-${ex.id}`,
+                title: 'Exam Assigned',
+                desc: `${ex.subject} exam on ${ex.date}.`,
+                time: 'Recent',
+                icon: 'fa-calendar-check',
+                color: 'text-orange-500',
+                bg: 'bg-orange-500/10'
+              })),
+              ...examResultsData.slice(0, 1).map(res => ({
+                id: `res-${res.courseName}`,
+                title: 'Grade Released',
+                desc: `Your grade for ${res.courseName} is ${res.grade}.`,
+                time: 'New',
+                icon: 'fa-file-invoice',
+                color: 'text-blue-500',
+                bg: 'bg-blue-500/10'
+              })),
+              ...dynamicAssignments.slice(0, 1).map(ass => ({
+                id: `ass-${ass.id}`,
+                title: 'Homework Assigned',
+                desc: `${ass.title} due ${ass.dueDate}.`,
+                time: 'Pending',
+                icon: 'fa-tasks',
+                color: 'text-purple-500',
+                bg: 'bg-purple-500/10'
+              })),
+            ].map((notif) => (
+              <div key={notif.id} className="p-5 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-6 hover:border-[#4ea59d] transition-all cursor-pointer group">
+                <div className={`w-12 h-12 rounded-2xl ${notif.bg} ${notif.color} flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform`}>
+                  <i className={`fa-solid ${notif.icon}`}></i>
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start">
+                    <h4 className="text-sm font-bold text-white mb-1">{notif.title}</h4>
+                    <span className="text-[9px] font-black text-slate-300 uppercase">{notif.time}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-medium">{notif.desc}</p>
+                </div>
+                <div className="w-2 h-2 rounded-full bg-[#4ea59d] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              </div>
+            ))}
+            {dynamicExams.length === 0 && examResultsData.length === 0 && dynamicAssignments.length === 0 && (
+              <p className="text-sm text-slate-400 text-center py-10">No recent notifications.</p>
+            )}
+          </div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#4ea59d]/5 blur-[100px] pointer-events-none"></div>
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Recent Grades</h3>
+            <div className="space-y-4">
+              {(examResultsData.length > 0 ? examResultsData : DETAILED_GRADES).slice(0, 3).map((item, i) => (
+                <div key={i} className="flex items-center justify-between p-6 bg-[#0a1a19] rounded-[32px] border border-white/20">
                   <div>
                     <h4 className="text-sm font-bold text-white">{item.courseName || item.assignment}</h4>
                     <p className="text-[9px] font-black text-slate-300 uppercase mt-1">Academic Session 2025</p>
@@ -1010,13 +1054,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     <p className="text-2xl font-black text-[#4ea59d]">{item.grade}</p>
                     {item.percentage && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.percentage}%</p>}
                   </div>
-               </div>
-             ))}
-          </div>
-        </section>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
-    </div>
-  );
+    );
   };
 
   const renderNoticeBoard = () => (
@@ -1027,7 +1071,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <p className="text-[#4ea59d]/60 text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] sm:tracking-[0.35em]">School Broadcasts</p>
         </div>
         <button
-          onClick={performSmsSync}
+          onClick={() => performSmsSync(false)}
           className="w-full md:w-auto px-4 sm:px-6 py-2.5 bg-[#1f4e4a] border border-[#4ea59d]/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] transition-all flex items-center justify-center gap-2"
         >
           <i className={`fa-solid fa-rotate ${isLoading ? 'animate-spin' : ''}`}></i> Refresh Notices
@@ -1050,15 +1094,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <div className="h-full flex flex-col">
                 <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
                   <span className="text-[11px] sm:text-sm font-black text-slate-400 uppercase tracking-wider">{item.date}</span>
-                  <span className={`text-[10px] sm:text-xs font-black px-2.5 sm:px-3 py-1 rounded-xl uppercase tracking-wider ${
-                    item.priority === 'Urgent'
+                  <span className={`text-[10px] sm:text-xs font-black px-2.5 sm:px-3 py-1 rounded-xl uppercase tracking-wider ${item.priority === 'Urgent'
                       ? 'bg-rose-500/15 text-rose-300'
                       : item.priority === 'High'
                         ? 'bg-red-500/10 text-red-400'
                         : item.priority === 'Low'
                           ? 'bg-blue-500/10 text-blue-400'
                           : 'bg-orange-500/10 text-orange-400'
-                  }`}>
+                    }`}>
                     {item.priority}
                   </span>
                 </div>
@@ -1109,15 +1152,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-            <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider ${
-              selectedNotice.priority === 'Urgent'
+            <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider ${selectedNotice.priority === 'Urgent'
                 ? 'bg-rose-500/15 text-rose-300'
                 : selectedNotice.priority === 'High'
                   ? 'bg-red-500/10 text-red-400'
                   : selectedNotice.priority === 'Low'
                     ? 'bg-blue-500/10 text-blue-400'
                     : 'bg-orange-500/10 text-orange-400'
-            }`}>
+              }`}>
               {selectedNotice.priority}
             </span>
             <span className="text-xs font-black text-slate-400 uppercase">{selectedNotice.date}</span>
@@ -1205,20 +1247,20 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         </div>
 
         <section className="space-y-8">
-           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Upcoming Events</h3>
-           <div className="space-y-6">
-              {SCHOOL_EVENTS.map(ev => (
-                <div key={ev.id} className="relative h-48 rounded-[32px] overflow-hidden group cursor-pointer shadow-xl">
-                   <img src={ev.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                   <div className="absolute bottom-6 left-6">
-                      <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-1">{ev.type}</p>
-                      <h4 className="text-sm font-bold text-white uppercase">{ev.name}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 "><i className="fa-solid fa-calendar mr-2"></i> {ev.date}</p>
-                   </div>
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Upcoming Events</h3>
+          <div className="space-y-6">
+            {SCHOOL_EVENTS.map(ev => (
+              <div key={ev.id} className="relative h-48 rounded-[32px] overflow-hidden group cursor-pointer shadow-xl">
+                <img src={ev.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                <div className="absolute bottom-6 left-6">
+                  <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-1">{ev.type}</p>
+                  <h4 className="text-sm font-bold text-white uppercase">{ev.name}</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 "><i className="fa-solid fa-calendar mr-2"></i> {ev.date}</p>
                 </div>
-              ))}
-           </div>
+              </div>
+            ))}
+          </div>
         </section>
       </div>
     </div>
@@ -1256,7 +1298,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       </div>
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ">{ass.dueDate}</span>
                     </div>
-                    
+
                     <h4 className="text-xl font-black text-white mb-2 group-hover:text-[#4ea59d] transition-colors line-clamp-2">{ass.title}</h4>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{ass.course || 'Core Curriculum'}</p>
                     {ass.description && (
@@ -1270,7 +1312,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between gap-4">
                       {ass.status === 'Active' || ass.status === 'Submitted' ? (
                         <div className="flex-1 px-6 py-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center">
@@ -1287,7 +1329,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       <div className="flex gap-2">
                         {/* Standardized Download Buttons */}
                         {ass.submissionUrl ? (
-                          <button 
+                          <button
                             onClick={() => window.open(ass.submissionUrl, '_blank')}
                             className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
                             title="View Submission"
@@ -1295,7 +1337,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                             <i className="fa-solid fa-cloud-arrow-down shadow-sm"></i>
                           </button>
                         ) : ass.fileUrl ? (
-                          <button 
+                          <button
                             onClick={() => window.open(ass.fileUrl, '_blank')}
                             className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
                             title="Download Instructions"
@@ -1328,103 +1370,103 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
         <div className="xl:col-span-2 space-y-12">
-           <section>
-              <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
-                <i className="fa-solid fa-clipboard-list text-[#4ea59d]"></i> Pending Assignments
-              </h3>
-              <div className="space-y-4">
-                 {dynamicAssignments.map(ass => (
-                   <div key={ass.id} className="p-6 md:p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 flex flex-col sm:flex-row justify-between items-center gap-6 group scale-[0.98] sm:scale-100 origin-center">
-                      <div className="flex-1">
-                         <div className="flex items-center gap-3 mb-2">
-                           <h4 className="text-lg font-bold text-white">{ass.title}</h4>
-                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${ass.status === 'Active' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
-                             {ass.status}
-                           </span>
-                         </div>
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{ass.course} • Due {ass.dueDate}</p>
+          <section>
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+              <i className="fa-solid fa-clipboard-list text-[#4ea59d]"></i> Pending Assignments
+            </h3>
+            <div className="space-y-4">
+              {dynamicAssignments.map(ass => (
+                <div key={ass.id} className="p-6 md:p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 flex flex-col sm:flex-row justify-between items-center gap-6 group scale-[0.98] sm:scale-100 origin-center">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h4 className="text-lg font-bold text-white">{ass.title}</h4>
+                      <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase ${ass.status === 'Active' ? 'bg-green-500/10 text-green-500' : 'bg-orange-500/10 text-orange-500'}`}>
+                        {ass.status}
+                      </span>
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{ass.course} • Due {ass.dueDate}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {ass.status === 'Active' || ass.status === 'Submitted' ? (
+                      <div className="px-6 py-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center flex items-center gap-2">
+                        <i className="fa-solid fa-check"></i> Submitted
                       </div>
-                      <div className="flex items-center gap-3">
-                         {ass.status === 'Active' || ass.status === 'Submitted' ? (
-                           <div className="px-6 py-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center flex items-center gap-2">
-                             <i className="fa-solid fa-check"></i> Submitted
-                           </div>
-                         ) : (
-                           <button 
-                            onClick={() => {
-                              setSelectedAssignment(ass);
-                              setIsSubmissionModalOpen(true);
-                            }}
-                            className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
-                           >
-                            Submit Task
-                           </button>
-                         )}
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setSelectedAssignment(ass);
+                          setIsSubmissionModalOpen(true);
+                        }}
+                        className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        Submit Task
+                      </button>
+                    )}
 
-                         {/* Standardized Download Buttons */}
-                        {ass.submissionUrl ? (
-                          <button 
-                             onClick={() => window.open(ass.submissionUrl, '_blank')}
-                             className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
-                             title="View Submission"
-                          >
-                             <i className="fa-solid fa-cloud-arrow-down shadow-sm"></i>
-                          </button>
-                        ) : ass.fileUrl ? (
-                          <button 
-                             onClick={() => window.open(ass.fileUrl, '_blank')}
-                             className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
-                             title="Download Instructions"
-                          >
-                             <i className="fa-solid fa-download"></i>
-                          </button>
-                        ) : null}
-                      </div>
-                   </div>
-                 ))}
-              </div>
-           </section>
+                    {/* Standardized Download Buttons */}
+                    {ass.submissionUrl ? (
+                      <button
+                        onClick={() => window.open(ass.submissionUrl, '_blank')}
+                        className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
+                        title="View Submission"
+                      >
+                        <i className="fa-solid fa-cloud-arrow-down shadow-sm"></i>
+                      </button>
+                    ) : ass.fileUrl ? (
+                      <button
+                        onClick={() => window.open(ass.fileUrl, '_blank')}
+                        className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
+                        title="Download Instructions"
+                      >
+                        <i className="fa-solid fa-download"></i>
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
-           <section>
-              <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Grades & AI Feedback</h3>
-              <div className="overflow-hidden rounded-[32px] border border-white/20 shadow-2xl">
-                 <table className="w-full text-left bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
-                    <thead className="bg-[#0a1a19]">
-                       <tr>
-                          <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Assessment</th>
-                          <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Mark</th>
-                          <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Faculty Insight</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1f4e4a]">
-                       {DETAILED_GRADES.map((g, i) => (
-                          <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
-                             <td className="px-8 py-6 font-bold text-sm text-white">{g.assignment}</td>
-                             <td className="px-8 py-6 text-xl font-black text-[#4ea59d]">{g.grade}</td>
-                             <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">{g.feedback}</td>
-                          </tr>
-                       ))}
-                    </tbody>
-                 </table>
-              </div>
-           </section>
+          <section>
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Grades & Feedback</h3>
+            <div className="overflow-hidden rounded-[32px] border border-white/20 shadow-2xl">
+              <table className="w-full text-left bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+                <thead className="bg-[#0a1a19]">
+                  <tr>
+                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Assessment</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Mark</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Faculty Insight</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1f4e4a]">
+                  {DETAILED_GRADES.map((g, i) => (
+                    <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
+                      <td className="px-8 py-6 font-bold text-sm text-white">{g.assignment}</td>
+                      <td className="px-8 py-6 text-xl font-black text-[#4ea59d]">{g.grade}</td>
+                      <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">{g.feedback}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
 
         <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl h-fit sticky top-10">
-           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Exam Schedule</h3>
-           <div className="space-y-6">
-              {dynamicExams.map((ex, i) => (
-                <div key={i} className="relative pl-6 border-l-2 border-[#1f4e4a] group">
-                   <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-[#4ea59d] shadow-[0_0_10px_#4ea59d] group-hover:scale-150 transition-transform"></div>
-                   <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">{ex.date} @ {ex.time}</p>
-                   <h4 className="text-sm font-bold text-white my-1">{ex.subject}</h4>
-                   <p className="text-[10px] text-slate-400 font-bold uppercase"><i className="fa-solid fa-location-dot mr-2"></i> {ex.venue}</p>
-                </div>
-              ))}
-           </div>
-           <button className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center justify-center gap-2">
-              <i className="fa-solid fa-cloud-arrow-down"></i> Download Full Schedule
-           </button>
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Exam Schedule</h3>
+          <div className="space-y-6">
+            {dynamicExams.map((ex, i) => (
+              <div key={i} className="relative pl-6 border-l-2 border-[#1f4e4a] group">
+                <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-[#4ea59d] shadow-[0_0_10px_#4ea59d] group-hover:scale-150 transition-transform"></div>
+                <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">{ex.date} @ {ex.time}</p>
+                <h4 className="text-sm font-bold text-white my-1">{ex.subject}</h4>
+                <p className="text-[10px] text-slate-400 font-bold uppercase"><i className="fa-solid fa-location-dot mr-2"></i> {ex.venue}</p>
+              </div>
+            ))}
+          </div>
+          <button className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center justify-center gap-2">
+            <i className="fa-solid fa-cloud-arrow-down"></i> Download Full Schedule
+          </button>
         </section>
       </div>
     </div>
@@ -1458,50 +1500,90 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Exam Results</h3>
           <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-             {examResultsData.map((ex, i) => (
-               <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center">
-                  <div>
-                    <h4 className="text-sm font-bold text-white">{ex.courseName}</h4>
-                    <p className="text-[9px] font-black text-slate-400 uppercase">{ex.className}</p>
-                  </div>
+            {examResultsData.map((ex, i) => (
+              <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center">
+                <div>
+                  <h4 className="text-sm font-bold text-white">{ex.courseName}</h4>
+                  <p className="text-[9px] font-black text-slate-400 uppercase">{ex.className}</p>
+                </div>
                 <div className="text-right">
                   <span className={`text-lg font-black block ${ex.grade === 'Pending' ? 'text-orange-500' : 'text-[#4ea59d]'}`}>{ex.grade}</span>
                   {ex.percentage && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ex.percentage}%</span>}
                 </div>
-               </div>
-             ))}
-             {examResultsData.length === 0 && (
-                <p className="text-sm text-slate-400">No exam results available.</p>
-             )}
+              </div>
+            ))}
+            {examResultsData.length === 0 && (
+              <p className="text-sm text-slate-400">No exam results available.</p>
+            )}
           </div>
         </section>
 
         <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Assignment Results</h3>
           <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-             {DETAILED_GRADES.map((g, i) => (
-               <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center">
-                  <h4 className="text-sm font-bold text-white">{g.assignment}</h4>
-                  <span className="text-lg font-black text-[#4ea59d]">{g.grade}</span>
-               </div>
-             ))}
+            {DETAILED_GRADES.map((g, i) => (
+              <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center">
+                <h4 className="text-sm font-bold text-white">{g.assignment}</h4>
+                <span className="text-lg font-black text-[#4ea59d]">{g.grade}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="lg:col-span-2 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
+          <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+            <i className="fa-solid fa-file-pdf text-[#4ea59d]"></i> Official Report Cards
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {dynamicReportCards.length === 0 ? (
+              <div className="md:col-span-2 p-10 bg-[#0a1a19] rounded-[32px] border border-dashed border-[#1f4e4a] text-center">
+                <p className="text-sm text-slate-400">No official report cards available for download.</p>
+              </div>
+            ) : (
+              dynamicReportCards.map((rc) => (
+                <div key={rc.id} className="p-8 bg-[#0a1a19] rounded-[32px] border border-white/20 group hover:border-[#4ea59d] transition-all flex flex-col justify-between">
+                  <div className="flex items-start justify-between gap-4 mb-6">
+                    <div className="w-12 h-12 bg-[#4ea59d]/10 rounded-2xl flex items-center justify-center text-[#4ea59d] shrink-0">
+                      <i className="fa-solid fa-file-invoice text-2xl"></i>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-lg font-bold text-white truncate" title={rc.title || 'Official Report Card'}>{rc.title || 'Official Report Card'}</h4>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Released on {rc.reportDate}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[10px] font-black text-[#4ea59d]/60 uppercase tracking-widest bg-[#4ea59d]/5 px-3 py-1 rounded-lg">
+                      {rc.reportType}
+                    </span>
+                    {rc.fileUrl && (
+                      <button
+                        onClick={() => window.open(rc.fileUrl, '_blank')}
+                        className="px-6 py-3 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#3d8c85] transition-all shadow-lg shadow-[#4ea59d]/20 flex items-center gap-2"
+                      >
+                        <i className="fa-solid fa-cloud-arrow-down"></i> Download
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
         <section className="lg:col-span-2 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Achievements & Badges</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-             {STUDENT_ACHIEVEMENTS.map(ach => (
-               <div key={ach.id} className="p-8 bg-[#0a1a19] rounded-[40px] border border-white/20 text-center space-y-4 group hover:bg-[#4ea59d]/5 transition-all">
-                  <div className={`w-20 h-20 mx-auto rounded-[28px] bg-[#0a1a19]/5 flex items-center justify-center text-4xl ${ach.color} group-hover:scale-110 transition-transform`}>
-                     <i className={`fa-solid ${ach.icon}`}></i>
-                  </div>
-                  <div>
-                    <h4 className="text-base font-black text-white uppercase">{ach.title}</h4>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{ach.desc}</p>
-                  </div>
-               </div>
-             ))}
+            {STUDENT_ACHIEVEMENTS.map(ach => (
+              <div key={ach.id} className="p-8 bg-[#0a1a19] rounded-[40px] border border-white/20 text-center space-y-4 group hover:bg-[#4ea59d]/5 transition-all">
+                <div className={`w-20 h-20 mx-auto rounded-[28px] bg-[#0a1a19]/5 flex items-center justify-center text-4xl ${ach.color} group-hover:scale-110 transition-transform`}>
+                  <i className={`fa-solid ${ach.icon}`}></i>
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-white uppercase">{ach.title}</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{ach.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       </div>
@@ -1521,64 +1603,64 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         <div className="xl:col-span-2 space-y-12">
           <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
             <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
-               <i className="fa-solid fa-hashtag text-[#4ea59d]"></i> School Hive
+              <i className="fa-solid fa-hashtag text-[#4ea59d]"></i> School Hive
             </h3>
             <div className="space-y-6">
-               {SCHOOL_HIVE_POSTS.map(post => (
-                 <div key={post.id} className="p-8 bg-[#0a1a19] rounded-[32px] border border-white/20">
-                    <div className="flex justify-between items-start mb-4">
-                       <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-full bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d]">
-                             <i className="fa-solid fa-user"></i>
-                          </div>
-                          <div>
-                             <h4 className="text-sm font-bold text-white">{post.user}</h4>
-                             <p className="text-[9px] text-slate-300 font-black uppercase">{post.time}</p>
-                          </div>
-                       </div>
-                       <button className="text-slate-300 hover:text-white"><i className="fa-solid fa-ellipsis"></i></button>
+              {SCHOOL_HIVE_POSTS.map(post => (
+                <div key={post.id} className="p-8 bg-[#0a1a19] rounded-[32px] border border-white/20">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d]">
+                        <i className="fa-solid fa-user"></i>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white">{post.user}</h4>
+                        <p className="text-[9px] text-slate-300 font-black uppercase">{post.time}</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-slate-300 leading-relaxed mb-6">{post.content}</p>
-                    <div className="flex gap-6 border-t border-[#1f4e4a] pt-4">
-                       <button className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest flex items-center gap-2 hover:opacity-80">
-                          <i className="fa-solid fa-heart"></i> {post.likes}
-                       </button>
-                       <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-white">
-                          <i className="fa-solid fa-comment"></i> {post.replies}
-                       </button>
-                    </div>
-                 </div>
-               ))}
+                    <button className="text-slate-300 hover:text-white"><i className="fa-solid fa-ellipsis"></i></button>
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed mb-6">{post.content}</p>
+                  <div className="flex gap-6 border-t border-[#1f4e4a] pt-4">
+                    <button className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest flex items-center gap-2 hover:opacity-80">
+                      <i className="fa-solid fa-heart"></i> {post.likes}
+                    </button>
+                    <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-white">
+                      <i className="fa-solid fa-comment"></i> {post.replies}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         </div>
 
         <div className="space-y-8">
           <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-             <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Direct Phone</h3>
-             <div className="space-y-4">
-                {SCHOOL_CONTACTS.phone.map((ph, i) => (
-                  <div key={i} className="p-5 bg-[#0a1a19] rounded-2xl border border-white/20">
-                     <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">{ph.label}</p>
-                     <p className="text-base font-bold text-white">{ph.number}</p>
-                     <p className="text-[8px] text-slate-300 uppercase font-black">{ph.hours}</p>
-                  </div>
-                ))}
-             </div>
+            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Direct Phone</h3>
+            <div className="space-y-4">
+              {SCHOOL_CONTACTS.phone.map((ph, i) => (
+                <div key={i} className="p-5 bg-[#0a1a19] rounded-2xl border border-white/20">
+                  <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">{ph.label}</p>
+                  <p className="text-base font-bold text-white">{ph.number}</p>
+                  <p className="text-[8px] text-slate-300 uppercase font-black">{ph.hours}</p>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-             <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Social Media</h3>
-             <div className="grid grid-cols-2 gap-4">
-                {SCHOOL_CONTACTS.socials.map((soc, i) => (
-                  <a key={i} href={soc.link} className="p-4 bg-[#0a1a19] rounded-2xl border border-white/20 flex flex-col items-center gap-2 group transition-all hover:border-[#4ea59d]">
-                     <div className="text-xl" style={{ color: soc.color }}>
-                        <i className={`fa-brands ${soc.icon}`}></i>
-                     </div>
-                     <span className="text-[9px] font-black text-slate-400 group-hover:text-white uppercase">{soc.brand}</span>
-                  </a>
-                ))}
-             </div>
+            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Social Media</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {SCHOOL_CONTACTS.socials.map((soc, i) => (
+                <a key={i} href={soc.link} className="p-4 bg-[#0a1a19] rounded-2xl border border-white/20 flex flex-col items-center gap-2 group transition-all hover:border-[#4ea59d]">
+                  <div className="text-xl" style={{ color: soc.color }}>
+                    <i className={`fa-brands ${soc.icon}`}></i>
+                  </div>
+                  <span className="text-[9px] font-black text-slate-400 group-hover:text-white uppercase">{soc.brand}</span>
+                </a>
+              ))}
+            </div>
           </section>
         </div>
       </div>
@@ -1614,86 +1696,86 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
           <div className="xl:col-span-2 space-y-12">
             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
-               <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-4">
-                 <i className="fa-solid fa-compass text-[#4ea59d]"></i> Module Introduction
-               </h3>
-               <p className="text-slate-200 text-lg leading-relaxed ">{selectedCourse.moduleIntro}</p>
-               <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedCourse.topics.map((t, i) => (
-                    <div key={i} className="flex items-center gap-4 p-4 bg-[#0a1a19] rounded-2xl border border-white/20">
-                       <div className="w-8 h-8 rounded-full bg-[#4ea59d]/10 text-[#4ea59d] flex items-center justify-center text-xs font-black">
-                          {i + 1}
-                       </div>
-                       <span className="text-sm font-bold text-white">{t}</span>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-4">
+                <i className="fa-solid fa-compass text-[#4ea59d]"></i> Module Introduction
+              </h3>
+              <p className="text-slate-200 text-lg leading-relaxed ">{selectedCourse.moduleIntro}</p>
+              <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {selectedCourse.topics.map((t, i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 bg-[#0a1a19] rounded-2xl border border-white/20">
+                    <div className="w-8 h-8 rounded-full bg-[#4ea59d]/10 text-[#4ea59d] flex items-center justify-center text-xs font-black">
+                      {i + 1}
                     </div>
-                  ))}
-               </div>
+                    <span className="text-sm font-bold text-white">{t}</span>
+                  </div>
+                ))}
+              </div>
             </section>
 
             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
-               <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
-                 <i className="fa-solid fa-book-open text-[#4ea59d]"></i> Learning Resources
-               </h3>
-               <div className="space-y-8">
-                 {selectedCourse.notes.map(note => (
-                   <div key={note.id} className="p-8 bg-[#0a1a19] rounded-[40px] border border-white/20 space-y-6">
-                      <div className="flex justify-between items-start flex-col sm:flex-row gap-4">
-                        <h4 className="text-xl font-black text-white">{note.title}</h4>
-                        {note.ebookUrl && (
-                          <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center gap-2">
-                             <i className="fa-solid fa-download"></i> Download Ebook
-                          </a>
-                        )}
-                      </div>
-                      <p className="text-base text-slate-300 leading-relaxed">{note.content}</p>
-                      <div className="flex flex-wrap gap-4 pt-4 border-t border-[#1f4e4a]">
-                        <button onClick={() => handleSummarize(note)} className="px-6 py-3 bg-[#4ea59d]/10 border border-white/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all">
-                          AI Summary
-                        </button>
-                        <button onClick={() => handleGenerateQuiz(note)} className="px-6 py-3 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all">
-                          Generate Quiz
-                        </button>
-                      </div>
-                      {note.summary && (
-                        <div className="mt-8 p-8 bg-[#4ea59d]/5 border-l-8 border-[#4ea59d] rounded-r-[32px] animate-slideIn">
-                           <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em] mb-4 ">AI Intelligent Summary</p>
-                           <p className="text-base text-slate-400 leading-relaxed">{note.summary}</p>
-                        </div>
+              <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
+                <i className="fa-solid fa-book-open text-[#4ea59d]"></i> Learning Resources
+              </h3>
+              <div className="space-y-8">
+                {selectedCourse.notes.map(note => (
+                  <div key={note.id} className="p-8 bg-[#0a1a19] rounded-[40px] border border-white/20 space-y-6">
+                    <div className="flex justify-between items-start flex-col sm:flex-row gap-4">
+                      <h4 className="text-xl font-black text-white">{note.title}</h4>
+                      {note.ebookUrl && (
+                        <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center gap-2">
+                          <i className="fa-solid fa-download"></i> Download Ebook
+                        </a>
                       )}
-                   </div>
-                 ))}
-                 {selectedCourse.notes.length === 0 && (
-                   <div className="p-12 text-center bg-[#0a1a19] rounded-[40px] border border-dashed border-[#1f4e4a] text-slate-300 font-black uppercase tracking-widest ">
-                     No notes uploaded yet.
-                   </div>
-                 )}
-               </div>
+                    </div>
+                    <p className="text-base text-slate-300 leading-relaxed">{note.content}</p>
+                    <div className="flex flex-wrap gap-4 pt-4 border-t border-[#1f4e4a]">
+                      <button onClick={() => handleSummarize(note)} className="px-6 py-3 bg-[#4ea59d]/10 border border-white/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all">
+                        AI Summary
+                      </button>
+                      <button onClick={() => handleGenerateQuiz(note)} className="px-6 py-3 bg-orange-500/10 border border-orange-500/30 text-orange-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 hover:text-white transition-all">
+                        Generate Quiz
+                      </button>
+                    </div>
+                    {note.summary && (
+                      <div className="mt-8 p-8 bg-[#4ea59d]/5 border-l-8 border-[#4ea59d] rounded-r-[32px] animate-slideIn">
+                        <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em] mb-4 ">AI Intelligent Summary</p>
+                        <p className="text-base text-slate-400 leading-relaxed">{note.summary}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {selectedCourse.notes.length === 0 && (
+                  <div className="p-12 text-center bg-[#0a1a19] rounded-[40px] border border-dashed border-[#1f4e4a] text-slate-300 font-black uppercase tracking-widest ">
+                    No notes uploaded yet.
+                  </div>
+                )}
+              </div>
             </section>
           </div>
 
           <div className="space-y-8">
             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-               <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Faculty Details</h3>
-               <div className="space-y-6">
-                  <div className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-4">
-                     <div className="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl shrink-0">
-                        <i className="fa-solid fa-user-tie"></i>
-                     </div>
-                     <div>
-                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Faculty Lead</p>
-                        <p className="text-base font-bold text-white">{selectedCourse.subTeacherName || "Lead Professor"}</p>
-                     </div>
+              <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Faculty Details</h3>
+              <div className="space-y-6">
+                <div className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xl shrink-0">
+                    <i className="fa-solid fa-user-tie"></i>
                   </div>
-                  <div className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-4">
-                     <div className="w-14 h-14 rounded-2xl bg-[#4ea59d]/10 text-[#4ea59d] flex items-center justify-center text-xl shrink-0">
-                        <i className="fa-solid fa-clock"></i>
-                     </div>
-                     <div>
-                        <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Class Timetable</p>
-                        <p className="text-sm font-bold text-white leading-snug">{selectedCourse.scheduleDescription}</p>
-                     </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Faculty Lead</p>
+                    <p className="text-base font-bold text-white">{selectedCourse.subTeacherName || "Lead Professor"}</p>
                   </div>
-               </div>
+                </div>
+                <div className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-[#4ea59d]/10 text-[#4ea59d] flex items-center justify-center text-xl shrink-0">
+                    <i className="fa-solid fa-clock"></i>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Class Timetable</p>
+                    <p className="text-sm font-bold text-white leading-snug">{selectedCourse.scheduleDescription}</p>
+                  </div>
+                </div>
+              </div>
             </section>
           </div>
         </div>
@@ -1745,9 +1827,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         </button>
       </header>
 
-      <Sidebar 
-        currentView={currentView} 
-        onViewChange={setCurrentView} 
+      <Sidebar
+        currentView={currentView}
+        onViewChange={setCurrentView}
         onLogout={handleLogout}
         userRole={user.role}
         userEmail={user.email}
@@ -1775,38 +1857,38 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         {currentView === 'contact' && renderContact()}
         {currentView === 'timetable' && <LiveCalendar schoolId={schoolId} />}
         {currentView === 'profile' && (
-           <div className="space-y-8 animate-fadeIn text-slate-100">
-             <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">User Profile</h2>
-             <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-white/20 max-w-2xl shadow-2xl relative overflow-hidden">
-                 <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-center relative z-10">
-                     <img src={user.avatar} className="w-32 h-32 md:w-40 md:h-40 rounded-[24px] md:rounded-[40px] border-4 border-[#4ea59d] p-1 shadow-2xl object-cover" />
-                     <div className="flex-1 space-y-4 text-center sm:text-left">
-                         <div>
-                             <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">Full Name</p>
-                             <h3 className="text-2xl md:text-3xl font-black text-white">{user.name}</h3>
-                         </div>
-                         <div className="grid grid-cols-1 gap-4 pt-4 border-t border-[#1f4e4a]">
-                             <div>
-                                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Email Address</p>
-                                 <p className="text-xs font-bold text-slate-200">{user.email}</p>
-                             </div>
-                             <div>
-                                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Student ID</p>
-                                 <p className="text-xs font-mono font-bold text-[#4ea59d]">{user.studentId || user.childId || 'N/A'}</p>
-                             </div>
-                         </div>
-                     </div>
-                 </div>
-             </div>
-           </div>
+          <div className="space-y-8 animate-fadeIn text-slate-100">
+            <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">User Profile</h2>
+            <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-white/20 max-w-2xl shadow-2xl relative overflow-hidden">
+              <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-center relative z-10">
+                <img src={user.avatar} className="w-32 h-32 md:w-40 md:h-40 rounded-[24px] md:rounded-[40px] border-4 border-[#4ea59d] p-1 shadow-2xl object-cover" />
+                <div className="flex-1 space-y-4 text-center sm:text-left">
+                  <div>
+                    <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">Full Name</p>
+                    <h3 className="text-2xl md:text-3xl font-black text-white">{user.name}</h3>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 pt-4 border-t border-[#1f4e4a]">
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Email Address</p>
+                      <p className="text-xs font-bold text-slate-200">{user.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Student ID</p>
+                      <p className="text-xs font-mono font-bold text-[#4ea59d]">{user.studentId || user.childId || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </main>
-      
+
       {isLoading && (
         <div className="fixed inset-0 bg-[#0a1a19]/80 backdrop-blur-md flex items-center justify-center z-[200] animate-fadeIn">
           <div className="flex flex-col items-center">
             <div className="w-20 h-20 border-4 border-[#4ea59d]/20 border-t-[#4ea59d] rounded-full animate-spin mb-6"></div>
-            
+
             <p className="text-[#4ea59d] mt-2 animate-pulse uppercase text-[10px] font-black tracking-widest">Processing request</p>
           </div>
         </div>
@@ -1817,14 +1899,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <div className="w-full max-w-xl bg-[#0a1a19] rounded-[32px] sm:rounded-[40px] border border-white/20 p-5 sm:p-8 shadow-2xl animate-in zoom-in duration-300 max-h-[95vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-black text-white tracking-tighter uppercase underline decoration-[#4ea59d] decoration-4 underline-offset-8">Submit Homework</h3>
-              <button 
+              <button
                 onClick={() => setIsSubmissionModalOpen(false)}
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
               >
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
-            
+
             <div className="space-y-6">
               <div>
                 <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Assignment</label>
@@ -1835,8 +1917,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div>
                 <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Upload Solution</label>
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   onChange={(e) => setSubmissionFile(e.target.files?.[0] || null)}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-[#4ea59d] file:text-white hover:file:bg-[#3d8c85]"
                 />
@@ -1844,7 +1926,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div>
                 <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Comments (Optional)</label>
-                <textarea 
+                <textarea
                   value={submissionComment}
                   onChange={(e) => setSubmissionComment(e.target.value)}
                   placeholder="Add any notes here..."
@@ -1852,7 +1934,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 />
               </div>
 
-              <button 
+              <button
                 onClick={() => setShowSubmitConfirm(true)}
                 disabled={isSubmitting || !submissionFile || submissionStatus === 'success'}
                 className="w-full py-4 bg-[#4ea59d] hover:bg-[#3d8c85] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-[#4ea59d]/20"
@@ -1860,12 +1942,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 {isSubmitting ? 'Uploading...' : 'Complete Submission'}
               </button>
             </div>
-            
+
             {/* Inner Notification Overlay */}
             {submissionStatus !== 'idle' && (
-              <div className={`mt-6 p-4 rounded-2xl border flex items-center gap-3 animate-in slide-in-from-top duration-300 ${
-                submissionStatus === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
-              }`}>
+              <div className={`mt-6 p-4 rounded-2xl border flex items-center gap-3 animate-in slide-in-from-top duration-300 ${submissionStatus === 'success' ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+                }`}>
                 <i className={`fa-solid ${submissionStatus === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}`}></i>
                 <p className="text-[10px] font-black uppercase tracking-wider">{statusMessage}</p>
               </div>
@@ -1886,13 +1967,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               Are you sure you want to submit your homework? This action will register your solution in the SMS records.
             </p>
             <div className="grid grid-cols-2 gap-4">
-              <button 
+              <button
                 onClick={() => setShowSubmitConfirm(false)}
                 className="py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={executeHomeworkSubmission}
                 className="py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
               >

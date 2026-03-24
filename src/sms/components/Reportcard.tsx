@@ -105,7 +105,11 @@ const renderReportPdfBlob = (payload: {
   return doc.output('blob');
 };
 
-export default function ReportCardPage() {
+interface ReportCardPageProps {
+  schoolId?: string | null;
+}
+
+export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
   const [students, setStudents] = useState<AppStudent[]>([]);
   const [classes, setClasses] = useState<AppClass[]>([]);
   const [availableClasses, setAvailableClasses] = useState<AppClass[]>([]);
@@ -165,10 +169,12 @@ export default function ReportCardPage() {
         supabase
           .from('students')
           .select('id, name')
+          .eq('school_id', schoolId)
           .order('created_at', { ascending: false }),
         supabase
           .from('classes')
           .select('id, name')
+          .eq('school_id', schoolId)
           .order('created_at', { ascending: false }),
       ]);
 
@@ -180,6 +186,7 @@ export default function ReportCardPage() {
         const primaryReportsResult = await supabase
           .from('report_cards')
           .select('id, student_id, class_id, report_date, report_type, title, content, file_path, file_name, created_at')
+          .eq('school_id', schoolId)
           .order('created_at', { ascending: false });
 
         if (!primaryReportsResult.error) {
@@ -188,6 +195,7 @@ export default function ReportCardPage() {
           const fallbackReportsResult = await supabase
             .from('report_cards')
             .select('id, student_id, report_date, report_type, title, content, file_path, file_name, created_at')
+            .eq('school_id', schoolId)
             .order('created_at', { ascending: false });
 
           if (fallbackReportsResult.error) throw fallbackReportsResult.error;
@@ -250,7 +258,8 @@ export default function ReportCardPage() {
         const primary = await supabase
           .from('class_course_students')
           .select('class_id')
-          .eq('student_id', formData.student_id);
+          .eq('student_id', formData.student_id)
+          .eq('school_id', schoolId);
 
         if (!primary.error) {
           classIds = Array.from(new Set((primary.data || []).map((row: any) => String(row.class_id || '')).filter(Boolean)));
@@ -258,7 +267,8 @@ export default function ReportCardPage() {
           const fallback = await supabase
             .from('student_courses')
             .select('course_id')
-            .eq('student_id', formData.student_id);
+            .eq('student_id', formData.student_id)
+            .eq('school_id', schoolId);
 
           if (fallback.error) throw fallback.error;
 
@@ -272,7 +282,8 @@ export default function ReportCardPage() {
           const courseRows = await supabase
             .from('class_courses')
             .select('class_id')
-            .in('id', courseIds);
+            .in('id', courseIds)
+            .eq('school_id', schoolId);
 
           if (courseRows.error) throw courseRows.error;
           classIds = Array.from(new Set((courseRows.data || []).map((row: any) => String(row.class_id || '')).filter(Boolean)));
@@ -691,7 +702,8 @@ export default function ReportCardPage() {
       const { error: deleteError } = await supabase
         .from('report_cards')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('school_id', schoolId);
 
       if (deleteError) throw deleteError;
 
@@ -754,7 +766,8 @@ export default function ReportCardPage() {
           file_path: uploaded.filePath,
           file_name: uploaded.fileName,
         })
-        .eq('id', row.id);
+        .eq('id', row.id)
+        .eq('school_id', schoolId);
 
       if (updateError) {
         await deleteStorageFileIfExists(uploaded.filePath);
@@ -776,7 +789,8 @@ export default function ReportCardPage() {
       const { error: updateError } = await supabase
         .from('report_cards')
         .update({ file_path: null, file_name: null })
-        .eq('id', row.id);
+        .eq('id', row.id)
+        .eq('school_id', schoolId);
 
       if (updateError) throw updateError;
 

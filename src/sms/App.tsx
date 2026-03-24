@@ -59,7 +59,7 @@ const INITIAL_PROGRAMS: any[] = [];
 const INITIAL_PARENTS: any[] = [];
 
 type AttendanceContextType = 'class' | 'subject';
-const CLOUD_SYNC_INTERVAL_SECONDS = 60;
+const CLOUD_SYNC_INTERVAL_SECONDS = 10;
 
 const normalizeClassCodeBase = (name: string) => {
   const sanitized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -3604,7 +3604,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           )}
 
           {currentPage === 'report-card' && (
-            <ReportCardPage />
+            <ReportCardPage schoolId={schoolId} />
           )}
 
           {currentPage === 'payment' && (
