@@ -1,0 +1,258 @@
+
+import React, { useEffect, useState, useCallback } from 'react';
+import { fetchParentPortalData, ParentPortalData, ExamResult } from '../services/smsService';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+  ResponsiveContainer, Cell 
+} from 'recharts';
+import { 
+  Calendar, TrendingUp, RefreshCw, CheckCircle2, CreditCard, 
+  Activity, Users, BookOpen, AlertCircle 
+} from 'lucide-react';
+
+interface DashboardProps {
+  parentEmail?: string;
+  studentNames?: string[];
+  studentIds?: string[];
+}
+
+const StatCard = ({ label, value, sub, subColor = 'text-emerald-500', icon: Icon }: any) => (
+  <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
+    <div className="flex items-start justify-between mb-3">
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label}</p>
+      {Icon && <div className="p-2 bg-slate-50 rounded-xl text-slate-400 group-hover:text-emerald-600 transition-colors"><Icon className="w-4 h-4" /></div>}
+    </div>
+    <p className="text-3xl font-black text-slate-900 tracking-tight">{value}</p>
+    {sub && <p className={`text-[10px] font-bold mt-2 flex items-center gap-1 ${subColor}`}>{sub}</p>}
+  </div>
+);
+
+const Dashboard: React.FC<DashboardProps> = ({ parentEmail, studentNames, studentIds }) => {
+  const [data, setData] = useState<ParentPortalData | null>(null);
+  const [syncing, setSyncing] = useState(true);
+
+  const studentName = studentNames?.length ? studentNames[0] : 'Student';
+  const primaryId = studentIds?.length ? studentIds[0] : '';
+
+  const fetchData = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const result = await fetchParentPortalData(studentIds || [], undefined);
+      setData(result);
+    } catch (e) {
+      console.error('Dashboard fetch failed:', e);
+    } finally {
+      setSyncing(false);
+    }
+  }, [studentIds?.join(',')]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const COLORS = ['#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0'];
+
+  // Derive chart data from exam results (per subject averages)
+  const chartData: { subject: string; score: number }[] = [];
+  if (data?.examResults) {
+    const subjectMap: Record<string, number[]> = {};
+    data.examResults.forEach(e => {
+      if (!subjectMap[e.subject]) subjectMap[e.subject] = [];
+      subjectMap[e.subject].push(e.score);
+    });
+    Object.entries(subjectMap).forEach(([subject, scores]) => {
+      chartData.push({
+        subject: subject.length > 10 ? subject.slice(0, 8) + '…' : subject,
+        score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+      });
+    });
+  }
+
+  const gpa = data?.reportCard?.gpa || '0.00';
+  const attendanceRate = data?.attendance?.rate || '0%';
+  const pendingHomework = data?.homework?.filter(h => h.status === 'Pending' || h.status === 'pending').length ?? 0;
+  const overduePayments = data?.payments?.filter(p => p.status === 'Overdue').length ?? 0;
+  const totalAbsent = data?.attendance?.absent ?? 0;
+
+  return (
+    <div className="space-y-6 animate-fadeIn pb-20">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Parental Dashboard</h1>
+          <div className="flex items-center gap-3 text-slate-500 text-sm mt-1 flex-wrap">
+            <p>Monitoring <span className="font-black text-emerald-600">{studentName}</span></p>
+            {data && (
+              <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-0.5 rounded-full text-[10px] font-black border border-emerald-100">
+                <span className={`w-1.5 h-1.5 bg-emerald-500 rounded-full ${syncing ? 'animate-pulse' : ''}`} />
+                {syncing ? 'Syncing…' : `Last: ${data.lastSync}`}
+              </span>
+            )}
+          </div>
+        </div>
+        <button 
+          onClick={fetchData} disabled={syncing}
+          className="bg-white border border-slate-100 px-4 py-2.5 rounded-xl text-slate-600 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm flex items-center gap-2 text-sm font-bold active:scale-95 disabled:opacity-50 self-start"
+        >
+          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin text-emerald-600' : ''}`} />
+          {syncing ? 'Syncing…' : 'Refresh'}
+        </button>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Current GPA" value={gpa} sub="From exam grades" icon={TrendingUp} />
+        <StatCard label="Attendance" value={attendanceRate} sub={`${totalAbsent} absences recorded`} icon={CheckCircle2} />
+        <StatCard label="Pending Tasks" value={pendingHomework} sub={pendingHomework > 0 ? `${pendingHomework} due soon` : 'All clear!'} subColor={pendingHomework > 0 ? 'text-amber-500' : 'text-emerald-500'} icon={Activity} />
+        <StatCard label="Overdue Fees" value={overduePayments} sub={overduePayments > 0 ? 'Action required' : 'Good standing'} subColor={overduePayments > 0 ? 'text-rose-500' : 'text-emerald-500'} icon={CreditCard} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Performance Chart */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
+              <TrendingUp className="w-5 h-5 text-emerald-600" /> Academic Performance
+            </h3>
+            <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 uppercase tracking-widest">
+              Live Exam Data
+            </span>
+          </div>
+          {syncing ? (
+            <div className="h-56 flex items-center justify-center">
+              <div className="w-8 h-8 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin" />
+            </div>
+          ) : chartData.length > 0 ? (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 0, right: 0, left: -24, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="subject" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
+                  <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                  <Tooltip
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
+                  />
+                  <Bar dataKey="score" radius={[8, 8, 0, 0]} barSize={36}>
+                    {chartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-56 flex flex-col items-center justify-center text-slate-300 gap-3">
+              <BookOpen className="w-12 h-12 opacity-40" />
+              <p className="text-sm font-bold text-slate-400">No exam results available yet</p>
+            </div>
+          )}
+        </div>
+
+        {/* Attendance Breakdown */}
+        <div className="bg-gradient-to-br from-emerald-900 to-emerald-800 p-8 rounded-2xl shadow-xl text-white relative overflow-hidden">
+          <div className="absolute top-[-30%] right-[-20%] w-48 h-48 bg-white/5 rounded-full blur-3xl" />
+          <div className="relative z-10 space-y-6">
+            <div>
+              <h3 className="font-black text-lg uppercase tracking-tighter flex items-center gap-2">
+                <Users className="w-5 h-5" /> Attendance
+              </h3>
+              <p className="text-emerald-300 text-[10px] font-bold uppercase tracking-widest mt-1">Current Period</p>
+            </div>
+            <div className="text-5xl font-black tracking-tighter">{attendanceRate}</div>
+            <div className="space-y-3">
+              {[
+                { label: 'Present', value: data?.attendance?.present ?? 0, color: 'bg-emerald-400' },
+                { label: 'Absent', value: data?.attendance?.absent ?? 0, color: 'bg-rose-400' },
+                { label: 'Late', value: data?.attendance?.late ?? 0, color: 'bg-amber-400' },
+              ].map(item => (
+                <div key={item.label} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
+                    <span className="text-emerald-100/80 font-bold text-xs uppercase tracking-widest">{item.label}</span>
+                  </div>
+                  <span className="font-black text-white">{item.value} days</span>
+                </div>
+              ))}
+            </div>
+            <div className="pt-4 border-t border-white/10">
+              <p className="text-[10px] font-black text-emerald-100/40 uppercase tracking-widest">
+                Total: {data?.attendance?.total ?? 0} school days
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Notices / Bulletins */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-black text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-tight">
+            <Calendar className="w-5 h-5 text-emerald-600" /> Institution Bulletins
+          </h3>
+          <div className="space-y-3">
+            {syncing ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="animate-pulse h-14 bg-slate-50 rounded-2xl" />
+              ))
+            ) : data?.notices && data.notices.length > 0 ? (
+              data.notices.map((note, idx) => (
+                <div key={idx} className="flex items-start gap-4 p-4 bg-slate-50 rounded-2xl border-l-4 border-emerald-600 hover:bg-emerald-50 transition-colors">
+                  <p className="text-xs text-slate-700 font-bold leading-relaxed">{note}</p>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-300 gap-2">
+                <AlertCircle className="w-10 h-10 opacity-40" />
+                <p className="text-sm font-bold text-slate-400">No notices available</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Recent Payments */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-black text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-tight">
+            <CreditCard className="w-5 h-5 text-emerald-600" /> Financial Standing
+          </h3>
+          <div className="space-y-3">
+            {syncing ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="animate-pulse h-14 bg-slate-50 rounded-2xl" />
+              ))
+            ) : data?.payments && data.payments.length > 0 ? (
+              data.payments.slice(0, 5).map(pay => (
+                <div key={pay.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 hover:border-emerald-100 hover:bg-emerald-50/20 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2.5 rounded-xl ${
+                      pay.status === 'Paid' ? 'bg-emerald-50 text-emerald-600' : 
+                      pay.status === 'Overdue' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
+                    }`}>
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black text-slate-800 leading-tight">{pay.description}</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{pay.date}</p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-base font-black text-slate-900">${Number(pay.amount).toFixed(2)}</p>
+                    <span className={`text-[9px] font-black px-2.5 py-0.5 rounded-md uppercase tracking-widest ${
+                      pay.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
+                      pay.status === 'Overdue' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                    }`}>{pay.status}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-300 gap-2">
+                <CreditCard className="w-10 h-10 opacity-40" />
+                <p className="text-sm font-bold text-slate-400">No payment records found</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;

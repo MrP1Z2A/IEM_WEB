@@ -41,6 +41,7 @@ type DynamicReportCard = {
 };
 
 const NOTICE_FILE_BUCKET = import.meta.env.VITE_SUPABASE_NOTICE_BUCKET || 'notice_board';
+const MAX_SUBMISSION_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
 
 const formatNoticeDate = (value?: string | null) => {
   if (!value) return 'N/A';
@@ -201,6 +202,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
+  const [submissionFileError, setSubmissionFileError] = useState<string | null>(null);
 
   const hasNewNotices = dynamicAnnouncements.some(notice => !viewedNoticeIds.includes(notice.id));
 
@@ -215,18 +217,21 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       setDynamicAnnouncements(notices);
 
       if (supabase && isSupabaseConfigured) {
-        // Fetch grades
+        // Fetch grades with assessment titles
         const { data: gradesData, error: gradesError } = await supabase
           .from('exam_grades')
-          .select('*')
+          .select('*, exams:exam_id(title)')
           .eq('student_id', user.studentId)
           .eq('school_id', schoolId);
+
         if (!gradesError && gradesData) {
           const mappedGrades = gradesData.map(g => ({
+            assignment: (g.exams as any)?.title || 'Unknown Assessment',
             className: g.name || 'Unknown Class',
             courseName: g.course_name || 'Unknown Course',
             grade: g.grade ? String(g.grade) : 'Pending',
-            percentage: g.percentage ? String(g.percentage) : null
+            percentage: g.percentage ? String(g.percentage) : null,
+            feedback: g.note || 'No feedback provided'
           }));
           setExamResultsData(mappedGrades);
         } else {
@@ -1044,10 +1049,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
             <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Recent Grades</h3>
             <div className="space-y-4">
-              {(examResultsData.length > 0 ? examResultsData : DETAILED_GRADES).slice(0, 3).map((item, i) => (
+              {examResultsData.slice(0, 3).map((item, i) => (
                 <div key={i} className="flex items-center justify-between p-6 bg-[#0a1a19] rounded-[32px] border border-white/20">
                   <div>
-                    <h4 className="text-sm font-bold text-white">{item.courseName || item.assignment}</h4>
+                    <h4 className="text-sm font-bold text-white">{item.assignment || item.courseName}</h4>
                     <p className="text-[9px] font-black text-slate-300 uppercase mt-1">Academic Session 2025</p>
                   </div>
                   <div className="text-right">
@@ -1056,6 +1061,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   </div>
                 </div>
               ))}
+              {examResultsData.length === 0 && (
+                <div className="p-6 bg-[#0a1a19] rounded-[32px] border border-white/20 text-center">
+                  <p className="text-sm text-slate-400">No recent grades available.</p>
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -1439,13 +1449,20 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#1f4e4a]">
-                  {DETAILED_GRADES.map((g, i) => (
+                  {examResultsData.map((g, i) => (
                     <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
                       <td className="px-8 py-6 font-bold text-sm text-white">{g.assignment}</td>
                       <td className="px-8 py-6 text-xl font-black text-[#4ea59d]">{g.grade}</td>
                       <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">{g.feedback}</td>
                     </tr>
                   ))}
+                  {examResultsData.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-8 py-10 text-center text-sm text-slate-400">
+                        No official grades available yet.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1503,8 +1520,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             {examResultsData.map((ex, i) => (
               <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center">
                 <div>
-                  <h4 className="text-sm font-bold text-white">{ex.courseName}</h4>
-                  <p className="text-[9px] font-black text-slate-400 uppercase">{ex.className}</p>
+                  <h4 className="text-sm font-bold text-white">{ex.assignment || ex.courseName}</h4>
+                  <p className="text-[9px] font-black text-slate-400 uppercase">{ex.className} • {ex.courseName}</p>
                 </div>
                 <div className="text-right">
                   <span className={`text-lg font-black block ${ex.grade === 'Pending' ? 'text-orange-500' : 'text-[#4ea59d]'}`}>{ex.grade}</span>
@@ -1521,12 +1538,19 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Assignment Results</h3>
           <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-            {DETAILED_GRADES.map((g, i) => (
-              <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center">
-                <h4 className="text-sm font-bold text-white">{g.assignment}</h4>
-                <span className="text-lg font-black text-[#4ea59d]">{g.grade}</span>
-              </div>
-            ))}
+            {examResultsData.length > 0 ? (
+              examResultsData.map((g, i) => (
+                <div key={i} className="p-6 bg-[#0a1a19] rounded-3xl border border-white/20 flex justify-between items-center group relative overflow-hidden">
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-white">{g.assignment}</h4>
+                    <p className="text-[9px] text-[#4ea59d] font-black uppercase mt-1">Feedback: {g.feedback}</p>
+                  </div>
+                  <span className="text-lg font-black text-[#4ea59d] ml-4">{g.grade}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-400 text-center py-10">No assignment results available.</p>
+            )}
           </div>
         </section>
 
@@ -1916,12 +1940,28 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Upload Solution</label>
+                <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Upload PDF (Max 200 MB)</label>
                 <input
                   type="file"
-                  onChange={(e) => setSubmissionFile(e.target.files?.[0] || null)}
+                  accept="application/pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    if (file && file.size > MAX_SUBMISSION_FILE_SIZE) {
+                      setSubmissionFileError('File exceeds 200 MB limit. Please choose a smaller PDF.');
+                      setSubmissionFile(null);
+                      e.target.value = '';
+                    } else {
+                      setSubmissionFileError(null);
+                      setSubmissionFile(file);
+                    }
+                  }}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-[#4ea59d] file:text-white hover:file:bg-[#3d8c85]"
                 />
+                {submissionFileError && (
+                  <p className="mt-2 text-[10px] font-black text-red-400 uppercase tracking-wider flex items-center gap-1">
+                    <i className="fa-solid fa-circle-exclamation"></i> {submissionFileError}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1936,7 +1976,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <button
                 onClick={() => setShowSubmitConfirm(true)}
-                disabled={isSubmitting || !submissionFile || submissionStatus === 'success'}
+                disabled={isSubmitting || !submissionFile || !!submissionFileError || submissionStatus === 'success'}
                 className="w-full py-4 bg-[#4ea59d] hover:bg-[#3d8c85] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-[#4ea59d]/20"
               >
                 {isSubmitting ? 'Uploading...' : 'Complete Submission'}
