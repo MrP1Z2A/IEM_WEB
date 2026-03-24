@@ -636,9 +636,9 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     if (!courseFolderBasePath || !files?.length) return;
 
     const selectedFiles = Array.from(files);
-    const oversized = selectedFiles.find(file => file.size > 50 * 1024 * 1024);
+    const oversized = selectedFiles.find(file => file.size > 200 * 1024 * 1024);
     if (oversized) {
-      notify(`File too large: ${oversized.name}. Max size is 50MB.`);
+      notify(`File too large: ${oversized.name}. Max size is 200MB.`);
       return;
     }
 
