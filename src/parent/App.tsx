@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, UserCircle, BookOpen, Bell, LogOut, 
-  Menu, X, School, ChevronRight, CreditCard, ChevronLeft
+  Menu, X, School, ChevronRight, CreditCard, ChevronLeft,
+  LayoutGrid
 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import StudentHub from './components/StudentHub';
@@ -10,8 +11,9 @@ import InstitutionHub from './components/InstitutionHub';
 import Communications from './components/Communications';
 import Finance from './components/Finance';
 import LoginPage from './components/LoginPage';
+import NoticeDetail from './components/NoticeDetail';
 
-type ParentView = 'dashboard' | 'student' | 'institution' | 'news' | 'finance';
+type ParentView = 'dashboard' | 'student' | 'institution' | 'news' | 'finance' | 'notice-detail';
 
 interface ParentAppProps {
   onSwitch?: () => void;
@@ -44,9 +46,9 @@ const Sidebar = ({
       {/* Sidebar panel */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-[100] flex flex-col bg-slate-900 text-white border-r border-slate-800
-          transition-all duration-300 ease-in-out overflow-hidden
-          ${isOpen ? 'w-72 translate-x-0' : 'w-0 -translate-x-full'}
+          fixed md:relative inset-y-0 left-0 z-[100] md:z-0 flex flex-col bg-slate-900 text-white border-r border-slate-800
+          transition-all duration-300 ease-in-out overflow-hidden h-screen
+          ${isOpen ? 'w-72 translate-x-0' : 'w-0 -translate-x-full md:translate-x-0'}
         `}
       >
         {/* Logo */}
@@ -136,6 +138,17 @@ const Header = ({
       >
         {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
+
+      {/* Switch Environment Button */}
+      <button
+        onClick={() => { (window as any).switchEnvironment?.() }}
+        title="Switch Environment"
+        className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white border border-slate-700 active:scale-95 transition-all shadow-md flex items-center gap-2"
+      >
+        <LayoutGrid className="w-5 h-5" />
+        <span className="text-[10px] font-black uppercase tracking-widest hidden lg:block">Platform Hub</span>
+      </button>
+
       <div>
         <h2 className="text-base font-black text-slate-800 tracking-tight">Academic Portal</h2>
         <p className="text-[10px] text-emerald-600 font-black uppercase tracking-[0.2em] hidden sm:block">Parental Monitoring Gateway</p>
@@ -166,21 +179,39 @@ const Header = ({
 // ─────────────────────────────────────────────
 // ParentApp
 // ─────────────────────────────────────────────
+const PARENT_SESSION_KEY = 'iem_parent_session';
+
 const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true); // open by default on desktop
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [parentData, setParentData] = useState<any>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem(PARENT_SESSION_KEY) === 'true';
+  });
+  const [parentData, setParentData] = useState<any>(() => {
+    const saved = localStorage.getItem('iem_parent_data');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [currentView, setCurrentView] = useState<ParentView>('dashboard');
+  const [selectedNotice, setSelectedNotice] = useState<any>(null);
+
+  // Expose onSwitch to window so Header can call it
+  useEffect(() => {
+    (window as any).switchEnvironment = onSwitch;
+    return () => { delete (window as any).switchEnvironment; };
+  }, [onSwitch]);
 
   const handleLogin = (data: any) => {
     setParentData(data);
     setIsLoggedIn(true);
+    localStorage.setItem(PARENT_SESSION_KEY, 'true');
+    localStorage.setItem('iem_parent_data', JSON.stringify(data));
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setParentData(null);
     setSidebarOpen(false);
+    localStorage.removeItem(PARENT_SESSION_KEY);
+    localStorage.removeItem('iem_parent_data');
     if (onSwitch) onSwitch();
   };
 
@@ -189,13 +220,16 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
   const renderContent = () => {
     const ids = parentData?.studentIds;
     const names = parentData?.studentNames;
+    const keyStr = ids?.join(',') || 'empty';
+
     switch (currentView) {
-      case 'dashboard':   return <Dashboard parentEmail={parentData?.email} studentNames={names} studentIds={ids} />;
-      case 'student':     return <StudentHub studentNames={names} studentIds={ids} />;
-      case 'institution': return <InstitutionHub />;
-      case 'news':        return <Communications />;
-      case 'finance':     return <Finance studentIds={ids} />;
-      default:            return <Dashboard studentNames={names} studentIds={ids} />;
+      case 'dashboard':     return <Dashboard key={keyStr} parentEmail={parentData?.email} studentNames={names} studentIds={ids} schoolId={parentData?.schoolId} onNoticeClick={(n: any) => { setSelectedNotice(n); setCurrentView('notice-detail'); }} />;
+      case 'student':       return <StudentHub key={keyStr} studentNames={names} studentIds={ids} schoolId={parentData?.schoolId} />;
+      case 'institution':   return <InstitutionHub key={parentData?.schoolId || 'inst'} />;
+      case 'news':          return <Communications schoolId={parentData?.schoolId} />;
+      case 'finance':       return <Finance key={keyStr} studentIds={ids} schoolId={parentData?.schoolId} />;
+      case 'notice-detail': return <NoticeDetail notice={selectedNotice} onBack={() => setCurrentView('dashboard')} />;
+      default:              return <Dashboard key={keyStr} studentNames={names} studentIds={ids} schoolId={parentData?.schoolId} />;
     }
   };
 

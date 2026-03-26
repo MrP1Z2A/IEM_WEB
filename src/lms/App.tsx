@@ -8,6 +8,7 @@ import { Course, User, UserRole, View, Note, Quiz, ReportCard } from './types';
 import { INITIAL_USER, INITIAL_COURSES, SCHOOL_EVENTS, SCHOOL_ACTIVITIES, DETAILED_GRADES, STUDENT_ACHIEVEMENTS, SCHOOL_HIVE_POSTS, SCHOOL_CONTACTS } from './constants';
 import { summarizeNotes, generateQuizFromNotes } from './services/aiService';
 import { supabase, isSupabaseConfigured } from './src/supabaseClient';
+import Messaging from './components/Messaging';
 
 type NoticeItem = {
   id: string;
@@ -195,6 +196,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [examResultsData, setExamResultsData] = useState<any[]>([]);
   const [reportCard, setReportCard] = useState<ReportCard | null>(null);
   const [dynamicReportCards, setDynamicReportCards] = useState<DynamicReportCard[]>([]);
+  const [dynamicSchoolEvents, setDynamicSchoolEvents] = useState<any[]>([]);
+  const [dynamicStudentActivities, setDynamicStudentActivities] = useState<any[]>([]);
+  const [dynamicLiveIntel, setDynamicLiveIntel] = useState<any[]>([]);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [studentAttendanceRate, setStudentAttendanceRate] = useState<string>('98%');
 
@@ -208,6 +212,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   const performSmsSync = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsLoading(true);
+    // Reset data to prevent leakage from previous school session
+    setDynamicAnnouncements([]);
+    setDynamicExams([]);
+    setDynamicAssignments([]);
+    setExamResultsData([]);
+    setDynamicReportCards([]);
+    setDynamicSchoolEvents([]);
+    setDynamicStudentActivities([]);
+    setDynamicLiveIntel([]);
+    
     try {
       // Debug log for schoolId
       console.log('[NoticeBoard] Fetching notices for schoolId:', schoolId);
@@ -351,10 +365,64 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               console.error("Error fetching report cards:", reportCardsError);
               setDynamicReportCards([]);
             }
+
+            // Fetch School Events
+            const { data: schoolEventsData } = await supabase
+              .from('events')
+              .select('*')
+              .eq('school_id', schoolId)
+              .order('event_date', { ascending: true });
+            
+            if (schoolEventsData) {
+              setDynamicSchoolEvents(schoolEventsData.map(ev => ({
+                id: ev.id,
+                name: ev.title,
+                type: ev.type,
+                date: ev.event_date ? new Date(ev.event_date).toLocaleDateString() : 'TBA',
+                image: ev.image_url || 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800',
+                location: ev.location
+              })));
+            }
+
+            // Fetch Student Activities
+            const { data: activitiesData } = await supabase
+              .from('student_activities')
+              .select('*')
+              .eq('school_id', schoolId)
+              .order('created_at', { ascending: false });
+            
+            if (activitiesData) {
+              setDynamicStudentActivities(activitiesData.map(act => ({
+                id: act.id,
+                name: act.name,
+                description: act.description,
+                icon: act.activity_type === 'Sports' ? 'fa-volleyball' : 
+                      act.activity_type === 'Arts' ? 'fa-palette' : 
+                      act.activity_type === 'Science' ? 'fa-flask' : 'fa-users',
+                activity_type: act.activity_type,
+                attachment_url: act.attachment_url
+              })));
+            }
+
+            // Fetch Live Intel
+            const { data: liveIntelData } = await supabase
+              .from('live_intel')
+              .select('*')
+              .eq('school_id', schoolId)
+              .order('created_at', { ascending: false });
+            
+            if (liveIntelData) {
+              setDynamicLiveIntel(liveIntelData.map(intel => ({
+                id: intel.id,
+                title: intel.title,
+                content: intel.content,
+                date: intel.created_at ? new Date(intel.created_at).toLocaleTimeString() : 'Recent'
+              })));
+            }
           }
         }
       }
-
+      setLastSyncTime(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Sync error", err);
       setDynamicAnnouncements([]);
@@ -370,7 +438,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         setCurrentView('parent-portal');
       }
     }
-  }, [isLoggedIn, user.role]);
+  }, [isLoggedIn, user.role, schoolId, performSmsSync]);
 
   const loadStudentProfile = useCallback(async () => {
     if (!isLoggedIn || !supabase || !isSupabaseConfigured) return;
@@ -451,9 +519,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     return () => window.clearInterval(refreshInterval);
   }, [isLoggedIn, performSmsSync, loadStudentProfile]);
 
-  const handleLogin = (role: Exclude<UserRole, UserRole.PARENT>, email: string, loginSchoolId?: string) => {
+  const handleLogin = (role: Exclude<UserRole, UserRole.PARENT>, email: string, loginSchoolId?: string, authUserId?: string) => {
     const newUser = {
       ...INITIAL_USER,
+      id: authUserId || INITIAL_USER.id,
       role,
       email,
       name: INITIAL_USER.name,
@@ -602,7 +671,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 text-center">
-            <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Current GPA</p>
+            <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Overall Grade Percentage</p>
             <p className="text-4xl font-black text-white">{reportCard.gpa}</p>
           </div>
           <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 text-center">
@@ -951,9 +1020,21 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 <span className="text-[8px] text-slate-400">Last Sync: {lastSyncTime}</span>
               </div>
             )}
-
           </div>
         </header>
+
+        {/* Live Intel Ticker */}
+        {dynamicLiveIntel.length > 0 && (
+          <div className="bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-2xl flex items-center gap-4 animate-fadeIn">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+              <i className="fa-solid fa-bolt-lightning animate-pulse"></i>
+            </div>
+            <div className="flex-1 min-w-0">
+               <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Live Intel Update • {dynamicLiveIntel[0].date}</p>
+               <h4 className="text-sm font-bold text-white truncate">{dynamicLiveIntel[0].title}: {dynamicLiveIntel[0].content}</h4>
+            </div>
+          </div>
+        )}
 
         {/* Metric Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -994,7 +1075,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </button>
           </div>
 
-          <div className="space-y-4 relative z-10">
+          <div className="space-y-4 relative z-10 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
             {[
               ...dynamicExams.slice(0, 1).map(ex => ({
                 id: `ex-${ex.id}`,
@@ -1020,6 +1101,24 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 desc: `${ass.title} due ${ass.dueDate}.`,
                 time: 'Pending',
                 icon: 'fa-tasks',
+                color: 'text-purple-500',
+                bg: 'bg-purple-500/10'
+              })),
+              ...dynamicSchoolEvents.slice(0, 1).map(ev => ({
+                id: `ev-${ev.id}`,
+                title: 'Campus Event',
+                desc: `${ev.name} happening on ${ev.date}.`,
+                time: 'Upcoming',
+                icon: 'fa-champagne-glasses',
+                color: 'text-emerald-500',
+                bg: 'bg-emerald-500/10'
+              })),
+              ...dynamicStudentActivities.slice(0, 1).map(act => ({
+                id: `act-${act.id}`,
+                title: 'New Activity',
+                desc: `Join the ${act.name} ${act.activity_type}!`,
+                time: 'Activity',
+                icon: 'fa-masks-theater',
                 color: 'text-purple-500',
                 bg: 'bg-purple-500/10'
               })),
@@ -1105,12 +1204,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
                   <span className="text-[11px] sm:text-sm font-black text-slate-400 uppercase tracking-wider">{item.date}</span>
                   <span className={`text-[10px] sm:text-xs font-black px-2.5 sm:px-3 py-1 rounded-xl uppercase tracking-wider ${item.priority === 'Urgent'
-                      ? 'bg-rose-500/15 text-rose-300'
-                      : item.priority === 'High'
-                        ? 'bg-red-500/10 text-red-400'
-                        : item.priority === 'Low'
-                          ? 'bg-blue-500/10 text-blue-400'
-                          : 'bg-orange-500/10 text-orange-400'
+                    ? 'bg-rose-500/15 text-rose-300'
+                    : item.priority === 'High'
+                      ? 'bg-red-500/10 text-red-400'
+                      : item.priority === 'Low'
+                        ? 'bg-blue-500/10 text-blue-400'
+                        : 'bg-orange-500/10 text-orange-400'
                     }`}>
                     {item.priority}
                   </span>
@@ -1163,12 +1262,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider ${selectedNotice.priority === 'Urgent'
-                ? 'bg-rose-500/15 text-rose-300'
-                : selectedNotice.priority === 'High'
-                  ? 'bg-red-500/10 text-red-400'
-                  : selectedNotice.priority === 'Low'
-                    ? 'bg-blue-500/10 text-blue-400'
-                    : 'bg-orange-500/10 text-orange-400'
+              ? 'bg-rose-500/15 text-rose-300'
+              : selectedNotice.priority === 'High'
+                ? 'bg-red-500/10 text-red-400'
+                : selectedNotice.priority === 'Low'
+                  ? 'bg-blue-500/10 text-blue-400'
+                  : 'bg-orange-500/10 text-orange-400'
               }`}>
               {selectedNotice.priority}
             </span>
@@ -1214,7 +1313,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
               <i className="fa-solid fa-bullhorn text-[#4ea59d]"></i> School Announcements
             </h3>
-            <div className="space-y-4">
+            <div className="max-h-96 overflow-y-auto pr-1 custom-scrollbar space-y-4">
               {dynamicAnnouncements.length === 0 && (
                 <div className="p-6 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-3xl border border-white/20 text-center">
                   <p className="text-sm text-slate-300">No school announcements published yet.</p>
@@ -1243,15 +1342,20 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <i className="fa-solid fa-masks-theater text-[#4ea59d]"></i> Student Activities
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {SCHOOL_ACTIVITIES.map((act, i) => (
+              {dynamicStudentActivities.length > 0 ? dynamicStudentActivities.map((act, i) => (
                 <div key={i} className="p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[40px] border border-white/20 group hover:bg-[#4ea59d]/5 transition-all">
                   <div className="w-14 h-14 bg-[#4ea59d]/10 rounded-2xl flex items-center justify-center text-[#4ea59d] text-2xl mb-6 group-hover:scale-110 transition-transform">
                     <i className={`fa-solid ${act.icon}`}></i>
                   </div>
                   <h4 className="text-lg font-bold text-white mb-2">{act.name}</h4>
+                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">{act.activity_type}</p>
                   <p className="text-xs text-slate-400 leading-relaxed">{act.description}</p>
                 </div>
-              ))}
+              )) : (
+                <div className="col-span-2 p-10 bg-white/5 border border-white/10 rounded-[40px] text-center">
+                  <p className="text-slate-400 text-sm italic">No extracurricular activities recorded at this time.</p>
+                </div>
+              )}
             </div>
           </section>
         </div>
@@ -1259,7 +1363,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         <section className="space-y-8">
           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Upcoming Events</h3>
           <div className="space-y-6">
-            {SCHOOL_EVENTS.map(ev => (
+            {dynamicSchoolEvents.length > 0 ? dynamicSchoolEvents.map(ev => (
               <div key={ev.id} className="relative h-48 rounded-[32px] overflow-hidden group cursor-pointer shadow-xl">
                 <img src={ev.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
@@ -1267,9 +1371,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-1">{ev.type}</p>
                   <h4 className="text-sm font-bold text-white uppercase">{ev.name}</h4>
                   <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 "><i className="fa-solid fa-calendar mr-2"></i> {ev.date}</p>
+                  {ev.location && <p className="text-[9px] text-emerald-400/60 font-black uppercase mt-1"><i className="fa-solid fa-location-dot mr-2"></i> {ev.location}</p>}
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="p-6 bg-white/5 border border-white/10 rounded-[32px] text-center">
+                 <p className="text-slate-400 text-xs italic">Awaiting upcoming institutional events.</p>
+              </div>
+            )}
           </div>
         </section>
       </div>
@@ -1384,7 +1493,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
               <i className="fa-solid fa-clipboard-list text-[#4ea59d]"></i> Pending Assignments
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
               {dynamicAssignments.map(ass => (
                 <div key={ass.id} className="p-6 md:p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 flex flex-col sm:flex-row justify-between items-center gap-6 group scale-[0.98] sm:scale-100 origin-center">
                   <div className="flex-1">
@@ -1440,38 +1549,40 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <section>
             <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Grades & Feedback</h3>
             <div className="overflow-hidden rounded-[32px] border border-white/20 shadow-2xl">
-              <table className="w-full text-left bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
-                <thead className="bg-[#0a1a19]">
-                  <tr>
-                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Assessment</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Mark</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Faculty Insight</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1f4e4a]">
-                  {examResultsData.map((g, i) => (
-                    <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
-                      <td className="px-8 py-6 font-bold text-sm text-white">{g.assignment}</td>
-                      <td className="px-8 py-6 text-xl font-black text-[#4ea59d]">{g.grade}</td>
-                      <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">{g.feedback}</td>
-                    </tr>
-                  ))}
-                  {examResultsData.length === 0 && (
+              <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                <table className="w-full text-left bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+                  <thead className="bg-[#0a1a19] sticky top-0 z-10 shadow-sm">
                     <tr>
-                      <td colSpan={3} className="px-8 py-10 text-center text-sm text-slate-400">
-                        No official grades available yet.
-                      </td>
+                      <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Assessment</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Mark</th>
+                      <th className="px-8 py-5 text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">Faculty Insight</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#1f4e4a]">
+                    {examResultsData.map((g, i) => (
+                      <tr key={i} className="hover:bg-[#0a1a19]/[0.02] transition-colors">
+                        <td className="px-8 py-6 font-bold text-sm text-white">{g.assignment}</td>
+                        <td className="px-8 py-6 text-xl font-black text-[#4ea59d]">{g.grade}</td>
+                        <td className="px-8 py-6 text-xs text-slate-400 font-medium leading-relaxed max-w-sm">{g.feedback}</td>
+                      </tr>
+                    ))}
+                    {examResultsData.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-8 py-10 text-center text-sm text-slate-400">
+                          No official grades available yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
         </div>
 
         <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl h-fit sticky top-10">
           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8">Exam Schedule</h3>
-          <div className="space-y-6">
+          <div className="space-y-6 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
             {dynamicExams.map((ex, i) => (
               <div key={i} className="relative pl-6 border-l-2 border-[#1f4e4a] group">
                 <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-[#4ea59d] shadow-[0_0_10px_#4ea59d] group-hover:scale-150 transition-transform"></div>
@@ -1623,70 +1734,35 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         </div>
       </header>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
-        <div className="xl:col-span-2 space-y-12">
-          <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
-            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
-              <i className="fa-solid fa-hashtag text-[#4ea59d]"></i> School Hive
-            </h3>
-            <div className="space-y-6">
-              {SCHOOL_HIVE_POSTS.map(post => (
-                <div key={post.id} className="p-8 bg-[#0a1a19] rounded-[32px] border border-white/20">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d]">
-                        <i className="fa-solid fa-user"></i>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-white">{post.user}</h4>
-                        <p className="text-[9px] text-slate-300 font-black uppercase">{post.time}</p>
-                      </div>
-                    </div>
-                    <button className="text-slate-300 hover:text-white"><i className="fa-solid fa-ellipsis"></i></button>
-                  </div>
-                  <p className="text-sm text-slate-300 leading-relaxed mb-6">{post.content}</p>
-                  <div className="flex gap-6 border-t border-[#1f4e4a] pt-4">
-                    <button className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest flex items-center gap-2 hover:opacity-80">
-                      <i className="fa-solid fa-heart"></i> {post.likes}
-                    </button>
-                    <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-white">
-                      <i className="fa-solid fa-comment"></i> {post.replies}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+      <Messaging currentUser={user} schoolId={schoolId || ''} />
 
-        <div className="space-y-8">
-          <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Direct Phone</h3>
-            <div className="space-y-4">
-              {SCHOOL_CONTACTS.phone.map((ph, i) => (
-                <div key={i} className="p-5 bg-[#0a1a19] rounded-2xl border border-white/20">
-                  <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">{ph.label}</p>
-                  <p className="text-base font-bold text-white">{ph.number}</p>
-                  <p className="text-[8px] text-slate-300 uppercase font-black">{ph.hours}</p>
-                </div>
-              ))}
-            </div>
-          </section>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 mt-12">
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+          <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Direct Phone</h3>
+          <div className="space-y-4">
+            {SCHOOL_CONTACTS.phone.map((ph, i) => (
+              <div key={i} className="p-5 bg-[#0a1a19] rounded-2xl border border-white/20">
+                <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">{ph.label}</p>
+                <p className="text-base font-bold text-white">{ph.number}</p>
+                <p className="text-[8px] text-slate-300 uppercase font-black">{ph.hours}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-          <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Social Media</h3>
-            <div className="grid grid-cols-2 gap-4">
-              {SCHOOL_CONTACTS.socials.map((soc, i) => (
-                <a key={i} href={soc.link} className="p-4 bg-[#0a1a19] rounded-2xl border border-white/20 flex flex-col items-center gap-2 group transition-all hover:border-[#4ea59d]">
-                  <div className="text-xl" style={{ color: soc.color }}>
-                    <i className={`fa-brands ${soc.icon}`}></i>
-                  </div>
-                  <span className="text-[9px] font-black text-slate-400 group-hover:text-white uppercase">{soc.brand}</span>
-                </a>
-              ))}
-            </div>
-          </section>
-        </div>
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
+          <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Social Media</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {SCHOOL_CONTACTS.socials.map((soc, i) => (
+              <a key={i} href={soc.link} className="p-4 bg-[#0a1a19] rounded-2xl border border-white/20 flex flex-col items-center gap-2 group transition-all hover:border-[#4ea59d]">
+                <div className="text-xl" style={{ color: soc.color }}>
+                  <i className={`fa-brands ${soc.icon}`}></i>
+                </div>
+                <span className="text-[9px] font-black text-slate-400 group-hover:text-white uppercase">{soc.brand}</span>
+              </a>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -1837,7 +1913,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   }
 
   return (
-    <div className="flex flex-col md:flex-row bg-[#0a1a19] min-h-screen text-[#f1f5f9] relative overflow-hidden">
+    <div className="flex flex-col md:flex-row bg-[#0a1a19] min-h-screen text-[#f1f5f9] relative">
       {/* Background Ambient Orbs for Glass Effect */}
       <div className="fixed top-[-10%] left-[-5%] w-[500px] h-[500px] bg-[#4ea59d]/20 rounded-full blur-[120px] pointer-events-none z-[0]"></div>
       <div className="fixed bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#1f4e4a]/40 rounded-full blur-[150px] pointer-events-none z-0"></div>
@@ -1866,7 +1942,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         onSwitch={onSwitch}
         schoolName={schoolName}
       />
-      <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-72'} p-6 md:p-8 overflow-x-hidden ${isSidebarOpen ? 'hidden md:block' : 'block'}`}>
+      <main className={`flex-1 transition-all duration-300 p-6 md:p-8 overflow-x-hidden ${isSidebarOpen ? 'hidden md:block' : 'block'} ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-72'}`}>
         {currentView === 'dashboard' && renderDashboard()}
         {currentView === 'notice-board' && renderNoticeBoard()}
         {currentView === 'notice-detail' && renderNoticeDetail()}

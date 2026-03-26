@@ -98,4 +98,8 @@ export type PageId =
   | 'payment-history'
   | 'student-finance-status'
   | 'student-service'
-  | 'student-service-batch';
+  | 'student-service-batch'
+  | 'events'
+  | 'student-activities'
+  | 'announcements-parent'
+  | 'live-intel';

@@ -19,6 +19,7 @@ interface LiveCalendarEvent {
   course_id: string | null;
   course_name: string | null;
   notes: string | null;
+  isInstitutional?: boolean;
 }
 
 const toMonthRange = (cursor: Date) => {
@@ -59,7 +60,8 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
     const { start, end } = toMonthRange(targetMonth);
     setIsLoading(true);
     try {
-      const { data, error } = await db
+      // Fetch academic events
+      const { data: calendarData, error: calendarError } = await db
         .from('live_calendar_events')
         .select('id, title, event_date, start_time, end_time, class_id, class_name, course_id, course_name, notes')
         .eq('school_id', schoolId)
@@ -68,8 +70,19 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
         .order('event_date', { ascending: true })
         .order('start_time', { ascending: true });
 
-      if (error) throw error;
-      setEvents((data || []).map((event: any) => ({
+      if (calendarError) throw calendarError;
+
+      // Fetch institutional events
+      const { data: institutionalData, error: institutionalError } = await db
+        .from('events')
+        .select('id, title, event_date, type, location')
+        .eq('school_id', schoolId)
+        .gte('event_date', start)
+        .lte('event_date', end);
+
+      if (institutionalError) throw institutionalError;
+
+      const academicEvents = (calendarData || []).map((event: any) => ({
         id: String(event.id),
         title: String(event.title || ''),
         event_date: String(event.event_date),
@@ -80,14 +93,31 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
         course_id: event.course_id ? String(event.course_id) : null,
         course_name: event.course_name ? String(event.course_name) : null,
         notes: event.notes ? String(event.notes) : null,
-      })));
+        isInstitutional: false
+      }));
+
+      const schoolEvents = (institutionalData || []).map((event: any) => ({
+        id: `inst-${event.id}`,
+        title: `[Event] ${event.title}`,
+        event_date: String(event.event_date),
+        start_time: '00:00:00',
+        end_time: '23:59:59',
+        class_id: 'institutional',
+        class_name: event.type || 'Event',
+        course_id: null,
+        course_name: event.location || 'Institutional Campus',
+        notes: null,
+        isInstitutional: true
+      }));
+
+      setEvents([...academicEvents, ...schoolEvents]);
     } catch (error: any) {
       console.error('Failed to load live calendar events:', error);
       setEvents([]);
     } finally {
       setIsLoading(false);
     }
-  }, [db]);
+  }, [db, schoolId]);
 
   React.useEffect(() => {
     void loadMonthEvents(monthCursor);
@@ -205,8 +235,15 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
                     <p className="text-xs font-black text-slate-500">{day.date.getDate()}</p>
                     <div className="mt-1 space-y-1">
                       {dayEvents.slice(0, 2).map(event => (
-                        <div key={event.id} className="px-1.5 py-1 rounded-lg bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 text-[10px] font-black text-brand-700 dark:text-brand-300 truncate">
-                          {toTimeInputValue(event.start_time)} {event.title}
+                        <div 
+                          key={event.id} 
+                          className={`px-1.5 py-1 rounded-lg border text-[10px] font-black truncate shadow-sm ${
+                            event.isInstitutional 
+                              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300' 
+                              : 'bg-brand-50 dark:bg-brand-900/20 border-brand-200 dark:border-brand-700 text-brand-700 dark:text-brand-300'
+                          }`}
+                        >
+                          {!event.isInstitutional && `${toTimeInputValue(event.start_time)} `}{event.title}
                         </div>
                       ))}
                       {dayEvents.length > 2 && (
@@ -232,11 +269,25 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
         ) : (
           <div className="space-y-2">
             {selectedDayEvents.map(event => (
-              <div key={event.id} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div 
+                key={event.id} 
+                className={`rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md transition-all hover:scale-[1.01] ${
+                  event.isInstitutional 
+                    ? 'bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-700' 
+                    : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                }`}
+              >
                 <div className="min-w-0">
-                  <p className="text-sm font-black text-brand-700 dark:text-brand-300 truncate">{event.title}</p>
-                  <p className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 truncate">
-                    {toTimeInputValue(event.start_time)} - {toTimeInputValue(event.end_time)} • {event.class_name}{event.course_name ? ` • ${event.course_name}` : ''}
+                  <div className="flex items-center gap-2 mb-1">
+                    {event.isInstitutional && <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase tracking-widest">Institutional Event</span>}
+                    <p className={`text-sm font-black truncate ${event.isInstitutional ? 'text-emerald-700 dark:text-emerald-300' : 'text-brand-700 dark:text-brand-300'}`}>{event.title}</p>
+                  </div>
+                  <p className={`text-[11px] font-semibold truncate ${event.isInstitutional ? 'text-emerald-600 dark:text-emerald-400' : 'text-brand-600 dark:text-brand-400'}`}>
+                    {event.isInstitutional ? (
+                      <><i className="fa-solid fa-location-dot mr-1"></i> {event.course_name}</>
+                    ) : (
+                      <>{toTimeInputValue(event.start_time)} - {toTimeInputValue(event.end_time)} • {event.class_name}{event.course_name ? ` • ${event.course_name}` : ''}</>
+                    )}
                   </p>
                   {event.notes && <p className="text-[11px] text-slate-500 mt-1 truncate">{event.notes}</p>}
                 </div>

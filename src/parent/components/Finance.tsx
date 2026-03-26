@@ -1,22 +1,25 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { fetchParentPortalData, PaymentRecord } from '../services/smsService';
-import { DollarSign, Download, Clock, AlertTriangle, ShieldCheck, Plus, QrCode, X, RefreshCw } from 'lucide-react';
+import { DollarSign, Download, Clock, AlertTriangle, ShieldCheck, Plus, QrCode, X, RefreshCw, FileDown } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface FinanceProps {
   studentIds?: string[];
+  schoolId?: string;
 }
 
-const Finance: React.FC<FinanceProps> = ({ studentIds }) => {
-  const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
+const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
+  const [activeTab, setActiveTab ] = useState<'pending' | 'history'>('pending');
   const [showQr, setShowQr] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setPayments([]); // Reset locally to avoid showing previous user's records
     try {
-      const data = await fetchParentPortalData(studentIds || []);
+      const data = await fetchParentPortalData(studentIds || [], schoolId);
       setPayments(data.payments || []);
     } catch (e) {
       console.error('Finance fetch error:', e);
@@ -24,7 +27,126 @@ const Finance: React.FC<FinanceProps> = ({ studentIds }) => {
     } finally {
       setLoading(false);
     }
-  }, [studentIds?.join(',')]);
+  }, [studentIds?.join(','), schoolId]);
+
+  const downloadHistory = () => {
+    if (payments.length === 0) return;
+    
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.text('Financial Statement', 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Student ID: ${studentIds?.[0] || 'N/A'}`, 14, 30);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 35);
+    
+    // Summary
+    const totalPaid = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + p.amount, 0);
+    const totalPending = payments.filter(p => p.status !== 'Paid').reduce((s, p) => s + p.amount, 0);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(2, 44, 34); // emerald-950
+    doc.text(`Total Paid: $${totalPaid.toLocaleString()}`, 14, 45);
+    doc.setTextColor(153, 27, 27); // rose-800
+    doc.text(`Outstanding Balance: $${totalPending.toLocaleString()}`, 14, 52);
+
+    // Table
+    const tableData = payments.map(p => [
+      p.date,
+      p.description,
+      `$${p.amount.toLocaleString()}`,
+      p.status.toUpperCase(),
+      p.note || '-'
+    ]);
+
+    autoTable(doc, {
+      startY: 60,
+      head: [['Date', 'Description', 'Amount', 'Status', 'Note']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [5, 150, 105] }, // emerald-600
+      styles: { fontSize: 9, cellPadding: 5 },
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'center' }
+      }
+    });
+
+    doc.save(`finance_statement_${studentIds?.[0] || 'student'}.pdf`);
+  };
+
+  const downloadInvoice = (payment: PaymentRecord) => {
+    const doc = new jsPDF();
+    
+    // Branding/Header
+    doc.setFillColor(5, 150, 105); // emerald-600
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setFontSize(24);
+    doc.setTextColor(255, 255, 255);
+    doc.text('PAYMENT VOUCHER', 14, 28);
+    
+    doc.setFontSize(10);
+    doc.text(`Invoice ID: ${payment.id.toUpperCase()}`, 140, 28);
+
+    // Body
+    let y = 60;
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Student Details', 14, y);
+    
+    y += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Student ID: ${studentIds?.[0] || 'N/A'}`, 14, y);
+    
+    y += 20;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Payment Information', 14, y);
+    
+    y += 10;
+    autoTable(doc, {
+      startY: y,
+      head: [['Description', 'Date', 'Status', 'Amount']],
+      body: [[
+        payment.description,
+        payment.date,
+        payment.status.toUpperCase(),
+        `$${payment.amount.toLocaleString()}`
+      ]],
+      theme: 'grid',
+      headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105] }, // slate-50, slate-600
+      styles: { cellPadding: 8 }
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 20;
+    
+    if (payment.note) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Notes:', 14, y);
+      y += 8;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(payment.note, 14, y);
+      y += 20;
+    }
+
+    // Footer
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.line(14, 250, 196, 250);
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text('This is an electronically generated document. No signature is required.', 105, 260, { align: 'center' });
+    doc.text('Thank you for your payment!', 105, 265, { align: 'center' });
+
+    doc.save(`invoice_${payment.id}.pdf`);
+  };
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -71,10 +193,19 @@ const Finance: React.FC<FinanceProps> = ({ studentIds }) => {
             </div>
           )}
         </div>
-        <div className="bg-emerald-600 p-6 rounded-2xl shadow-xl shadow-emerald-200 text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-5 opacity-10"><ShieldCheck className="w-20 h-20" /></div>
+        <div className="bg-emerald-600 p-6 rounded-2xl shadow-xl shadow-emerald-200 text-white relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-5 opacity-10 group-hover:scale-110 transition-transform"><ShieldCheck className="w-20 h-20" /></div>
           <p className="text-emerald-100/60 text-[10px] font-black uppercase tracking-[0.2em] mb-3">Total Paid (All Time)</p>
-          <p className="text-3xl font-black tracking-tight">${loading ? '—' : totalPaid.toFixed(2)}</p>
+          <div className="flex items-end justify-between">
+            <p className="text-3xl font-black tracking-tight">${loading ? '—' : totalPaid.toFixed(2)}</p>
+            <button
+              onClick={downloadHistory}
+              className="bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-all border border-white/10 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest"
+              title="Download Full History"
+            >
+              <Download className="w-3.5 h-3.5" /> PDF
+            </button>
+          </div>
           <div className="mt-3 flex items-center gap-2 text-emerald-100 text-[10px] font-black uppercase tracking-widest">
             <ShieldCheck className="w-3.5 h-3.5" /> Verified Standing
           </div>
@@ -131,8 +262,12 @@ const Finance: React.FC<FinanceProps> = ({ studentIds }) => {
                     <p className="text-xl font-black text-slate-900">${payment.amount.toFixed(2)}</p>
                   </div>
                   {payment.status === 'Paid' ? (
-                    <button className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-100 shadow-sm">
-                      <Download className="w-5 h-5" />
+                    <button
+                      onClick={() => downloadInvoice(payment)}
+                      className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-100 shadow-sm"
+                      title="Download Invoice"
+                    >
+                      <FileDown className="w-5 h-5" />
                     </button>
                   ) : (
                     <button onClick={() => setShowQr(true)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 active:scale-95">

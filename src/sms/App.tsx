@@ -160,6 +160,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     dataEncryption: true
   });
 
+  // Announcement Sections Data
+  const [events, setEvents] = useState<any[]>([]);
+  const [studentActivities, setStudentActivities] = useState<any[]>([]);
+  const [parentAnnouncements, setParentAnnouncements] = useState<any[]>([]);
+  const [liveIntelData, setLiveIntelData] = useState<any[]>([]);
+
   // Filters
   const [selectedDate, setSelectedDate] = useState('');
   const [classes, setClasses] = useState<any[]>([]);
@@ -213,6 +219,139 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [classDeleteError, setClassDeleteError] = useState<string | null>(null);
   const [isClassDeleteSubmitting, setIsClassDeleteSubmitting] = useState(false);
   const [newStudentCredentials, setNewStudentCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [isGlobalCreateModalOpen, setIsGlobalCreateModalOpen] = useState<'events' | 'student-activities' | 'announcements-parent' | 'live-intel' | null>(null);
+  const [isGlobalCreateSubmitting, setIsGlobalCreateSubmitting] = useState(false);
+  const [globalCreateData, setGlobalCreateData] = useState<any>({});
+  const [globalCreateFile, setGlobalCreateFile] = useState<File | null>(null);
+  const [globalEditId, setGlobalEditId] = useState<string | null>(null);
+
+  const handleGlobalSave = async (type: string, payload: any) => {
+    if (!schoolId) return;
+    setIsGlobalCreateSubmitting(true);
+    try {
+      let tableName = '';
+      if (type === 'events') tableName = 'events';
+      else if (type === 'student-activities') tableName = 'student_activities';
+      else if (type === 'announcements-parent') tableName = 'parent_announcements';
+      else if (type === 'live-intel') tableName = 'live_intel';
+
+      if (!tableName) throw new Error('Invalid creation type');
+
+      let attachmentUrl = payload.attachment_url || payload.image_url || null;
+      if (globalCreateFile) {
+        attachmentUrl = await uploadAnnouncementAttachment(globalCreateFile);
+      }
+
+      // Build a clean payload for the specific table to avoid column mismatch errors
+      let cleanPayload: any = { school_id: schoolId };
+      if (type === 'events') {
+        cleanPayload.title = payload.title || '';
+        cleanPayload.description = payload.description || '';
+        cleanPayload.event_date = payload.event_date || new Date().toISOString().split('T')[0];
+        cleanPayload.type = payload.type || 'General';
+        cleanPayload.image_url = attachmentUrl; // Events uses image_url
+        cleanPayload.location = payload.location || '';
+      } else if (type === 'student-activities') {
+        cleanPayload.name = payload.name || '';
+        cleanPayload.description = payload.description || '';
+        cleanPayload.activity_type = payload.activity_type || 'Club';
+        cleanPayload.attachment_url = attachmentUrl;
+      } else if (type === 'announcements-parent') {
+        cleanPayload.title = payload.title || '';
+        cleanPayload.message = payload.message || '';
+        cleanPayload.importance = payload.importance || 'Medium';
+        cleanPayload.attachment_url = attachmentUrl;
+      } else if (type === 'live-intel') {
+        cleanPayload.event_type = payload.event_type || 'System';
+        cleanPayload.severity = payload.severity || 'Info';
+        cleanPayload.details = { log: payload.details_text || (payload.details?.log) || 'Institutional update logged.' };
+        cleanPayload.attachment_url = attachmentUrl;
+      }
+
+      let saveError;
+      if (globalEditId) {
+        const { error } = await supabase
+          .from(tableName)
+          .update(cleanPayload)
+          .eq('id', globalEditId)
+          .eq('school_id', schoolId);
+        saveError = error;
+      } else {
+        const { error } = await supabase
+          .from(tableName)
+          .insert([cleanPayload]);
+        saveError = error;
+      }
+
+      if (saveError) throw saveError;
+
+      notify(`${type.replace('-', ' ').toUpperCase()} successfully ${globalEditId ? 'updated' : 'published'}.`);
+      setIsGlobalCreateModalOpen(null);
+      setGlobalEditId(null);
+      setGlobalCreateFile(null); // Clear file
+      // Refresh current data
+      if (type === 'events') void fetchEvents();
+      else if (type === 'student-activities') void fetchStudentActivities();
+      else if (type === 'announcements-parent') void fetchParentAnnouncements();
+      else if (type === 'live-intel') void fetchLiveIntel();
+    } catch (err: any) {
+      console.error(`[GlobalSave] Error:`, err);
+      notify(`Error: ${err.message || 'Failed to save item'}`);
+    } finally {
+      setIsGlobalCreateSubmitting(false);
+    }
+  };
+
+  const openGlobalEdit = (type: any, item: any) => {
+    setGlobalEditId(item.id);
+    setIsGlobalCreateModalOpen(type);
+    setGlobalCreateData({ ...item, details_text: item.details?.log || '' });
+    setGlobalCreateFile(null);
+  };
+
+  const fetchEvents = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('event_date', { ascending: true });
+
+    if (!error && data) setEvents(data);
+  };
+
+  const fetchStudentActivities = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('student_activities')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setStudentActivities(data);
+  };
+
+  const fetchParentAnnouncements = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('parent_announcements')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setParentAnnouncements(data);
+  };
+
+  const fetchLiveIntel = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('live_intel')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setLiveIntelData(data);
+  };
 
   const stats = useMemo(() => {
     const totalStudents = allStudents.length || students.length;
@@ -251,6 +390,22 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   const handleLogout = useCallback(async () => {
     try {
+      // 1. CLEAR ALL STATE SYNCHRONOUSLY FIRST
+      setStudents([]);
+      setAllStudents([]);
+      setAttendanceStudents([]);
+      setTeachers([]);
+      setParents([]);
+      setStudentServiceStaff([]);
+      setClasses([]);
+      setTotalEarningMMK(0);
+      setSubjects([]);
+      setLibraryItems([]);
+      setExams([]);
+      setHomeworks([]);
+      setPrograms([]);
+      setSelectedDate('');
+
       await authService.signOut();
       if (onSchoolIdChange) onSchoolIdChange(undefined);
       setOnboardingStatus('needs-school');
@@ -527,6 +682,27 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
     if (!data?.publicUrl) {
       throw new Error('Failed to retrieve uploaded image URL.');
+    }
+
+    return data.publicUrl;
+  };
+
+  const uploadAnnouncementAttachment = async (file: File) => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `att-${Date.now()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from('announcements')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('announcements')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded file URL.');
     }
 
     return data.publicUrl;
@@ -1153,51 +1329,69 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     }
   };
 
+  // Main data synchronization effect with explicit state clearing for isolation
   useEffect(() => {
-    const syncStudentsForDateFilter = async () => {
-      if (selectedDate) {
-        await fetchStudentsByDate(selectedDate);
-        return;
-      }
+    // 1. IMMEDIATELY RESET EVERYTHING BEFORE ANY AWAIT
+    // This synchronously removes stale data from the previous school context
+    setStudents([]);
+    setAllStudents([]);
+    setAttendanceStudents([]);
+    setTeachers([]);
+    setParents([]);
+    setStudentServiceStaff([]);
+    setClasses([]);
+    setTotalEarningMMK(0);
+    setSubjects([]);
+    setLibraryItems([]);
+    setExams([]);
+    setHomeworks([]);
+    setPrograms([]);
+    setSelectedDate('');
 
-      const schoolId = await requireSchoolId();
-      const { data, error } = await supabase
-        .schema('public')
-        .from('students')
-        .select('*')
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false });
+    const performCloudSync = async () => {
+      const activeSchoolId = await requireSchoolId();
+      if (!activeSchoolId) return;
 
-      if (!error && data) {
-        setStudents(data.map(mapStudentFromDB));
+      try {
+        await Promise.all([
+          (async () => {
+            if (activeSchoolId) {
+              if (selectedDate) {
+                await fetchStudentsByDate(selectedDate);
+              } else {
+                const { data, error } = await supabase
+                  .schema('public')
+                  .from('students')
+                  .select('*')
+                  .eq('school_id', activeSchoolId)
+                  .order('created_at', { ascending: false });
+
+                if (!error && data) {
+                  const mapped = data.map(mapStudentFromDB);
+                  setStudents(mapped);
+                  setAttendanceStudents(mapped);
+                }
+              }
+            }
+          })(),
+          fetchAllStudents(),
+          fetchTeachers(),
+          fetchParents(),
+          fetchStudentServiceStaff(),
+          fetchClasses(),
+          fetchTotalEarnings(),
+          fetchEvents(),
+          fetchStudentActivities(),
+          fetchParentAnnouncements(),
+          fetchLiveIntel()
+        ]);
+      } catch (err) {
+        console.error('Core data sync failed:', err);
       }
     };
 
-    void syncStudentsForDateFilter();
-  }, [selectedDate]);
-
-  useEffect(() => {
-    const fetchStudents = async () => {
-      const schoolId = await requireSchoolId();
-      const { data, error } = await supabase
-        .schema('public')
-        .from('students')
-        .select('*')
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setStudents(data.map(mapStudentFromDB));
-      }
-    };
-    fetchStudents();
-    fetchAllStudents();
-    fetchTeachers();
-    fetchParents();
-    fetchStudentServiceStaff();
-    fetchClasses();
-    fetchTotalEarnings();
-  }, []);
+    void performCloudSync();
+  }, [schoolId, selectedDate, requireSchoolId]);
 
   useEffect(() => {
     if (currentPage === 'dashboard') {
@@ -1723,8 +1917,32 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             setStudentServiceStaff(prev => prev.filter(s => s.id !== id));
             break;
           }
+          case 'events': {
+            const schoolId = await requireSchoolId();
+            void supabase.from('events').delete().eq('id', id).eq('school_id', schoolId);
+            setEvents(prev => prev.filter(e => e.id !== id));
+            break;
+          }
+          case 'student-activities': {
+            const schoolId = await requireSchoolId();
+            void supabase.from('student_activities').delete().eq('id', id).eq('school_id', schoolId);
+            setStudentActivities(prev => prev.filter(a => a.id !== id));
+            break;
+          }
+          case 'announcements-parent': {
+            const schoolId = await requireSchoolId();
+            void supabase.from('parent_announcements').delete().eq('id', id).eq('school_id', schoolId);
+            setParentAnnouncements(prev => prev.filter(p => p.id !== id));
+            break;
+          }
+          case 'live-intel': {
+            const schoolId = await requireSchoolId();
+            void supabase.from('live_intel').delete().eq('id', id).eq('school_id', schoolId);
+            setLiveIntelData(prev => prev.filter(i => i.id !== id));
+            break;
+          }
         }
-        notify(`${type.charAt(0).toUpperCase() + type.slice(1)} node deleted.`);
+        notify(`${type.replace('-', ' ').toUpperCase()} node deleted.`);
       }
     });
   };
@@ -2996,7 +3214,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   if (onboardingStatus === 'needs-school') {
     return (
       <CreateSchoolPage
-        onCreated={() => setOnboardingStatus('ready')}
+        onCreated={(id) => {
+          if (onSchoolIdChange) onSchoolIdChange(id);
+          setOnboardingStatus('ready');
+        }}
       />
     );
   }
@@ -3295,7 +3516,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         schoolName={schoolName}
       />
 
-      <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} flex flex-col min-w-0`}>
+      <main className={`flex-1 transition-all duration-300 flex flex-col min-w-0`}>
         <header className="h-20 bg-white/60 dark:bg-slate-900/40 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-40 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-4 sm:gap-8">
             <button className="lg:hidden p-3 text-slate-500 hover:text-brand-500 transition-all" onClick={() => setIsMobileMenuOpen(true)}><i className="fas fa-bars-staggered"></i></button>
@@ -3704,12 +3925,509 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             />
           )}
 
+          {/* EVENTS PAGE */}
+          {currentPage === 'events' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl"><i className="fas fa-calendar-star"></i></div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">Events</h2>
+                  <p className="text-sm text-slate-400 mt-1">Manage and publish school events for students and parents.</p>
+                </div>
+              </div>
+              {events.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-10 text-center shadow-premium">
+                  <i className="fas fa-calendar-plus text-5xl text-brand-500/30 mb-6 block"></i>
+                  <p className="text-slate-500 font-semibold">No events scheduled yet. Create an event to share with the school community.</p>
+                  <button 
+                    onClick={() => setIsGlobalCreateModalOpen('events')}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Create Event
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                  <div 
+                    onClick={() => setIsGlobalCreateModalOpen('events')}
+                    className="group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:border-brand-500 hover:bg-brand-500/5 transition-all cursor-pointer min-h-[280px]"
+                  >
+                    <div className="w-16 h-16 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform"><i className="fas fa-plus"></i></div>
+                    <h4 className="mt-6 text-xl font-black tracking-tight">Post New Event</h4>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-400">Share with community</p>
+                  </div>
+                  {events.map((event: any) => (
+                    <div key={event.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 shadow-premium group hover:-translate-y-1 transition-all overflow-hidden relative">
+                      {event.image_url && (
+                        <div className="absolute inset-0 opacity-5 group-hover:opacity-10 transition-opacity">
+                          <img src={event.image_url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex justify-between items-start mb-6 relative z-10">
+                        <div className="flex flex-col gap-2">
+                          <span className="px-4 py-1.5 rounded-xl bg-brand-500/10 text-brand-500 text-[10px] font-black uppercase tracking-widest w-fit">{event.type}</span>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">{new Date(event.event_date).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <button onClick={(e) => { e.stopPropagation(); openGlobalEdit('events', event); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-brand-500 transition-all flex items-center justify-center text-xs shadow-sm"><i className="fas fa-pencil"></i></button>
+                           <button onClick={(e) => { e.stopPropagation(); deleteEntity(event.id, 'events'); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-all flex items-center justify-center text-xs shadow-sm"><i className="fas fa-trash-can"></i></button>
+                        </div>
+                      </div>
+                      <h4 className="text-xl font-black tracking-tight mb-2 line-clamp-1 relative z-10">{event.title}</h4>
+                      <p className="text-sm text-slate-500 line-clamp-3 mb-6 font-medium leading-relaxed relative z-10">{event.description}</p>
+                      <div className="flex items-center justify-between mt-auto relative z-10">
+                        {event.location && (
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            <i className="fas fa-location-dot text-brand-500"></i>
+                            {event.location}
+                          </div>
+                        )}
+                        {event.image_url && (
+                          <a href={event.image_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black uppercase tracking-widest text-brand-500 hover:text-brand-600 flex items-center gap-2 bg-brand-500/5 px-3 py-1.5 rounded-lg transition-colors">
+                            <i className="fas fa-file-image"></i> Media
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STUDENT ACTIVITIES PAGE */}
+          {currentPage === 'student-activities' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl"><i className="fas fa-masks-theater"></i></div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">Student Activities</h2>
+                  <p className="text-sm text-slate-400 mt-1">Publish extracurricular programs, clubs, and student initiatives.</p>
+                </div>
+              </div>
+              {studentActivities.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-10 text-center shadow-premium">
+                  <i className="fas fa-users text-5xl text-brand-500/30 mb-6 block"></i>
+                  <p className="text-slate-500 font-semibold">No activities posted yet. Add activities for students to explore and join.</p>
+                  <button 
+                    onClick={() => setIsGlobalCreateModalOpen('student-activities')}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Add Activity
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                  <div 
+                    onClick={() => setIsGlobalCreateModalOpen('student-activities')}
+                    className="group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:border-brand-500 hover:bg-brand-500/5 transition-all cursor-pointer min-h-[250px]"
+                  >
+                    <div className="w-16 h-16 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform"><i className="fas fa-plus"></i></div>
+                    <h4 className="mt-6 text-xl font-black tracking-tight">Add New Activity</h4>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-400">Expand campus life</p>
+                  </div>
+                  {studentActivities.map((act: any) => (
+                    <div key={act.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 shadow-premium group hover:-translate-y-1 transition-all">
+                      <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 text-brand-500 rounded-2xl flex items-center justify-center text-xl mb-6 group-hover:bg-brand-500 group-hover:text-white transition-all">
+                        <i className={`fas ${act.icon || 'fa-users'}`}></i>
+                      </div>
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-xl font-black tracking-tight line-clamp-1">{act.name}</h4>
+                        <div className="flex items-center gap-2">
+                           <button onClick={(e) => { e.stopPropagation(); openGlobalEdit('student-activities', act); }} className="text-slate-400 hover:text-brand-500 transition-colors text-xs p-1"><i className="fas fa-pencil"></i></button>
+                           <button onClick={(e) => { e.stopPropagation(); deleteEntity(act.id, 'student-activities'); }} className="text-slate-400 hover:text-rose-500 transition-colors text-xs p-1"><i className="fas fa-trash-can"></i></button>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 items-center mb-6">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{act.activity_type}</span>
+                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${act.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'}`}>{act.status}</span>
+                      </div>
+                      <p className="text-sm text-slate-500 line-clamp-4 font-medium leading-relaxed mb-6">{act.description}</p>
+                      {act.attachment_url && (
+                        <a href={act.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-brand-500 hover:text-brand-600 bg-brand-500/5 px-4 py-2 rounded-xl transition-all">
+                          <i className="fas fa-paperclip"></i> View Attached File
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ANNOUNCEMENTS FOR PARENT PAGE */}
+          {currentPage === 'announcements-parent' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl"><i className="fas fa-people-roof"></i></div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">Announcements For Parent</h2>
+                  <p className="text-sm text-slate-400 mt-1">Send targeted announcements directly to parents via the Parent Portal.</p>
+                </div>
+              </div>
+              {parentAnnouncements.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-10 text-center shadow-premium">
+                  <i className="fas fa-envelope-open-text text-5xl text-brand-500/30 mb-6 block"></i>
+                  <p className="text-slate-500 font-semibold">No parent announcements published yet. Create one to notify parents instantly.</p>
+                  <button 
+                    onClick={() => setIsGlobalCreateModalOpen('announcements-parent')}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Create Announcement
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
+                  <div 
+                    onClick={() => setIsGlobalCreateModalOpen('announcements-parent')}
+                    className="group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex items-center gap-6 hover:border-brand-500 hover:bg-brand-500/5 transition-all cursor-pointer"
+                  >
+                    <div className="w-14 h-14 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform"><i className="fas fa-plus"></i></div>
+                    <div className="text-left">
+                      <h4 className="text-lg font-black tracking-tight">New Parent Update</h4>
+                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Push to portal</p>
+                    </div>
+                  </div>
+                  {parentAnnouncements.map((pa: any) => (
+                    <div key={pa.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-8 shadow-premium group">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                          pa.importance === 'Urgent' ? 'bg-rose-500/10 text-rose-500' :
+                          pa.importance === 'High' ? 'bg-amber-500/10 text-amber-500' :
+                          'bg-sky-500/10 text-sky-500'
+                        }`}>
+                          {pa.importance}
+                        </div>
+                        <div className="flex items-center gap-3">
+                           <button onClick={() => openGlobalEdit('announcements-parent', pa)} className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-brand-500 transition-all flex items-center justify-center shadow-sm"><i className="fas fa-edit text-xs"></i></button>
+                           <button onClick={() => deleteEntity(pa.id, 'announcements-parent')} className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-all flex items-center justify-center shadow-sm"><i className="fas fa-trash text-xs"></i></button>
+                        </div>
+                      </div>
+                      <h4 className="text-2xl font-black tracking-tight mb-4">{pa.title}</h4>
+                      <p className="text-sm text-slate-500 font-medium leading-relaxed mb-6">{pa.message}</p>
+                      <div className="flex items-center gap-4 mt-6">
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-brand-500 bg-brand-500/5 px-4 py-2 rounded-xl w-fit">
+                          <i className="fas fa-check-double"></i> Published to Parent Portal
+                        </div>
+                        {pa.attachment_url && (
+                          <a href={pa.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-brand-500 transition-colors">
+                            <i className="fas fa-paperclip"></i> Attachment
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* LIVE INTEL PAGE */}
+          {currentPage === 'live-intel' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl"><i className="fas fa-satellite-dish"></i></div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">Live Intel</h2>
+                  <p className="text-sm text-slate-400 mt-1">Real-time alerts, system activity, and institutional intelligence feed.</p>
+                </div>
+              </div>
+
+              {liveIntelData.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-10 text-center shadow-premium">
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-black uppercase tracking-widest mb-4"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Live Feed Active</span>
+                  <p className="text-slate-500 font-semibold">Real-time intelligence data will appear here as events occur across the institution.</p>
+                  <button 
+                    onClick={() => setIsGlobalCreateModalOpen('live-intel')}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Post Intel
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 pb-20">
+                  <div 
+                    onClick={() => setIsGlobalCreateModalOpen('live-intel')}
+                    className="group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex items-center justify-between hover:border-brand-500 hover:bg-brand-500/5 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-brand-500/10 text-brand-500 rounded-xl flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i className="fas fa-satellite"></i></div>
+                      <h4 className="text-lg font-black tracking-tight">Manual Intel Dispatch</h4>
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Broadcast updates</span>
+                  </div>
+                  {liveIntelData.map((intel: any) => (
+                    <div key={intel.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 shadow-sm flex items-center gap-6">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
+                        intel.severity === 'Critical' ? 'bg-rose-500/10 text-rose-500' :
+                        intel.severity === 'Warning' ? 'bg-amber-500/10 text-amber-500' :
+                        'bg-sky-500/10 text-sky-500'
+                      }`}>
+                        <i className={`fas ${
+                          intel.event_type.toLowerCase().includes('sec') ? 'fa-shield-halved' :
+                          intel.event_type.toLowerCase().includes('sys') ? 'fa-microchip' :
+                          'fa-bolt'
+                        }`}></i>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h5 className="font-black tracking-tight truncate uppercase text-xs">{intel.event_type}</h5>
+                          <span className="text-[10px] font-bold text-slate-400">{new Date(intel.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <p className="text-sm text-slate-500 font-medium truncate italic">{intel.details?.log || 'Intel snapshot captured'}</p>
+                          {intel.attachment_url && (
+                            <a href={intel.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-500 hover:underline flex-shrink-0">
+                              <i className="fas fa-link"></i>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => openGlobalEdit('live-intel', intel)} className="p-2 text-slate-400 hover:text-brand-500 transition-colors"><i className="fas fa-pen-to-square text-xs"></i></button>
+                        <button onClick={() => deleteEntity(intel.id, 'live-intel')} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><i className="fas fa-trash text-xs"></i></button>
+                        <div className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${
+                          intel.severity === 'Critical' ? 'text-rose-500' :
+                          intel.severity === 'Warning' ? 'text-amber-500' :
+                          'text-sky-500'
+                        }`}>
+                          {intel.severity}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* FALLBACK HUB */}
-          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail'].includes(currentPage) && (
+          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel'].includes(currentPage) && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>
               <button onClick={() => setCurrentPage('dashboard')} className="mt-8 sm:mt-12 lg:mt-16 px-8 sm:px-14 lg:px-24 py-4 sm:py-6 lg:py-8 bg-brand-500 text-white font-black rounded-[24px] sm:rounded-[40px] lg:rounded-[64px] text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.2em] sm:tracking-[0.35em] lg:tracking-[0.5em] shadow-2xl active:scale-95 transition-all">Initialize Core</button>
+            </div>
+          )}
+
+          {/* GLOBAL CREATE MODAL */}
+          {isGlobalCreateModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 lg:p-10">
+              <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsGlobalCreateModalOpen(null)}></div>
+              <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
+                <div className="p-8 sm:p-10 lg:p-12 overflow-y-auto max-h-[85vh] no-scrollbar">
+                  <div className="flex justify-between items-start mb-10">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl">
+                        <i className={`fas ${
+                          isGlobalCreateModalOpen === 'events' ? 'fa-calendar-star' :
+                          isGlobalCreateModalOpen === 'student-activities' ? 'fa-masks-theater' :
+                          isGlobalCreateModalOpen === 'announcements-parent' ? 'fa-people-roof' : 'fa-satellite-dish'
+                        }`}></i>
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black tracking-tighter capitalize">{isGlobalCreateModalOpen.replace('-', ' ')}</h3>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Institutional Communication Hub</p>
+                      </div>
+                    </div>
+                    <button onClick={() => {
+                      setIsGlobalCreateModalOpen(null);
+                      setGlobalCreateData({});
+                      setGlobalCreateFile(null);
+                    }} className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all"><i className="fas fa-times"></i></button>
+                  </div>
+
+                  <form className="space-y-6" onSubmit={(e) => {
+                    e.preventDefault();
+                    handleGlobalSave(isGlobalCreateModalOpen, globalCreateData);
+                  }}>
+                    {/* COMMON TITLE/NAME/CATEGORY FIELD - HIDDEN FOR LIVE-INTEL AS IT HAS SPECIFIC LAYOUT */}
+                    {isGlobalCreateModalOpen !== 'live-intel' && (
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
+                          {isGlobalCreateModalOpen === 'student-activities' ? 'Activity Name' : 'Title / Subject'}
+                        </span>
+                        <input
+                          required
+                          type="text"
+                          value={
+                            isGlobalCreateModalOpen === 'student-activities' 
+                              ? (globalCreateData.name || '') 
+                              : (globalCreateData.title || '')
+                          }
+                          onChange={(e) => setGlobalCreateData({ 
+                            ...globalCreateData, 
+                            [isGlobalCreateModalOpen === 'student-activities' ? 'name' : 'title']: e.target.value 
+                          })}
+                          placeholder={isGlobalCreateModalOpen === 'events' ? 'Winter Workshop 2024' : 'Announcement Subject...'}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all font-sans"
+                        />
+                      </div>
+                    )}
+
+                    {/* CONTEXT SPECIFIC FIELDS */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {isGlobalCreateModalOpen === 'events' && (
+                        <>
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Event Date</span>
+                            <input
+                              required
+                              type="date"
+                              value={globalCreateData.event_date || ''}
+                              onChange={(e) => setGlobalCreateData({ ...globalCreateData, event_date: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Type</span>
+                            <select
+                              value={globalCreateData.type || 'General'}
+                              onChange={(e) => setGlobalCreateData({ ...globalCreateData, type: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all appearance-none"
+                            >
+                              <option value="General">General</option>
+                              <option value="Holiday">Holiday</option>
+                              <option value="Workshop">Workshop</option>
+                              <option value="Exam">Exam Schedule</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      {isGlobalCreateModalOpen === 'student-activities' && (
+                        <div className="sm:col-span-2 space-y-2">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Activity Category</span>
+                          <select
+                            value={globalCreateData.activity_type || 'Club'}
+                            onChange={(e) => setGlobalCreateData({ ...globalCreateData, activity_type: e.target.value })}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all appearance-none"
+                          >
+                            <option value="Club">Student Club</option>
+                            <option value="Sports">Sports / Athletics</option>
+                            <option value="Arts">Arts & Culture</option>
+                            <option value="Academic">Academic Competition</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {isGlobalCreateModalOpen === 'announcements-parent' && (
+                        <div className="sm:col-span-2 space-y-2">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Priority Status</span>
+                          <select
+                            value={globalCreateData.importance || 'Medium'}
+                            onChange={(e) => setGlobalCreateData({ ...globalCreateData, importance: e.target.value })}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all appearance-none"
+                          >
+                            <option value="Low">Low Priority</option>
+                            <option value="Medium">Standard Announcement</option>
+                            <option value="High">High Importance</option>
+                            <option value="Urgent">Urgent Alert</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {isGlobalCreateModalOpen === 'live-intel' && (
+                        <>
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Intel Category</span>
+                            <input
+                              required
+                              type="text"
+                              value={globalCreateData.event_type || ''}
+                              onChange={(e) => setGlobalCreateData({ ...globalCreateData, event_type: e.target.value })}
+                              placeholder="e.g. Security, System"
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Severity</span>
+                            <select
+                              value={globalCreateData.severity || 'Info'}
+                              onChange={(e) => setGlobalCreateData({ ...globalCreateData, severity: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all appearance-none"
+                            >
+                              <option value="Info">Info</option>
+                              <option value="Warning">Warning</option>
+                              <option value="Critical">Critical Alert</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* MAIN DESCRIPTION FIELD */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
+                        {isGlobalCreateModalOpen === 'live-intel' ? 'System Details' : 'Detailed Message / Description'}
+                      </span>
+                      <textarea
+                        required
+                        value={
+                          (isGlobalCreateModalOpen === 'events' || isGlobalCreateModalOpen === 'student-activities') ? (globalCreateData.description || '') :
+                          (isGlobalCreateModalOpen === 'announcements-parent') ? (globalCreateData.message || '') :
+                          (globalCreateData.details_text || '')
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (isGlobalCreateModalOpen === 'events' || isGlobalCreateModalOpen === 'student-activities') setGlobalCreateData({ ...globalCreateData, description: val });
+                          else if (isGlobalCreateModalOpen === 'announcements-parent') setGlobalCreateData({ ...globalCreateData, message: val });
+                          else if (isGlobalCreateModalOpen === 'live-intel') setGlobalCreateData({ ...globalCreateData, details_text: val });
+                        }}
+                        placeholder="Write details here..."
+                        className="w-full h-32 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all resize-none"
+                      />
+                    </div>
+
+                    {/* FILE ATTACHMENT FIELD */}
+                    <div className="space-y-2">
+                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Attachment (Optional)</span>
+                       <div className="flex items-center gap-4 px-4">
+                          <input
+                            type="file"
+                            id="announcement-file"
+                            className="hidden"
+                            onChange={(e) => setGlobalCreateFile(e.target.files?.[0] || null)}
+                          />
+                          <label 
+                            htmlFor="announcement-file"
+                            className="flex-1 cursor-pointer bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4 flex items-center gap-3 text-sm font-bold text-slate-500 hover:border-brand-500 hover:bg-brand-500/5 transition-all group"
+                          >
+                            <i className="fas fa-paperclip text-brand-500 group-hover:scale-110 transition-transform"></i>
+                            {globalCreateFile ? globalCreateFile.name : 'Choose/Drop File'}
+                          </label>
+                          {globalCreateFile && (
+                            <button 
+                              type="button"
+                              onClick={() => setGlobalCreateFile(null)}
+                              className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all"
+                            >
+                              <i className="fas fa-trash-can"></i>
+                            </button>
+                          )}
+                       </div>
+                    </div>
+
+                    <button
+                      disabled={isGlobalCreateSubmitting}
+                      type="submit"
+                      className="w-full py-5 bg-brand-500 text-white font-black rounded-3xl text-sm uppercase tracking-[0.3em] shadow-xl shadow-brand-500/30 hover:bg-brand-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+                    >
+                      {isGlobalCreateSubmitting ? (
+                        <>
+                          <i className="fas fa-circle-notch fa-spin"></i>
+                          Uploading & Processing...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-paper-plane"></i>
+                          Deploy Announcement
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -3717,5 +4435,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     </div>
   );
 };
+
 
 export default App;

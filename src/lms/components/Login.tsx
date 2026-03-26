@@ -8,7 +8,7 @@ import { isSupabaseConfigured, supabase } from '../src/supabaseClient';
 // Define props accepted by the Login component.
 interface LoginProps {
   // Callback used after successful auth for STUDENT or TEACHER roles.
-  onLogin: (role: Exclude<UserRole, UserRole.PARENT>, email: string, schoolId?: string) => void;
+  onLogin: (role: Exclude<UserRole, UserRole.PARENT>, email: string, schoolId?: string, authUserId?: string) => void;
 }
 
 // Create a typed functional component and extract onLogin from props.
@@ -64,7 +64,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       // Fetch matching student credentials from students table.
       const { data: student, error: studentError } = await supabase
         .from('students')
-        .select('name, email, temp_password, school_id')
+        .select('id, auth_user_id, name, email, temp_password, school_id')
         .or(`name.eq.${identifier},email.eq.${identifier}`)
         .eq('temp_password', password)
         .maybeSingle();
@@ -78,7 +78,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
 
       // Successful match logs in as student.
-      onLogin(UserRole.STUDENT, student.email || student.name, student.school_id || undefined);
+      onLogin(UserRole.STUDENT, student.email || student.name, student.school_id || undefined, student.auth_user_id || student.id);
     } catch (err: any) {
       // Display known error message or fallback generic auth error.
       setError(err.message || 'Authentication failed');

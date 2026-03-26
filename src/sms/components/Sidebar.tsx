@@ -72,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   return (
-    <aside className={`fixed h-full bg-[#0f172a] text-white z-50 flex flex-col transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl w-64' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}>
+    <aside className={`fixed lg:sticky lg:top-0 lg:h-screen bg-[#0f172a] text-white z-50 lg:z-0 flex flex-col transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl w-64' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} ${!isMobileMenuOpen ? 'lg:w-0' : ''}`}>
       <div className={`p-8 pb-10 flex items-center shrink-0 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
         <div className="w-10 h-10 bg-brand-500 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/30 overflow-hidden shrink-0">
           <img src={logoIem} alt="IEM" className="w-full h-full object-cover" />
@@ -114,7 +114,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         <SidebarMenuItem id="student-attendance" icon="fa-calendar-check" label="Class Management" activePage={currentPage} />
         <SidebarMenuItem id="homework" icon="fa-book-open" label="Homework" activePage={currentPage} />
         <SidebarMenuItem id="report-card" icon="fa-file-lines" label="Report Card" activePage={currentPage} />
-        <SidebarMenuItem id="notice" icon="fa-bullhorn" label="Notice Board" activePage={currentPage} />
+        <SidebarMenuItem icon="fa-bullhorn" label="Announcement" activePage={currentPage} hasDropdown>
+          <SidebarSubItem id="notice" label="Notice Board" activePage={currentPage} />
+          <SidebarSubItem id="events" label="Events" activePage={currentPage} />
+          <SidebarSubItem id="student-activities" label="Student Activities" activePage={currentPage} />
+          <SidebarSubItem id="announcements-parent" label="Announcements For Parent" activePage={currentPage} />
+          <SidebarSubItem id="live-intel" label="Live Intel" activePage={currentPage} />
+        </SidebarMenuItem>
         <SidebarMenuItem icon="fa-money-bill-wave" label="Payment" activePage={currentPage} hasDropdown>
             <SidebarSubItem id="payment" label="Payment" activePage={currentPage} />
           <SidebarSubItem id="payment-assign" label="Assign Payment" activePage={currentPage} />
@@ -123,6 +129,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </SidebarMenuItem>
         <SidebarMenuItem id="exam" icon="fa-clipboard-check" label="Exam Management" activePage={currentPage} />
         <SidebarMenuItem id="security" icon="fa-user-shield" label="Security Permission" activePage={currentPage} />
+
         
         <div className="mt-auto px-8 mb-8 space-y-4">
           <button 

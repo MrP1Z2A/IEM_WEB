@@ -7,9 +7,10 @@ import { Trophy, Mail, Hash, User, MapPin, Award, BookOpen, Clock, RefreshCw, Sh
 interface StudentHubProps {
   studentNames?: string[];
   studentIds?: string[];
+  schoolId?: string;
 }
 
-const StudentHub: React.FC<StudentHubProps> = ({ studentNames, studentIds }) => {
+const StudentHub: React.FC<StudentHubProps> = ({ studentNames, studentIds, schoolId }) => {
   const [data, setData] = useState<ParentPortalData | null>(null);
   const [syncing, setSyncing] = useState(true);
 
@@ -18,15 +19,16 @@ const StudentHub: React.FC<StudentHubProps> = ({ studentNames, studentIds }) => 
 
   const fetchData = useCallback(async () => {
     setSyncing(true);
+    setData(null); // Clear old results to prevent stale data visibility
     try {
-      const result = await fetchParentPortalData(studentIds || []);
+      const result = await fetchParentPortalData(studentIds || [], schoolId);
       setData(result);
     } catch (e) {
       console.error('StudentHub fetch error:', e);
     } finally {
       setSyncing(false);
     }
-  }, [studentIds?.join(',')]);
+  }, [studentIds?.join(','), schoolId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -181,7 +183,7 @@ const StudentHub: React.FC<StudentHubProps> = ({ studentNames, studentIds }) => 
             <p className="text-4xl font-black text-slate-900 tracking-tight">{data?.attendance?.rate || '0%'}</p>
           </div>
           <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Current GPA</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Overall Grade Percentage</p>
             <p className="text-4xl font-black text-slate-900 tracking-tight">{reportCard?.gpa || '0.00'}</p>
           </div>
           <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100">

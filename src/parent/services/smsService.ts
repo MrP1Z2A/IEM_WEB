@@ -20,8 +20,9 @@ export interface PaymentRecord {
   id: string;
   description: string;
   amount: number;
-  status: 'Paid' | 'Pending' | 'Overdue';
+  status: 'Paid' | 'Pending' | 'Overdue' | 'paid' | 'pending' | 'overdue';
   date: string;
+  note?: string;
 }
 
 export interface ExamResult {
@@ -45,6 +46,13 @@ export interface HomeworkItem {
   title: string;
   status: string;
   dueDate: string;
+  description: string;
+}
+
+export interface NoticeRecord {
+  title: string;
+  content: string;
+  date: string;
 }
 
 export interface ParentPortalData {
@@ -53,7 +61,7 @@ export interface ParentPortalData {
   homework: HomeworkItem[];
   payments: PaymentRecord[];
   reportCard: ReportCard | null;
-  notices: string[];
+  notices: NoticeRecord[];
   lastSync: string;
 }
 
@@ -63,9 +71,9 @@ export interface ParentPortalData {
  */
 export const fetchParentPortalData = async (
   studentIds: string[],
-  schoolId?: string
+  schoolId: string | undefined
 ): Promise<ParentPortalData> => {
-  if (!studentIds || studentIds.length === 0) {
+  if (!studentIds || studentIds.length === 0 || !schoolId) {
     return getEmptyPortalData();
   }
 
@@ -74,69 +82,154 @@ export const fetchParentPortalData = async (
   const [
     examGradesRes,
     attendanceRes,
-    homeworkRes,
     paymentsRes,
     reportCardRes,
     noticesRes,
   ] = await Promise.allSettled([
-    // 1. Exam grades joined with exam title
+    // 3. Exam grades - use student_id and school_id
     supabase
       .from('exam_grades')
-      .select('score, note, student_id, exam_id, exams(title, subject, date)')
+      .select('percentage, grade, note, student_id, exam_id, exam_title, exams(title, exam_date, class_id)')
       .eq('student_id', primaryStudentId)
-      .order('created_at', { ascending: false })
-      .limit(20),
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false }),
 
-    // 2. Attendance
+    // 4. Attendance - use student_id and school_id
     supabase
       .from('attendance_records')
-      .select('status, date')
-      .eq('student_id', primaryStudentId),
+      .select('status, attendance_date')
+      .eq('student_id', primaryStudentId)
+      .eq('school_id', schoolId),
 
-    // 3. Homework assignments
-    supabase
-      .from('homework_assignments')
-      .select('id, title, due_date, status')
-      .order('due_date', { ascending: true })
-      .limit(10),
-
-    // 4. Student payments
+    // 5. Student payments - get all history for student and school
     supabase
       .from('student_payments')
-      .select('id, description, amount, status, created_at')
+      .select('id, amount_mmk, status, created_at, note')
       .eq('student_id', primaryStudentId)
+      .eq('school_id', schoolId)
       .order('created_at', { ascending: false })
-      .limit(15),
+      .limit(50),
 
-    // 5. Latest report card
+    // 6. Latest report card - use student_id and school_id
     supabase
       .from('report_cards')
       .select('*')
       .eq('student_id', primaryStudentId)
+      .eq('school_id', schoolId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
 
-    // 6. Notice board
+    // 7. Notice board - use school_id
     supabase
       .from('notice_board')
-      .select('title, content, created_at')
-      .order('created_at', { ascending: false })
+      .select('title, message, notice_date')
+      .eq('school_id', schoolId)
+      .order('notice_date', { ascending: false })
       .limit(5),
   ]);
+
+  // --- Sub-queries for Homework ---
+  let homework: HomeworkItem[] = [];
+  if (noticesRes.status === 'fulfilled') { // Just a marker to keep the flow
+    // 1. Try direct mapping from class_course_students
+    const classStudentRes = (examGradesRes.status === 'fulfilled' ? (await Promise.allSettled([
+      supabase.from('class_course_students').select('class_id').eq('student_id', primaryStudentId).eq('school_id', schoolId)
+    ]))[0] : null);
+
+    let classIds: string[] = [];
+    if (classStudentRes && classStudentRes.status === 'fulfilled' && classStudentRes.value.data) {
+      const data = classStudentRes.value.data as any[];
+      classIds = Array.from(new Set(data.map(d => d.class_id).filter(Boolean)));
+    }
+
+    let classId = classIds.length > 0 ? classIds[0] : null;
+
+    // 2. Fallback: Try to get class_id from existing exam records if mapping is missing
+    if (!classId && examGradesRes.status === 'fulfilled' && examGradesRes.value.data) {
+      const examData = examGradesRes.value.data as any[];
+      const foundExamClassId = examData.find(eg => eg.exams?.class_id)?.exams?.class_id;
+      if (foundExamClassId) {
+        classId = foundExamClassId;
+        if (classId) classIds.push(classId);
+      }
+    }
+
+    // 3. Fallback: Try student_courses -> class_courses
+    if (!classId) {
+      const studentCoursesRes = await supabase
+        .from('student_courses')
+        .select('course_id')
+        .eq('student_id', primaryStudentId);
+      
+      if (!studentCoursesRes.error && studentCoursesRes.data && studentCoursesRes.data.length > 0) {
+        const courseIds = studentCoursesRes.data.map(sc => sc.course_id);
+        const classCoursesRes = await supabase
+          .from('class_courses')
+          .select('class_id')
+          .in('id', courseIds)
+          .limit(1);
+        
+        if (!classCoursesRes.error && classCoursesRes.data && classCoursesRes.data.length > 0) {
+          classId = classCoursesRes.data[0].class_id;
+        }
+      }
+    }
+
+    if (classIds.length > 0) {
+      const [assignmentsRes, submissionsRes] = await Promise.all([
+        supabase
+          .from('homework_assignments')
+          .select('id, title, due_date, description')
+          .in('class_id', classIds)
+          .eq('school_id', schoolId)
+          .order('due_date', { ascending: true }),
+        supabase
+          .from('homework_submissions')
+          .select('assignment_id, status')
+          .eq('student_id', primaryStudentId)
+          .eq('school_id', schoolId)
+      ]);
+
+      console.log('[smsService] Assignments fetch result:', assignmentsRes.data?.length || 0, 'rows');
+      console.log('[smsService] Submissions fetch result:', submissionsRes.data?.length || 0, 'rows');
+
+      if (assignmentsRes.data) {
+        const submissionMap = new Map((submissionsRes.data || []).map(s => [s.assignment_id, s.status]));
+        for (const row of assignmentsRes.data) {
+          const subStatus = submissionMap.get(row.id);
+          homework.push({
+            id: String(row.id),
+            title: row.title || 'Assignment',
+            status: subStatus || 'Pending',
+            dueDate: row.due_date || '',
+            description: (row as any).description || '',
+          });
+        }
+      }
+    }
+  }
 
   // --- Exam Results ---
   const examResults: ExamResult[] = [];
   if (examGradesRes.status === 'fulfilled' && examGradesRes.value.data) {
     for (const row of examGradesRes.value.data) {
       const exam = (row as any).exams;
-      const score = Number(row.score) || 0;
+      // Get percentage, or try to parse from grade if percentage is missing
+      let percentage = parsePercentage((row as any).percentage);
+      
+      // Fallback: If percentage is 0 and grade looks like a number, use grade
+      if (percentage === 0) {
+        const gradeVal = parsePercentage(row.grade);
+        if (gradeVal > 0) percentage = gradeVal;
+      }
+
       examResults.push({
-        subject: exam?.subject || exam?.title || 'Subject',
-        score,
-        grade: scoreToGrade(score),
-        examTitle: exam?.title || 'Assessment',
-        date: exam?.date || '',
+        subject: (row as any).exam_title || exam?.title || 'Subject',
+        score: percentage || 0,
+        grade: String(row.grade || scoreToGrade(percentage || 0)),
+        examTitle: (row as any).exam_title || exam?.title || 'Assessment',
+        date: exam?.exam_date || '',
       });
     }
   }
@@ -146,26 +239,25 @@ export const fetchParentPortalData = async (
   if (attendanceRes.status === 'fulfilled' && attendanceRes.value.data) {
     const records = attendanceRes.value.data;
     attendance.total = records.length;
-    attendance.present = records.filter((r: any) => r.status === 'P' || r.status === 'present').length;
-    attendance.absent = records.filter((r: any) => r.status === 'A' || r.status === 'absent').length;
-    attendance.late = records.filter((r: any) => r.status === 'L' || r.status === 'late').length;
+    attendance.present = records.filter((r: any) => {
+      const s = String(r.status || '').toLowerCase();
+      return s === 'p' || s === 'present' || s === 'true';
+    }).length;
+    attendance.absent = records.filter((r: any) => {
+      const s = String(r.status || '').toLowerCase();
+      return s === 'a' || s === 'absent' || s === 'false';
+    }).length;
+    attendance.late = records.filter((r: any) => {
+      const s = String(r.status || '').toLowerCase();
+      return s === 'l' || s === 'late';
+    }).length;
     attendance.rate = attendance.total > 0
       ? `${Math.round((attendance.present / attendance.total) * 100)}%`
       : '0%';
   }
 
-  // --- Homework ---
-  const homework: HomeworkItem[] = [];
-  if (homeworkRes.status === 'fulfilled' && homeworkRes.value.data) {
-    for (const row of homeworkRes.value.data) {
-      homework.push({
-        id: String(row.id),
-        title: row.title || 'Assignment',
-        status: row.status || 'Pending',
-        dueDate: row.due_date || '',
-      });
-    }
-  }
+  // --- Homework (Processed above) ---
+
 
   // --- Payments ---
   const payments: PaymentRecord[] = [];
@@ -173,10 +265,11 @@ export const fetchParentPortalData = async (
     for (const row of paymentsRes.value.data) {
       payments.push({
         id: String(row.id),
-        description: row.description || 'Fee',
-        amount: Number(row.amount) || 0,
-        status: (row.status as PaymentRecord['status']) || 'Pending',
+        description: row.note || 'Fee',
+        amount: Number(row.amount_mmk) || 0,
+        status: row.status ? (row.status.charAt(0).toUpperCase() + row.status.slice(1).toLowerCase() as PaymentRecord['status']) : 'Pending',
         date: row.created_at ? new Date(row.created_at).toLocaleDateString() : '',
+        note: row.note || '',
       });
     }
   }
@@ -202,13 +295,13 @@ export const fetchParentPortalData = async (
       });
     }
 
-    const avgScore = subjects.length > 0
-      ? subjects.reduce((s, sub) => s + sub.score, 0) / subjects.length
+    const overallAvg = examResults.length > 0
+      ? examResults.reduce((sum, e) => sum + e.score, 0) / examResults.length
       : 0;
 
     reportCard = {
       term: rc.term || rc.semester || 'Current Term',
-      gpa: rc.gpa ? String(rc.gpa) : avgScore > 0 ? (avgScore / 25).toFixed(2) : '0.00',
+      gpa: overallAvg > 0 ? `${overallAvg.toFixed(2)}%` : '0.00%',
       rank: rc.rank || '—',
       attendance: attendance.rate,
       subjects,
@@ -221,13 +314,15 @@ export const fetchParentPortalData = async (
       subjectMap[e.subject].push(e.score);
     });
     const subjects: SubjectResult[] = Object.entries(subjectMap).map(([name, scores]) => {
-      const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+      const avg = Math.round(scores.reduce((a, b) => a + b, 0) / (scores.length || 1));
       return { name, score: avg, grade: scoreToGrade(avg), comment: '' };
     });
-    const avgScore = subjects.reduce((s, sub) => s + sub.score, 0) / (subjects.length || 1);
+    
+    const overallAvg = examResults.reduce((sum, e) => sum + e.score, 0) / (examResults.length || 1);
+
     reportCard = {
       term: 'Current Term',
-      gpa: (avgScore / 25).toFixed(2),
+      gpa: `${overallAvg.toFixed(2)}%`,
       rank: '—',
       attendance: attendance.rate,
       subjects,
@@ -235,10 +330,14 @@ export const fetchParentPortalData = async (
   }
 
   // --- Notices ---
-  const notices: string[] = [];
+  const notices: NoticeRecord[] = [];
   if (noticesRes.status === 'fulfilled' && noticesRes.value.data) {
     for (const row of noticesRes.value.data) {
-      notices.push(row.title || row.content || 'Notice');
+      notices.push({
+        title: row.title || 'Notification',
+        content: (row as any).message || '',
+        date: (row as any).notice_date ? new Date((row as any).notice_date).toLocaleDateString() : '',
+      });
     }
   }
 
@@ -251,6 +350,47 @@ export const fetchParentPortalData = async (
     notices,
     lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   };
+};
+
+export const fetchEvents = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from('events')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('event_date', { ascending: true });
+  if (error) throw error;
+  return data || [];
+};
+
+export const fetchStudentActivities = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from('student_activities')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+};
+
+export const fetchParentAnnouncements = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from('parent_announcements')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+};
+
+export const fetchLiveIntel = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from('live_intel')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  return data || [];
 };
 
 // ---------- helpers ----------
@@ -267,6 +407,16 @@ function scoreToGrade(score: number): string {
   if (score >= 70) return 'C-';
   if (score >= 60) return 'D';
   return 'F';
+}
+
+function parsePercentage(val: any): number {
+  if (val === null || val === undefined) return 0;
+  const str = String(val).trim();
+  if (!str) return 0;
+  // Remove % and any non-numeric characters except decimal point
+  const numericStr = str.replace(/[^0-9.]/g, '');
+  const num = parseFloat(numericStr);
+  return isNaN(num) ? 0 : num;
 }
 
 function getEmptyPortalData(): ParentPortalData {

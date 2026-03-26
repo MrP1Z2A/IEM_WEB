@@ -4,7 +4,7 @@ import { Mail, ShieldCheck, BookOpen, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../../sms/supabaseClient';
 
 interface LoginPageProps {
-  onLogin: (parentData: { email: string; studentIds: string[]; studentNames: string[] }) => void;
+  onLogin: (parentData: { email: string; studentIds: string[]; studentNames: string[]; schoolId: string }) => void;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
@@ -20,10 +20,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     setError(null);
 
     try {
-      // Search for students linked to this parent email using parent_email column
       let { data, error: fetchError } = await supabase
         .from('students')
-        .select('id, name, parent_email, secondary_parent_email')
+        .select('id, name, parent_email, secondary_parent_email, school_id')
         .or(`parent_email.eq.${email.trim()},secondary_parent_email.eq.${email.trim()}`);
 
       if (fetchError) throw fetchError;
@@ -33,7 +32,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         onLogin({
           email: email.trim(),
           studentIds: data.map(s => s.id),
-          studentNames: data.map(s => s.name)
+          studentNames: data.map(s => s.name),
+          schoolId: data[0].school_id || ''
         });
       } else {
         setLoading(false);
@@ -47,7 +47,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden font-inter">
-      {/* Decorative Circles */}
       <div className="absolute top-[-10%] left-[-5%] w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl"></div>
       <div className="absolute bottom-[-10%] right-[-5%] w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl"></div>
 

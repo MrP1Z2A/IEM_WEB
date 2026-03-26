@@ -103,7 +103,7 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats, schoolId }) => 
     };
 
     fetchGrades();
-  }, []);
+  }, [schoolId]);
 
   const formatCompactMMK = (value: number) => {
     const abs = Math.abs(value || 0);

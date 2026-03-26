@@ -113,8 +113,32 @@ export interface User {
   avatar: string;
   studentId?: string;
   schoolId?: string;
+  childId?: string; // Linked student for Parent role
   eduLevel?: string;
-  childId?: string; // parent -> child link
+  bio?: string;
+  specialization?: string[];
+  rating?: number;
+}
+
+export interface Message {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+  read_at?: string;
+  school_id: string;
+}
+
+export interface Contact {
+  id: string; // The record ID in its table (students/teachers/student_services)
+  auth_user_id: string; // The ID for messaging (auth.users.id)
+  name: string;
+  email: string;
+  role: 'teacher' | 'student' | 'student_service';
+  avatar?: string;
+  lastMessage?: Message;
+  unreadCount?: number;
 }
 
 // ...existing code...

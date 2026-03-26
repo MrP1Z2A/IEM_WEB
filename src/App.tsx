@@ -47,7 +47,7 @@ export default function Portal() {
 
   const updateSchoolId = (newId: string | undefined, newName?: string) => {
     setSchoolIdState(newId);
-    if (newName) setSchoolName(newName);
+    setSchoolName(newName); // This clears the old name if a new one is not provided, triggering re-fetch
     
     if (typeof window !== 'undefined') {
       if (newId) {
@@ -58,11 +58,10 @@ export default function Portal() {
           ...user, 
           schoolId: newId, 
           school_id: newId,
-          schoolName: newName || (user as any).schoolName 
+          schoolName: newName 
         }));
       } else {
         window.localStorage.removeItem('iem_user');
-        setSchoolName(undefined);
       }
     }
   };
