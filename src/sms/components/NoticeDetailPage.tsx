@@ -51,6 +51,10 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const canRenderNotice = useMemo(() => !!noticeId && !!notice, [noticeId, notice]);
 
@@ -132,35 +136,39 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
     URL.revokeObjectURL(objectUrl);
   };
 
-  const deleteNotice = async () => {
+  const deleteNotice = () => {
     if (!notice) return;
-    if (!window.confirm('Delete this notice?')) return;
+    setConfirmDialog({
+      message: 'Delete this notice? This action is irreversible.',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setIsDeleting(true);
+        setError(null);
+        setStatus(null);
 
-    setIsDeleting(true);
-    setError(null);
-    setStatus(null);
+        const { error: deleteError } = await supabase
+          .from('notice_board')
+          .delete()
+          .eq('id', notice.id);
 
-    const { error: deleteError } = await supabase
-      .from('notice_board')
-      .delete()
-      .eq('id', notice.id);
+        if (deleteError) {
+          setIsDeleting(false);
+          setError(deleteError.message || 'Failed to delete notice.');
+          return;
+        }
 
-    if (deleteError) {
-      setIsDeleting(false);
-      setError(deleteError.message || 'Failed to delete notice.');
-      return;
-    }
+        if (notice.file_path) {
+          const path = extractStoragePath(notice.file_path);
+          if (path) {
+            await supabase.storage.from(NOTICE_FILES_BUCKET).remove([path]);
+          }
+        }
 
-    if (notice.file_path) {
-      const path = extractStoragePath(notice.file_path);
-      if (path) {
-        await supabase.storage.from(NOTICE_FILES_BUCKET).remove([path]);
+        setIsDeleting(false);
+        setStatus('Notice deleted.');
+        onBack();
       }
-    }
-
-    setIsDeleting(false);
-    setStatus('Notice deleted.');
-    onBack();
+    });
   };
 
   return (
@@ -232,6 +240,33 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
       ) : (
         <div className="rounded-[32px] border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-8 text-center text-sm font-semibold text-slate-500">
           Notice not found.
+        </div>
+      )}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-700 shadow-2xl p-8 space-y-6 text-center">
+            <div className="w-16 h-16 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center text-2xl mx-auto">
+              <i className="fas fa-trash-can animate-bounce"></i>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">Confirm Deletion</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] mx-auto">{confirmDialog.message}</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className="flex-1 px-4 py-3 rounded-2xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all"
+              >
+                Delete Notice
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

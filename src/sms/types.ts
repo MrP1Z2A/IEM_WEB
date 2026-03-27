@@ -102,4 +102,5 @@ export type PageId =
   | 'events'
   | 'student-activities'
   | 'announcements-parent'
-  | 'live-intel';
+  | 'live-intel'
+  | 'about-school';

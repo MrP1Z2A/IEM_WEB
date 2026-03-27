@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Login from './components/Login';
 import COURSES from './components/ClassandCoursesmanager';
 import LiveCalendar from './components/Livecalender';
+import SchoolInfo from './components/SchoolInfo';
 import { Course, User, UserRole, View, Note, Quiz, ReportCard } from './types';
 import { INITIAL_USER, INITIAL_COURSES, SCHOOL_EVENTS, SCHOOL_ACTIVITIES, DETAILED_GRADES, STUDENT_ACHIEVEMENTS, SCHOOL_HIVE_POSTS, SCHOOL_CONTACTS } from './constants';
 import { summarizeNotes, generateQuizFromNotes } from './services/aiService';
@@ -199,6 +200,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [dynamicSchoolEvents, setDynamicSchoolEvents] = useState<any[]>([]);
   const [dynamicStudentActivities, setDynamicStudentActivities] = useState<any[]>([]);
   const [dynamicLiveIntel, setDynamicLiveIntel] = useState<any[]>([]);
+  const [selectedLiveIntel, setSelectedLiveIntel] = useState<any>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [studentAttendanceRate, setStudentAttendanceRate] = useState<string>('98%');
 
@@ -207,6 +209,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState('');
   const [submissionFileError, setSubmissionFileError] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'confirm' | 'info';
+  } | null>(null);
 
   const hasNewNotices = dynamicAnnouncements.some(notice => !viewedNoticeIds.includes(notice.id));
 
@@ -221,7 +229,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     setDynamicSchoolEvents([]);
     setDynamicStudentActivities([]);
     setDynamicLiveIntel([]);
-    
+
     try {
       // Debug log for schoolId
       console.log('[NoticeBoard] Fetching notices for schoolId:', schoolId);
@@ -352,7 +360,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 }
                 return {
                   id: rc.id,
-                  title: rc.title || 'Official Report Card',
+                  title: rc.title || rc.file_name || 'Official Report Card',
                   reportDate: rc.report_date ? new Date(rc.report_date).toLocaleDateString() : 'N/A',
                   reportType: rc.report_type,
                   filePath: rc.file_path,
@@ -372,7 +380,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               .select('*')
               .eq('school_id', schoolId)
               .order('event_date', { ascending: true });
-            
+
             if (schoolEventsData) {
               setDynamicSchoolEvents(schoolEventsData.map(ev => ({
                 id: ev.id,
@@ -390,15 +398,15 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               .select('*')
               .eq('school_id', schoolId)
               .order('created_at', { ascending: false });
-            
+
             if (activitiesData) {
               setDynamicStudentActivities(activitiesData.map(act => ({
                 id: act.id,
                 name: act.name,
                 description: act.description,
-                icon: act.activity_type === 'Sports' ? 'fa-volleyball' : 
-                      act.activity_type === 'Arts' ? 'fa-palette' : 
-                      act.activity_type === 'Science' ? 'fa-flask' : 'fa-users',
+                icon: act.activity_type === 'Sports' ? 'fa-volleyball' :
+                  act.activity_type === 'Arts' ? 'fa-palette' :
+                    act.activity_type === 'Science' ? 'fa-flask' : 'fa-users',
                 activity_type: act.activity_type,
                 attachment_url: act.attachment_url
               })));
@@ -410,12 +418,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               .select('*')
               .eq('school_id', schoolId)
               .order('created_at', { ascending: false });
-            
+
             if (liveIntelData) {
               setDynamicLiveIntel(liveIntelData.map(intel => ({
                 id: intel.id,
-                title: intel.title,
-                content: intel.content,
+                title: intel.event_type || 'Update',
+                content: intel.details?.log || 'No details available.',
+                attachment_url: intel.attachment_url,
                 date: intel.created_at ? new Date(intel.created_at).toLocaleTimeString() : 'Recent'
               })));
             }
@@ -445,7 +454,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
     let studentQuery = supabase
       .from('students')
-      .select('id, name, avatar, email, attendanceRate, school_id')
+      .select('id, name, avatar, email, attendanceRate, school_id, date_of_birth, parent_name, parent_number, parent_email')
       .or(`email.eq.${user.email},name.eq.${user.email}`);
 
     if (schoolId) {
@@ -460,6 +469,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     }
 
     if (!student) return;
+
+    // Fetch Grade (Class Name)
+    const { data: enrollment } = await supabase
+      .from('class_course_students')
+      .select('classes(name)')
+      .eq('student_id', student.id)
+      .limit(1)
+      .maybeSingle();
+
+    const grade = (enrollment?.classes as any)?.name || 'N/A';
 
     // Sync schoolId back to root if it's different
     if (student.school_id && student.school_id !== schoolId && onSchoolIdChange) {
@@ -477,7 +496,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       email: student.email || prev.email,
       studentId: student.id ? String(student.id) : prev.studentId,
       schoolId: student.school_id || prev.schoolId,
-      avatar: avatarUrl || prev.avatar
+      avatar: avatarUrl || prev.avatar,
+      dob: student.date_of_birth || undefined,
+      grade: grade,
+      parentName: student.parent_name || undefined,
+      parentPhone: student.parent_number || undefined,
+      parentEmail: student.parent_email || undefined
     }));
   }, [isLoggedIn, user.email, schoolId]);
 
@@ -1025,13 +1049,22 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         {/* Live Intel Ticker */}
         {dynamicLiveIntel.length > 0 && (
-          <div className="bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-2xl flex items-center gap-4 animate-fadeIn">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
+          <div
+            onClick={() => {
+              setSelectedLiveIntel(dynamicLiveIntel[0]);
+              setCurrentView('live-intel-detail');
+            }}
+            className="bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-2xl flex items-center gap-4 animate-fadeIn cursor-pointer hover:bg-emerald-500/20 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0 group-hover:scale-110 transition-transform">
               <i className="fa-solid fa-bolt-lightning animate-pulse"></i>
             </div>
             <div className="flex-1 min-w-0">
-               <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Live Intel Update • {dynamicLiveIntel[0].date}</p>
-               <h4 className="text-sm font-bold text-white truncate">{dynamicLiveIntel[0].title}: {dynamicLiveIntel[0].content}</h4>
+              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Live Intel Update • {dynamicLiveIntel[0].date}</p>
+              <h4 className="text-sm font-bold text-white truncate flex items-center gap-2">
+                {dynamicLiveIntel[0].title}
+                <i className="fa-solid fa-chevron-right text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
+              </h4>
             </div>
           </div>
         )}
@@ -1376,7 +1409,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </div>
             )) : (
               <div className="p-6 bg-white/5 border border-white/10 rounded-[32px] text-center">
-                 <p className="text-slate-400 text-xs italic">Awaiting upcoming institutional events.</p>
+                <p className="text-slate-400 text-xs italic">Awaiting upcoming institutional events.</p>
               </div>
             )}
           </div>
@@ -1669,39 +1702,41 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
             <i className="fa-solid fa-file-pdf text-[#4ea59d]"></i> Official Report Cards
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {dynamicReportCards.length === 0 ? (
-              <div className="md:col-span-2 p-10 bg-[#0a1a19] rounded-[32px] border border-dashed border-[#1f4e4a] text-center">
-                <p className="text-sm text-slate-400">No official report cards available for download.</p>
-              </div>
-            ) : (
-              dynamicReportCards.map((rc) => (
-                <div key={rc.id} className="p-8 bg-[#0a1a19] rounded-[32px] border border-white/20 group hover:border-[#4ea59d] transition-all flex flex-col justify-between">
-                  <div className="flex items-start justify-between gap-4 mb-6">
-                    <div className="w-12 h-12 bg-[#4ea59d]/10 rounded-2xl flex items-center justify-center text-[#4ea59d] shrink-0">
-                      <i className="fa-solid fa-file-invoice text-2xl"></i>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-lg font-bold text-white truncate" title={rc.title || 'Official Report Card'}>{rc.title || 'Official Report Card'}</h4>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Released on {rc.reportDate}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[10px] font-black text-[#4ea59d]/60 uppercase tracking-widest bg-[#4ea59d]/5 px-3 py-1 rounded-lg">
-                      {rc.reportType}
-                    </span>
-                    {rc.fileUrl && (
-                      <button
-                        onClick={() => window.open(rc.fileUrl, '_blank')}
-                        className="px-6 py-3 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#3d8c85] transition-all shadow-lg shadow-[#4ea59d]/20 flex items-center gap-2"
-                      >
-                        <i className="fa-solid fa-cloud-arrow-down"></i> Download
-                      </button>
-                    )}
-                  </div>
+          <div className="max-h-[300px] overflow-y-auto pr-4 custom-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+              {dynamicReportCards.length === 0 ? (
+                <div className="md:col-span-2 p-10 bg-[#0a1a19] rounded-[32px] border border-dashed border-[#1f4e4a] text-center">
+                  <p className="text-sm text-slate-400">No official report cards available for download.</p>
                 </div>
-              ))
-            )}
+              ) : (
+                dynamicReportCards.map((rc) => (
+                  <div key={rc.id} className="p-8 bg-[#0a1a19] rounded-[32px] border border-white/20 group hover:border-[#4ea59d] transition-all flex flex-col justify-between">
+                    <div className="flex items-start justify-between gap-4 mb-6">
+                      <div className="w-12 h-12 bg-[#4ea59d]/10 rounded-2xl flex items-center justify-center text-[#4ea59d] shrink-0">
+                        <i className="fa-solid fa-file-invoice text-2xl"></i>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-lg font-bold text-white truncate" title={rc.title}>{rc.title}</h4>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Released on {rc.reportDate}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-[10px] font-black text-[#4ea59d]/60 uppercase tracking-widest bg-[#4ea59d]/5 px-3 py-1 rounded-lg">
+                        {rc.reportType}
+                      </span>
+                      {rc.fileUrl && (
+                        <button
+                          onClick={() => window.open(rc.fileUrl, '_blank')}
+                          className="px-6 py-3 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#3d8c85] transition-all shadow-lg shadow-[#4ea59d]/20 flex items-center gap-2"
+                        >
+                          <i className="fa-solid fa-cloud-arrow-down"></i> Download
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </section>
 
@@ -1736,33 +1771,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
       <Messaging currentUser={user} schoolId={schoolId || ''} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 mt-12">
-        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-          <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Direct Phone</h3>
-          <div className="space-y-4">
-            {SCHOOL_CONTACTS.phone.map((ph, i) => (
-              <div key={i} className="p-5 bg-[#0a1a19] rounded-2xl border border-white/20">
-                <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">{ph.label}</p>
-                <p className="text-base font-bold text-white">{ph.number}</p>
-                <p className="text-[8px] text-slate-300 uppercase font-black">{ph.hours}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
-          <h3 className="text-lg font-black text-white uppercase tracking-tight mb-8">Social Media</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {SCHOOL_CONTACTS.socials.map((soc, i) => (
-              <a key={i} href={soc.link} className="p-4 bg-[#0a1a19] rounded-2xl border border-white/20 flex flex-col items-center gap-2 group transition-all hover:border-[#4ea59d]">
-                <div className="text-xl" style={{ color: soc.color }}>
-                  <i className={`fa-brands ${soc.icon}`}></i>
-                </div>
-                <span className="text-[9px] font-black text-slate-400 group-hover:text-white uppercase">{soc.brand}</span>
-              </a>
-            ))}
-          </div>
-        </section>
+      <div className="mt-16">
+        <SchoolInfo schoolId={schoolId || ''} />
       </div>
     </div>
   );
@@ -1902,8 +1912,86 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </div>
             </div>
           ))}
-          <button onClick={() => { alert('Quiz submitted!'); setCurrentView('course-detail'); }} className="w-full py-5 bg-[#4ea59d] text-white rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl">Submit Answers</button>
+          <button
+            onClick={() => {
+              setConfirmDialog({
+                title: 'Quiz Submitted',
+                message: 'Your answers have been securely transmitted to the faculty board. Evaluation is now in progress.',
+                type: 'info',
+                onConfirm: () => {
+                  setConfirmDialog(null);
+                  setCurrentView('course-detail');
+                }
+              });
+            }}
+            className="w-full py-5 bg-[#4ea59d] text-white rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl"
+          >
+            Submit Answers
+          </button>
         </div>
+      </div>
+    );
+  };
+
+  const renderLiveIntelDetail = () => {
+    if (!selectedLiveIntel) return null;
+    return (
+      <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
+          <div className="space-y-4 flex-1">
+            <button onClick={() => setCurrentView('dashboard')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
+              <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Dashboard
+            </button>
+            <h2 className="text-5xl font-black text-white uppercase tracking-tight leading-none">{selectedLiveIntel.title}</h2>
+            <div className="flex flex-wrap gap-4 pt-2">
+              <span className="bg-emerald-500/10 text-emerald-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/20 flex items-center gap-2">
+                <i className="fa-solid fa-clock"></i> {selectedLiveIntel.date}
+              </span>
+            </div>
+          </div>
+        </header>
+
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl max-w-4xl">
+          <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-6 flex items-center gap-4">
+            <i className="fa-solid fa-circle-info text-[#4ea59d]"></i> Live Intel
+          </h3>
+          <p className="text-lg text-slate-200 leading-relaxed font-medium whitespace-pre-wrap">
+            {selectedLiveIntel.content}
+          </p>
+
+          {selectedLiveIntel.attachment_url && (
+            <div className="mt-10 pt-8 border-t border-white/10">
+              <h4 className="text-xs font-black text-[#4ea59d] uppercase tracking-[0.2em] mb-4">Attached Intel Dossier</h4>
+
+              {/* Image Preview */}
+              {/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(selectedLiveIntel.attachment_url) && (
+                <div className="mb-6 rounded-3xl overflow-hidden border border-white/10 shadow-2xl max-w-2xl">
+                  <img
+                    src={selectedLiveIntel.attachment_url}
+                    alt="Intel Attachment Preview"
+                    className="w-full h-auto object-cover hover:scale-105 transition-transform duration-700"
+                  />
+                </div>
+              )}
+
+              <a
+                href={selectedLiveIntel.attachment_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 px-6 py-4 rounded-2xl transition-all border border-emerald-500/30 group/file"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center group-hover/file:scale-110 transition-transform">
+                  <i className={`fa-solid ${/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(selectedLiveIntel.attachment_url) ? 'fa-file-image' : 'fa-file-pdf'}`}></i>
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-black uppercase tracking-widest">Download Attachment</p>
+                  <p className="text-[10px] opacity-60">Intelligence Asset • Manual Dispatch</p>
+                </div>
+                <i className="fa-solid fa-download ml-4 opacity-40 group-hover/file:opacity-100 group-hover/file:translate-y-0.5 transition-all"></i>
+              </a>
+            </div>
+          )}
+        </section>
       </div>
     );
   };
@@ -1955,26 +2043,70 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         {currentView === 'quiz-player' && renderQuizPlayer()}
         {currentView === 'studies' && renderStudies()}
         {currentView === 'contact' && renderContact()}
+        {currentView === 'live-intel-detail' && renderLiveIntelDetail()}
         {currentView === 'timetable' && <LiveCalendar schoolId={schoolId} />}
         {currentView === 'profile' && (
           <div className="space-y-8 animate-fadeIn text-slate-100">
-            <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">User Profile</h2>
-            <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-white/20 max-w-2xl shadow-2xl relative overflow-hidden">
-              <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-center relative z-10">
-                <img src={user.avatar} className="w-32 h-32 md:w-40 md:h-40 rounded-[24px] md:rounded-[40px] border-4 border-[#4ea59d] p-1 shadow-2xl object-cover" />
-                <div className="flex-1 space-y-4 text-center sm:text-left">
-                  <div>
-                    <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">Full Name</p>
-                    <h3 className="text-2xl md:text-3xl font-black text-white">{user.name}</h3>
+            <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">STUDENT PROFILE</h2>
+            <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-white/20 max-w-4xl shadow-2xl relative overflow-hidden">
+              <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start relative z-10">
+                <div className="flex flex-col items-center gap-4">
+                  <img src={user.avatar} className="w-32 h-32 md:w-40 md:h-40 rounded-[24px] md:rounded-[40px] border-4 border-[#4ea59d] p-1 shadow-2xl object-cover" />
+                  <div className="px-4 py-2 bg-[#4ea59d]/20 rounded-xl border border-[#4ea59d]/30 text-center">
+                    <p className="text-[10px] font-black text-[#4ea59d] uppercase">Attendance</p>
+                    <p className="text-xl font-black text-white">{studentAttendanceRate}</p>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 pt-4 border-t border-[#1f4e4a]">
+                </div>
+                <div className="flex-1 space-y-6 text-center sm:text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                     <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Email Address</p>
-                      <p className="text-xs font-bold text-slate-200">{user.email}</p>
+                      <p className="text-[9px] font-black text-[#4ea59d] uppercase mb-1">Full Name</p>
+                      <h3 className="text-2xl md:text-4xl font-black text-white tracking-tight">{user.name}</h3>
                     </div>
-                    <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Student ID</p>
-                      <p className="text-xs font-mono font-bold text-[#4ea59d]">{user.studentId || user.childId || 'N/A'}</p>
+                    <div className="bg-white/5 px-4 py-2 rounded-2xl border border-white/10">
+                      <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Grade / Level</p>
+                      <p className="text-sm font-black text-[#4ea59d]">{user.grade || 'N/A'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6 border-t border-white/5">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
+                        <i className="fa-solid fa-envelope text-[#4ea59d]"></i> Email Address
+                      </p>
+                      <p className="text-sm font-bold text-slate-200 truncate">{user.email}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
+                        <i className="fa-solid fa-id-card text-[#4ea59d]"></i> Student ID
+                      </p>
+                      <p className="text-sm font-mono font-bold text-slate-200">{user.studentId || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
+                        <i className="fa-solid fa-cake-candles text-[#4ea59d]"></i> Date of Birth
+                      </p>
+                      <p className="text-sm font-bold text-slate-200">{user.dob ? new Date(user.dob).toLocaleDateString() : 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-white/5">
+                    <h4 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <i className="fa-solid fa-users-gear"></i> Guardian Information
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-3xl border border-white/5">
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase">Primary Guardian</p>
+                        <p className="text-sm font-bold text-white">{user.parentName || 'N/A'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase">Contact Number</p>
+                        <p className="text-sm font-bold text-white">{user.parentPhone || 'N/A'}</p>
+                      </div>
+                      <div className="md:col-span-2 space-y-1">
+                        <p className="text-[9px] font-black text-slate-400 uppercase">Guardian Email</p>
+                        <p className="text-sm font-bold text-white">{user.parentEmail || 'N/A'}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2094,6 +2226,36 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 className="py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
               >
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Global Confirmation Modal */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="absolute inset-0" onClick={() => setConfirmDialog(null)}></div>
+          <div className="relative w-full max-w-md bg-[#0a1a19] border border-white/10 rounded-[40px] p-10 shadow-3xl text-center animate-in zoom-in-95 duration-500">
+            <div className="w-20 h-20 bg-[#4ea59d]/10 text-[#4ea59d] rounded-[32px] flex items-center justify-center text-3xl mx-auto mb-8 shadow-inner">
+              <i className={`fa-solid ${confirmDialog.type === 'confirm' ? 'fa-triangle-exclamation' : 'fa-circle-check'} animate-pulse`}></i>
+            </div>
+            <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-4">{confirmDialog.title}</h3>
+            <p className="text-sm font-medium text-slate-400 leading-relaxed mb-10 max-w-[280px] mx-auto">{confirmDialog.message}</p>
+
+            <div className="flex gap-4">
+              {confirmDialog.type === 'confirm' && (
+                <button
+                  onClick={() => setConfirmDialog(null)}
+                  className="flex-1 py-4 bg-white/5 border border-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                onClick={confirmDialog.onConfirm}
+                className="flex-1 py-4 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all"
+              >
+                {confirmDialog.type === 'confirm' ? 'Confirm' : 'Continue'}
               </button>
             </div>
           </div>

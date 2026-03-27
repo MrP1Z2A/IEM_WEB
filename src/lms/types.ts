@@ -17,6 +17,12 @@ export interface User {
   bio?: string;
   specialization?: string[];
   rating?: number;
+  phone?: string;
+  dob?: string;
+  grade?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
 }
 
 export interface ReportCard {
@@ -101,24 +107,11 @@ export type View =
   | 'timetable'
   | 'studies'
   | 'contact'
+  | 'live-intel-detail'
   | 'parent-portal';
 
 // ...existing code...
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  avatar: string;
-  studentId?: string;
-  schoolId?: string;
-  childId?: string; // Linked student for Parent role
-  eduLevel?: string;
-  bio?: string;
-  specialization?: string[];
-  rating?: number;
-}
 
 export interface Message {
   id: string;

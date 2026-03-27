@@ -1,27 +1,86 @@
+import React, { useEffect, useState } from 'react';
+import { School, MapPin, Phone, Globe, MessageSquare, Share2, Send, Mail } from 'lucide-react';
+import { supabase } from '../../sms/supabaseClient';
 
-import React from 'react';
-import { School, MapPin, Phone, Globe, MessageSquare, Share2, Send } from 'lucide-react';
+interface InstitutionHubProps {
+  schoolId?: string;
+}
 
-const InstitutionHub: React.FC = () => {
+const InstitutionHub: React.FC<InstitutionHubProps> = ({ schoolId }) => {
+  const [data, setData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchInfo = async () => {
+      if (!schoolId) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const { data: school } = await supabase
+          .from('schools')
+          .select('*')
+          .eq('id', schoolId)
+          .single();
+        if (school) setData(school);
+      } catch (err) {
+        console.error('Error fetching school info:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    void fetchInfo();
+  }, [schoolId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  const school = data || {
+    name: 'Institution Profile',
+    about: 'Information about your institution will appear here.',
+    phone: 'Not provided',
+    email: 'Not provided',
+    address: 'Not provided'
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn pb-20">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* School Profile */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-          <img src="https://picsum.photos/seed/school/800/300" className="w-full h-48 object-cover opacity-90 transition-opacity hover:opacity-100" alt="School Campus" />
+          {school.banner_url ? (
+            <img src={school.banner_url} className="w-full h-48 object-cover opacity-90 transition-opacity hover:opacity-100" alt="School Campus" />
+          ) : (
+            <div className="w-full h-48 bg-slate-100 flex items-center justify-center text-slate-300">
+               <School className="w-12 h-12" />
+            </div>
+          )}
           <div className="p-8">
             <div className="flex items-center gap-5 mb-8">
-              <div className="bg-emerald-600 p-4 rounded-3xl text-white shadow-lg shadow-emerald-200">
-                <School className="w-8 h-8" />
-              </div>
+              {school.logo_url ? (
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-emerald-600 shadow-md flex-shrink-0">
+                   <img src={school.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="bg-emerald-600 p-4 rounded-3xl text-white shadow-lg shadow-emerald-200">
+                  <School className="w-8 h-8" />
+                </div>
+              )}
               <div>
-                <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Greenwood International</h2>
-                <p className="text-slate-500 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest mt-1"><MapPin className="w-4 h-4 text-emerald-600" /> Academic Valley, HQ</p>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">{school.name}</h2>
+                <p className="text-slate-500 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest mt-1">
+                  <MapPin className="w-4 h-4 text-emerald-600" /> {school.address || 'Campus Location'}
+                </p>
               </div>
             </div>
             
             <p className="text-slate-600 leading-relaxed mb-8 font-medium">
-              Greenwood International is a premier educational institution dedicated to fostering intellectual curiosity and personal growth. Founded in 1995, we offer a comprehensive K-12 curriculum that combines academic excellence with creative exploration.
+              {school.about || "Your school has not yet provided a description. Please contact the administration for more information."}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -30,17 +89,17 @@ const InstitutionHub: React.FC = () => {
                   <Phone className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-widest">Main Office</p>
-                  <p className="text-sm font-black text-slate-900">+1 (555) 012-3456</p>
+                  <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-widest">Contact Number</p>
+                  <p className="text-sm font-black text-slate-900">{school.phone || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 p-5 bg-emerald-50/50 border border-emerald-100 rounded-2xl group hover:bg-emerald-50 transition-colors">
                 <div className="p-2 bg-white rounded-lg shadow-sm text-emerald-600">
-                  <Globe className="w-5 h-5" />
+                  <Mail className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-widest">Website</p>
-                  <p className="text-sm font-black text-slate-900">www.greenwoodintl.edu</p>
+                  <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-widest">Email Address</p>
+                  <p className="text-sm font-black text-slate-900">{school.email || 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -50,10 +109,10 @@ const InstitutionHub: React.FC = () => {
                 <Share2 className="w-5 h-5 text-emerald-600" /> Digital Community
               </h3>
               <div className="flex gap-4">
-                <a href="#" className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Share2 className="w-5 h-5" /></a>
-                <a href="#" className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Globe className="w-5 h-5" /></a>
-                <a href="#" className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><MessageSquare className="w-5 h-5" /></a>
-                <a href="#" className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Send className="w-5 h-5" /></a>
+                <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Share2 className="w-5 h-5" /></button>
+                <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Globe className="w-5 h-5" /></button>
+                <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><MessageSquare className="w-5 h-5" /></button>
+                <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Send className="w-5 h-5" /></button>
               </div>
             </div>
           </div>

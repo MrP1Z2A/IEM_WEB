@@ -101,6 +101,11 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
 
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const classCourses = useMemo(
     () => courses.filter(item => item.class_id === selectedClassId),
@@ -671,22 +676,27 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
     }
   };
 
-  const deleteExam = async (exam: ExamItem) => {
-    if (!window.confirm(`Delete exam "${exam.title}"?`)) return;
+  const deleteExam = (exam: ExamItem) => {
+    setConfirmDialog({
+      title: 'Confirm Deletion',
+      message: `Are you sure you want to delete the exam "${exam.title}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setDeletingExamId(exam.id);
+        setError(null);
 
-    setDeletingExamId(exam.id);
-    setError(null);
-
-    try {
-      const deleteResult = await supabase.from('exams').delete().eq('id', exam.id).eq('school_id', schoolId);
-      if (deleteResult.error) throw deleteResult.error;
-      setStatus('Exam deleted.');
-      await loadExams(selectedClassId, selectedCourseId);
-    } catch (deleteError: any) {
-      setError(deleteError?.message || 'Failed to delete exam.');
-    } finally {
-      setDeletingExamId(null);
-    }
+        try {
+          const deleteResult = await supabase.from('exams').delete().eq('id', exam.id).eq('school_id', schoolId);
+          if (deleteResult.error) throw deleteResult.error;
+          setStatus('Exam deleted.');
+          await loadExams(selectedClassId, selectedCourseId);
+        } catch (deleteError: any) {
+          setError(deleteError?.message || 'Failed to delete exam.');
+        } finally {
+          setDeletingExamId(null);
+        }
+      }
+    });
   };
 
   return (
@@ -1023,7 +1033,33 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
         </div>
       )}
 
-      
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-700 shadow-2xl p-8 space-y-6 text-center">
+            <div className="w-16 h-16 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center text-2xl mx-auto">
+              <i className="fas fa-trash-can animate-bounce"></i>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">{confirmDialog.title}</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-[280px] mx-auto">{confirmDialog.message}</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className="flex-1 px-4 py-3 rounded-2xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all"
+              >
+                Delete Exam
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

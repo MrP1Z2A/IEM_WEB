@@ -155,9 +155,20 @@ const Communications: React.FC<CommunicationsProps> = ({ schoolId }) => {
                 <h4 className="font-black text-base tracking-tight group-hover/item:text-emerald-400 transition-colors uppercase text-xs">{item.event_type}</h4>
                 <p className="text-emerald-100/60 text-xs font-medium leading-relaxed">{item.details?.log || 'Log recorded'}</p>
                 {item.attachment_url && (
-                  <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[9px] font-black uppercase tracking-widest text-emerald-500 hover:text-white transition-colors">
-                    <i className="fas fa-link mr-1"></i> Secondary Intel View
-                  </a>
+                  <div className="space-y-3">
+                    {/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(item.attachment_url) && (
+                      <div className="rounded-2xl overflow-hidden border border-white/5 shadow-lg group-hover/item:border-emerald-500/30 transition-colors">
+                        <img 
+                          src={item.attachment_url} 
+                          className="w-full h-auto object-cover opacity-80 group-hover/item:opacity-100 transition-opacity duration-500" 
+                          alt="Intel Preview" 
+                        />
+                      </div>
+                    )}
+                    <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[9px] font-black uppercase tracking-widest text-emerald-500 hover:text-white transition-colors flex items-center gap-2">
+                       <i className={`fas ${/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(item.attachment_url) ? 'fa-file-image' : 'fa-link'}`}></i> Secondary Intel View
+                    </a>
+                  </div>
                 )}
               </div>
             )) : (

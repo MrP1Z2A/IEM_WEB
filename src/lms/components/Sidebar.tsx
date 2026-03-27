@@ -18,14 +18,14 @@ interface SidebarProps {
   schoolName?: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  currentView, 
-  onViewChange, 
-  onLogout, 
-  userRole, 
-  hasNewNotices, 
-  userName, 
-  isOpen, 
+const Sidebar: React.FC<SidebarProps> = ({
+  currentView,
+  onViewChange,
+  onLogout,
+  userRole,
+  hasNewNotices,
+  userName,
+  isOpen,
   onToggle,
   isCollapsed,
   onCollapse,
@@ -41,7 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: 'fa-house', roles: [UserRole.STUDENT] },
     { id: 'notice-board', label: 'Notice Board', icon: 'fa-bullhorn', roles: [UserRole.STUDENT, UserRole.PARENT] },
     { id: 'parent-portal', label: 'Parent Portal', icon: 'fa-clipboard-user', roles: [UserRole.PARENT] },
-    { id: 'profile', label: 'User Profile', icon: 'fa-id-card', roles: [UserRole.STUDENT, UserRole.PARENT] },
+    { id: 'profile', label: 'STUDENT PROFILE', icon: 'fa-id-card', roles: [UserRole.STUDENT, UserRole.PARENT] },
     { id: 'instruction', label: 'Instruction Page', icon: 'fa-book-open', roles: [UserRole.STUDENT, UserRole.PARENT] },
     { id: 'courses', label: 'Courses', icon: 'fa-graduation-cap', roles: [UserRole.STUDENT] },
     { id: 'activity', label: 'Activity', icon: 'fa-chart-line', roles: [UserRole.STUDENT] },
@@ -56,7 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] md:hidden transition-opacity"
           onClick={onToggle}
         />
@@ -75,7 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="hidden md:flex justify-end px-4 mb-2">
-          <button 
+          <button
             onClick={onCollapse}
             className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] transition-all hover:scale-110"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -91,19 +91,17 @@ const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id as View)}
-                className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-4 px-5'} py-3 rounded-2xl transition-all duration-300 group ${
-                  isActive 
-                    ? 'bg-[#4ea59d] text-white shadow-[0_8px_16px_-4px_rgba(78,165,157,0.5)] scale-[1.02]' 
+                className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-4 px-5'} py-3 rounded-2xl transition-all duration-300 group ${isActive
+                    ? 'bg-[#4ea59d] text-white shadow-[0_8px_16px_-4px_rgba(78,165,157,0.5)] scale-[1.02]'
                     : 'text-slate-300 hover:bg-[#1f4e4a] hover:text-[#4ea59d]'
-                }`}
+                  }`}
               >
                 <div className={`flex items-center justify-center w-7 h-7 shrink-0 rounded-lg transition-colors ${isActive ? 'bg-white/20' : 'bg-transparent'}`}>
                   <i className={`fa-solid ${item.icon} text-base`}></i>
                 </div>
                 {!isCollapsed && (
-                  <span className={`font-black text-[11px] uppercase tracking-wider text-left transition-all ${
-                    isActive ? 'text-white' : 'text-slate-300 group-hover:text-[#4ea59d]'
-                  } flex-1`}>
+                  <span className={`font-black text-[11px] uppercase tracking-wider text-left transition-all ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-[#4ea59d]'
+                    } flex-1`}>
                     {item.label}
                   </span>
                 )}
@@ -130,8 +128,8 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
           </div>
-          
-          <button 
+
+          <button
             onClick={onSwitch}
             className={`w-full flex items-center justify-center ${isCollapsed ? 'px-0' : 'gap-3 px-5'} py-3 rounded-2xl bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] hover:bg-[#4ea59d] hover:text-white transition-all duration-300 group`}
           >
@@ -139,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && <span className="font-black text-[10px] uppercase tracking-[0.2em]">Switch Environment</span>}
           </button>
 
-          <button 
+          <button
             onClick={onLogout}
             className={`w-full flex items-center justify-center ${isCollapsed ? 'px-0' : 'gap-3 px-5'} py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all duration-300 group`}
           >

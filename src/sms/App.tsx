@@ -21,6 +21,7 @@ import StudentServiceBatchRegister from './components/StudentServiceBatchRegiste
 import AttendanceProtocol from './components/AttendanceProtocol';
 import LiveCalendar from './components/LiveCalendar';
 import HomeworkManager from './components/HomeworkManager';
+import AboutSchool from './components/AboutSchool';
 import ReportCardPage from './components/Reportcard';
 import ExamManagementPage from './components/exammangement.tsx';
 import NoticeBoard from './components/NoticeBoard';
@@ -3792,6 +3793,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <SecurityPermission />
           )}
 
+          {currentPage === 'about-school' && (
+            <AboutSchool schoolId={schoolId} />
+          )}
+
           {/* SUBJECT PAGE - WITH CRUD */}
           {currentPage === 'subject' && (
             <div className="space-y-12 animate-in fade-in duration-700 pb-20">
@@ -4174,12 +4179,24 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                           <h5 className="font-black tracking-tight truncate uppercase text-xs">{intel.event_type}</h5>
                           <span className="text-[10px] font-bold text-slate-400">{new Date(intel.created_at).toLocaleTimeString()}</span>
                         </div>
-                        <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="flex flex-col gap-2 overflow-hidden">
                           <p className="text-sm text-slate-500 font-medium truncate italic">{intel.details?.log || 'Intel snapshot captured'}</p>
                           {intel.attachment_url && (
-                            <a href={intel.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-500 hover:underline flex-shrink-0">
-                              <i className="fas fa-link"></i>
-                            </a>
+                            <div className="flex items-center gap-3">
+                              {/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(intel.attachment_url) ? (
+                                <div className="mt-2 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm max-w-[200px]">
+                                  <img 
+                                    src={intel.attachment_url} 
+                                    alt="Intel Attachment Preview" 
+                                    className="w-full h-auto object-cover hover:scale-110 transition-transform duration-500"
+                                  />
+                                </div>
+                              ) : (
+                                <a href={intel.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-500 hover:underline flex-shrink-0 flex items-center gap-1 font-bold uppercase tracking-widest">
+                                  <i className="fas fa-paperclip"></i> View Attachment
+                                </a>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -4202,7 +4219,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           )}
 
           {/* FALLBACK HUB */}
-          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel'].includes(currentPage) && (
+          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'about-school', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel'].includes(currentPage) && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>

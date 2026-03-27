@@ -128,6 +128,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <SidebarSubItem id="student-finance-status" label="Student Finance Status" activePage={currentPage} />
         </SidebarMenuItem>
         <SidebarMenuItem id="exam" icon="fa-clipboard-check" label="Exam Management" activePage={currentPage} />
+        <SidebarMenuItem id="about-school" icon="fa-circle-info" label="About School" activePage={currentPage} />
         <SidebarMenuItem id="security" icon="fa-user-shield" label="Security Permission" activePage={currentPage} />
 
         
