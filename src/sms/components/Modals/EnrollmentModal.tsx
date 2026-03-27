@@ -168,6 +168,8 @@ interface EnrollmentModalProps {
     secondaryParentCountryCode: string;
     secondaryParentNumber: string;
     secondaryParentEmail: string;
+    phone: string;
+    address: string;
   };
   setEnrollData: (data: any) => void;
   studentProfileImage: File | null;
@@ -509,6 +511,26 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                       </button>
                     </div>
                   )}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Student Phone & Address</label>
+                <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <input
+                    type="tel"
+                    placeholder="Student Phone Number"
+                    className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                    value={enrollData.phone}
+                    onChange={(e) => setEnrollData({ ...enrollData, phone: e.target.value.replace(/\D/g, '') })}
+                  />
+                  <textarea
+                    placeholder="Residential Address"
+                    rows={2}
+                    className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all resize-none"
+                    value={enrollData.address}
+                    onChange={(e) => setEnrollData({ ...enrollData, address: e.target.value })}
+                  />
                 </div>
               </div>
             </>

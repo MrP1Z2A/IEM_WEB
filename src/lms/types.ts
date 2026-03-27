@@ -23,6 +23,7 @@ export interface User {
   parentName?: string;
   parentPhone?: string;
   parentEmail?: string;
+  address?: string;
 }
 
 export interface ReportCard {

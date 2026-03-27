@@ -114,6 +114,8 @@ const getInitialEnrollData = (type: 'New' | 'Old' = 'New') => ({
   secondaryParentCountryCode: '+1',
   secondaryParentNumber: '',
   secondaryParentEmail: '',
+  phone: '',
+  address: '',
 });
 
 const getInitialTeacherEnrollData = () => ({
@@ -1538,6 +1540,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           secondary_parent_name: getValue(row, ['secondaryparentname']) || null,
           secondary_parent_number: getValue(row, ['secondaryparentnumber', 'secondaryparentphone']) || null,
           secondary_parent_email: getValue(row, ['secondaryparentemail']) || null,
+          phone: getValue(row, ['phone', 'studentphone', 'contact']) || null,
+          address: getValue(row, ['address', 'residence', 'location']) || null,
         }, schoolId);
 
         let createdRow: any = null;
@@ -1752,6 +1756,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           secondary_parent_name: data?.secondary_parent_name ?? '',
           secondary_parent_number: data?.secondary_parent_number ?? '',
           secondary_parent_email: data?.secondary_parent_email ?? '',
+          phone: data?.phone ?? '',
+          address: data?.address ?? '',
         },
       });
       setIsEditModalOpen(true);
@@ -2423,6 +2429,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         secondary_parent_name: enrollData.secondaryParentName || null,
         secondary_parent_number: secondaryParentPhone,
         secondary_parent_email: normalizedSecondaryParentEmail || null,
+        phone: enrollData.phone || null,
+        address: enrollData.address || null,
       }, schoolId);
 
       let createdStudentRecord: any = null;
