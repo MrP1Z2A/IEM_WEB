@@ -41,7 +41,7 @@ export default function SchoolInfo({ schoolId }: SchoolInfoProps) {
       {/* About Section */}
       <section className="bg-white/10 backdrop-blur-2xl p-8 sm:p-12 rounded-[48px] border border-white/20 shadow-premium relative overflow-hidden">
         <div className="absolute top-0 right-0 p-12 opacity-10">
-           <i className="fa-solid fa-school text-9xl text-white"></i>
+           <i className="fa-solid fa-school text-9xl text-slate-900"></i>
         </div>
         
         <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start">
@@ -51,8 +51,8 @@ export default function SchoolInfo({ schoolId }: SchoolInfoProps) {
             </div>
           )}
           <div className="space-y-6">
-            <h3 className="text-3xl font-black text-white uppercase tracking-tighter">About {data.name}</h3>
-            <p className="text-slate-200 text-lg leading-relaxed font-medium max-w-4xl">
+            <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">About {data.name}</h3>
+            <p className="text-slate-700 text-lg leading-relaxed font-medium max-w-4xl">
               {data.about || "Welcome to our esteemed institution. We are dedicated to providing excellence in education and fostering a community of lifelong learners."}
             </p>
           </div>
@@ -67,7 +67,7 @@ export default function SchoolInfo({ schoolId }: SchoolInfoProps) {
           </div>
           <div>
             <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-1">Contact Phone</p>
-            <p className="text-white font-bold">{data.phone || "Not provided"}</p>
+            <p className="text-slate-900 font-bold">{data.phone || "Not provided"}</p>
           </div>
         </div>
 
@@ -77,7 +77,7 @@ export default function SchoolInfo({ schoolId }: SchoolInfoProps) {
           </div>
           <div>
             <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Official Email</p>
-            <p className="text-white font-bold">{data.email || "Not provided"}</p>
+            <p className="text-slate-900 font-bold">{data.email || "Not provided"}</p>
           </div>
         </div>
 
@@ -87,7 +87,7 @@ export default function SchoolInfo({ schoolId }: SchoolInfoProps) {
           </div>
           <div>
             <p className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-1">Campus Address</p>
-            <p className="text-white font-bold text-sm">{data.address || "Not provided"}</p>
+            <p className="text-slate-900 font-bold text-sm">{data.address || "Not provided"}</p>
           </div>
         </div>
       </div>

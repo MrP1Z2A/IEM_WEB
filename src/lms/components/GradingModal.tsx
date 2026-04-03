@@ -46,12 +46,12 @@ export default function GradingModal({
   if (!exam) return null;
 
   return (
-    <div className="space-y-8 animate-fadeIn text-slate-100">
+    <div className="space-y-8 animate-fadeIn text-slate-800">
       <div className="bg-white/10 backdrop-blur-2xl shadow-xl rounded-[40px] p-8 md:p-10 border border-white/20">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="space-y-2">
             <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.4em]">Grading Workspace</p>
-            <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight">{exam.title}</h2>
+            <h2 className="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tight">{exam.title}</h2>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#4ea59d]"></span>
               <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Class: {className || '-'}</p>
@@ -59,7 +59,7 @@ export default function GradingModal({
           </div>
           <button
             onClick={onBack}
-            className="px-6 py-3 bg-white/5 border border-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all flex items-center gap-2"
+            className="px-6 py-3 bg-white/5 border border-white/10 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all flex items-center gap-2"
           >
             <i className="fa-solid fa-arrow-left"></i> Back to Exams
           </button>
@@ -68,7 +68,7 @@ export default function GradingModal({
 
       <div className="bg-white/5 backdrop-blur-xl rounded-[40px] border border-white/10 p-8 shadow-2xl relative overflow-hidden">
         <div className="mb-8 flex items-center justify-between border-b border-white/5 pb-6">
-          <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
             <i className="fa-solid fa-users-viewfinder text-[#4ea59d]"></i> 
             Student Evaluations
           </h3>
@@ -93,7 +93,7 @@ export default function GradingModal({
                       {student.name.charAt(0)}
                     </div>
                     <div>
-                      <h4 className="font-black text-white text-base tracking-tight">{student.name}</h4>
+                      <h4 className="font-black text-slate-900 text-base tracking-tight">{student.name}</h4>
                       <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Student Portal Access Enabled</p>
                     </div>
                   </div>
@@ -109,8 +109,8 @@ export default function GradingModal({
                           onClick={() => onGrade(student.id, grade)}
                           className={`w-10 h-10 rounded-xl text-xs font-black transition-all duration-300 active:scale-90 ${
                             grades[student.id] === grade
-                              ? 'bg-[#4ea59d] text-white shadow-lg shadow-[#4ea59d]/30 scale-110'
-                              : 'bg-white/5 border border-white/10 text-slate-400 hover:border-[#4ea59d]/50 hover:text-white'
+                              ? 'bg-[#4ea59d] text-slate-900 shadow-lg shadow-[#4ea59d]/30 scale-110'
+                              : 'bg-white/5 border border-white/10 text-slate-400 hover:border-[#4ea59d]/50 hover:text-slate-900'
                           }`}
                         >
                           {grade}
@@ -126,7 +126,7 @@ export default function GradingModal({
                           value={percentages[student.id] || ''}
                           onChange={(e) => onPercentageChange(student.id, e.target.value)}
                           placeholder="0"
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-[#4ea59d] transition-all text-center pr-8"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:border-[#4ea59d] transition-all text-center pr-8"
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] font-black">%</span>
                       </div>
@@ -137,7 +137,7 @@ export default function GradingModal({
                           value={notes[student.id] || ''}
                           onChange={(e) => onNoteChange(student.id, e.target.value)}
                           placeholder="Teacher commentary & insight..."
-                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-200 focus:outline-none focus:border-[#4ea59d] transition-all"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-[#4ea59d] transition-all"
                         />
                       </div>
 
@@ -148,7 +148,7 @@ export default function GradingModal({
                         className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
                           savingNoteStudentId === student.id
                             ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-                            : 'bg-[#4ea59d] text-white shadow-[#4ea59d]/20 hover:bg-[#3d8c85]'
+                            : 'bg-[#4ea59d] text-slate-900 shadow-[#4ea59d]/20 hover:bg-[#3d8c85]'
                         }`}
                       >
                         {savingNoteStudentId === student.id ? (
@@ -169,7 +169,7 @@ export default function GradingModal({
                   <i className="fa-solid fa-users-slash text-slate-600 text-3xl"></i>
                 </div>
                 <div className="space-y-2">
-                  <h4 className="text-xl font-black text-white">No Students Found</h4>
+                  <h4 className="text-xl font-black text-slate-900">No Students Found</h4>
                   <p className="text-slate-500 text-sm max-w-md mx-auto">This course doesn't appear to have any enrolled students yet. Please verify assignments in the Academic Directory.</p>
                 </div>
               </div>

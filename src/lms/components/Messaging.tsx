@@ -411,13 +411,13 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
   }, [contacts, activeChat]);
 
   return (
-    <div className="flex bg-[#0a1a19]/40 backdrop-blur-2xl rounded-[40px] border border-white/20 h-[700px] overflow-hidden shadow-2xl">
+    <div className="flex bg-[#f6f1e8] rounded-[40px] border border-[#e2d6c2] h-[700px] overflow-hidden shadow-[0_22px_48px_rgba(95,79,53,0.10)]">
       {/* ──────────────── SIDEBAR ──────────────── */}
-      <div className="w-80 border-r border-white/10 flex flex-col bg-[#0a1a19]/60">
+      <div className="w-80 border-r border-[#ddd1bd] flex flex-col bg-[#ebe4d6]">
         {/* Header */}
-        <div className="p-5 border-b border-white/10 space-y-3">
+        <div className="p-5 border-b border-[#ddd1bd] space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-3">
               <i className="fa-solid fa-comments text-[#4ea59d]"></i> Messages
             </h3>
             <button
@@ -433,10 +433,10 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
             <input
               type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search contacts & groups..."
-              className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 pl-9 pr-8 text-xs text-white focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-600"
+              className="w-full bg-[#f6f1e8] border border-[#d7c8b2] rounded-2xl py-2.5 pl-9 pr-8 text-xs text-slate-900 focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-500"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors">
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 transition-colors">
                 <i className="fa-solid fa-xmark text-xs"></i>
               </button>
             )}
@@ -457,7 +457,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                 <div>
                   <button
                     onClick={() => setIsGroupsCollapsed(p => !p)}
-                    className="w-full flex items-center justify-between px-4 py-3 mt-1 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all"
+                    className="w-full flex items-center justify-between px-4 py-3 mt-1 rounded-2xl bg-[#f6f1e8] border border-[#d7c8b2] hover:bg-[#efe7da] transition-all"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-7 h-7 rounded-lg bg-indigo-500/20 flex items-center justify-center">
@@ -474,7 +474,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                         const isActive = activeChat?.kind === 'group' && activeChat.group.id === grp.id;
                         return (
                           <button key={grp.id} onClick={() => setActiveChat({ kind: 'group', group: grp })}
-                            className={`w-full p-3 rounded-2xl flex items-center gap-3 transition-all ${isActive ? 'bg-indigo-500/30 border border-indigo-500/40 text-white' : 'hover:bg-white/5 text-slate-300'}`}
+                            className={`w-full p-3 rounded-2xl flex items-center gap-3 transition-all ${isActive ? 'bg-indigo-500/20 border border-indigo-500/40 text-slate-900' : 'hover:bg-[#f6f1e8] text-slate-700'}`}
                           >
                             <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center shrink-0">
                               <i className="fa-solid fa-users text-indigo-400"></i>
@@ -511,14 +511,14 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                     <div key={roleKey}>
                       <button
                         onClick={() => setCollapsedGroups(prev => ({ ...prev, [roleKey]: !prev[roleKey] }))}
-                        className={`w-full flex items-center justify-between px-4 py-3 mt-1 rounded-2xl border transition-all ${isCollapsed ? 'bg-white/3 border-white/5 hover:bg-white/8' : 'bg-white/5 border-white/10 hover:bg-white/8'}`}
+                        className={`w-full flex items-center justify-between px-4 py-3 mt-1 rounded-2xl border transition-all ${isCollapsed ? 'bg-[#f1ebdf] border-[#e2d6c2] hover:bg-[#ece4d6]' : 'bg-[#f6f1e8] border-[#d7c8b2] hover:bg-[#efe7da]'}`}
                       >
                         <div className="flex items-center gap-3">
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${group.bgColor}`}>
                             <i className={`fa-solid ${group.icon} text-sm ${group.color}`}></i>
                           </div>
                           <span className={`text-xs font-black uppercase tracking-widest ${group.color}`}>{group.label}</span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 ${group.color} opacity-70`}>{group.contacts.length}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#efe7da] ${group.color} opacity-70`}>{group.contacts.length}</span>
                           {hasUnread && <span className="w-2 h-2 rounded-full bg-[#fa6d64] animate-pulse"></span>}
                         </div>
                         <i className={`fa-solid fa-chevron-right text-xs text-slate-400 transition-transform duration-300 ${isCollapsed ? '' : 'rotate-90'}`}></i>
@@ -529,24 +529,24 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                             const isActive = activeChat?.kind === 'dm' && activeChat.contact.id === contact.id;
                             return (
                               <button key={contact.id} onClick={() => setActiveChat({ kind: 'dm', contact })}
-                                className={`w-full p-3 rounded-2xl flex items-center gap-3 transition-all ${isActive ? 'bg-[#4ea59d] text-white shadow-lg shadow-[#4ea59d]/20' : 'hover:bg-white/5 text-slate-300'}`}
+                                className={`w-full p-3 rounded-2xl flex items-center gap-3 transition-all ${isActive ? 'bg-[#4ea59d] text-slate-900 shadow-lg shadow-[#4ea59d]/20' : 'hover:bg-[#f6f1e8] text-slate-700'}`}
                               >
                                 <div className="relative shrink-0">
                                   <img src={contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=4ea59d&color=fff`}
                                     className="w-10 h-10 rounded-xl object-cover" alt={contact.name} />
-                                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0a1a19]"></div>
+                                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#ebe4d6]"></div>
                                 </div>
                                 <div className="flex-1 text-left min-w-0">
                                   <div className="flex justify-between items-center gap-1">
-                                    <h4 className={`text-xs font-black truncate ${contact.unreadCount && contact.unreadCount > 0 && !isActive ? 'text-white' : ''}`}>{contact.name}</h4>
-                                    <span className={`text-[8px] font-bold shrink-0 ${isActive ? 'text-white/70' : 'text-slate-500'}`}>{formatTime(contact.lastMessageAt)}</span>
+                                    <h4 className={`text-xs font-black truncate ${contact.unreadCount && contact.unreadCount > 0 && !isActive ? 'text-slate-900' : ''}`}>{contact.name}</h4>
+                                    <span className={`text-[8px] font-bold shrink-0 ${isActive ? 'text-slate-700' : 'text-slate-500'}`}>{formatTime(contact.lastMessageAt)}</span>
                                   </div>
                                   <div className="flex items-center justify-between gap-1 mt-0.5">
-                                    <p className={`text-[10px] truncate ${isActive ? 'text-white/70' : contact.lastMessage ? 'text-slate-400' : getRoleColor(contact.role)}`}>
+                                    <p className={`text-[10px] truncate ${isActive ? 'text-slate-700' : contact.lastMessage ? 'text-slate-400' : getRoleColor(contact.role)}`}>
                                       {contact.lastMessage ? contact.lastMessage.content : contact.role.replace('_', ' ')}
                                     </p>
                                     {contact.unreadCount && contact.unreadCount > 0 && !isActive
-                                      ? <span className="shrink-0 flex h-4 w-4 items-center justify-center rounded-full bg-[#fa6d64] text-[9px] font-black text-white animate-pulse">{contact.unreadCount > 9 ? '9+' : contact.unreadCount}</span>
+                                      ? <span className="shrink-0 flex h-4 w-4 items-center justify-center rounded-full bg-[#fa6d64] text-[9px] font-black text-slate-900 animate-pulse">{contact.unreadCount > 9 ? '9+' : contact.unreadCount}</span>
                                       : null}
                                   </div>
                                 </div>
@@ -571,7 +571,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-white/10">
+        <div className="px-4 py-3 border-t border-[#ddd1bd]">
           <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 text-center">
             {contacts.length} contacts · {groups.length} groups
           </p>
@@ -583,12 +583,12 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
         {activeChat ? (
           <>
             {/* Chat Header */}
-            <div className="p-5 border-b border-white/10 flex items-center justify-between bg-[#0a1a19]/20">
+            <div className="p-5 border-b border-[#ddd1bd] flex items-center justify-between bg-[#efe7da]">
               <div className="flex items-center gap-4">
                 {activeChat.kind === 'dm' ? (
                   <div className="relative">
                     <img src={activeChatAvatar!} className="w-10 h-10 rounded-xl object-cover" alt={activeChatTitle} />
-                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#0a1a19]"></div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-[#efe7da]"></div>
                   </div>
                 ) : (
                   <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
@@ -596,7 +596,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                   </div>
                 )}
                 <div>
-                  <h4 className="text-sm font-black text-white">{activeChatTitle}</h4>
+                  <h4 className="text-sm font-black text-slate-900">{activeChatTitle}</h4>
                   {activeChat.kind === 'dm' ? (
                     <p className={`text-[10px] font-black uppercase tracking-widest ${getRoleColor(activeChat.contact.role)}`}>
                       {activeChat.contact.role.replace('_', ' ')}
@@ -621,7 +621,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                   </button>
                 )}
                 <button onClick={() => setActiveChat(null)} title="Close"
-                  className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+                  className="w-9 h-9 rounded-xl bg-[#f1ebdf] flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-[#e8dfd1] transition-all">
                   <i className="fa-solid fa-xmark"></i>
                 </button>
               </div>
@@ -666,21 +666,21 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                         )}
                         <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed relative ${
                           isOwn
-                            ? `bg-[#4ea59d] text-white rounded-tr-sm shadow-lg shadow-[#4ea59d]/10 ${isOpt ? 'opacity-60' : ''}`
-                            : 'bg-white/5 text-slate-200 border border-white/10 rounded-tl-sm'
+                            ? `bg-[#4ea59d] text-slate-900 rounded-tr-sm shadow-lg shadow-[#4ea59d]/10 ${isOpt ? 'opacity-60' : ''}`
+                            : 'bg-[#efe7da] text-slate-700 border border-[#ddd1bd] rounded-tl-sm'
                         }`}>
                           {isConfirming ? (
                             <div className="flex items-center gap-3">
                               <span className="font-bold text-[10px] uppercase tracking-widest text-rose-200">Delete?</span>
-                              <button onClick={() => void handleDeleteMessage(msg.id)} className="px-3 py-1 bg-rose-500 text-white rounded-lg text-[9px] font-black uppercase hover:bg-rose-600 transition-all">Yes</button>
-                              <button onClick={() => setDeletingMessageId(null)} className="px-3 py-1 bg-white/10 text-white rounded-lg text-[9px] font-black uppercase hover:bg-white/20 transition-all">No</button>
+                              <button onClick={() => void handleDeleteMessage(msg.id)} className="px-3 py-1 bg-rose-500 text-slate-900 rounded-lg text-[9px] font-black uppercase hover:bg-rose-600 transition-all">Yes</button>
+                              <button onClick={() => setDeletingMessageId(null)} className="px-3 py-1 bg-[#e8dfd1] text-slate-900 rounded-lg text-[9px] font-black uppercase hover:bg-[#ddd1bd] transition-all">No</button>
                             </div>
                           ) : (
                             <>
                               {msg.content}
                               {isOwn && !isOpt && (
                                 <button onClick={() => setDeletingMessageId(msg.id)}
-                                  className="absolute -left-9 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-slate-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
+                                  className="absolute -left-9 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-[#efe7da] flex items-center justify-center text-slate-500 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
                                   title="Delete">
                                   <i className="fa-solid fa-trash-can text-[9px]"></i>
                                 </button>
@@ -704,15 +704,15 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
             </div>
 
             {/* Input */}
-            <div className="p-5 bg-[#0a1a19]/40 border-t border-white/10">
+            <div className="p-5 bg-[#efe7da] border-t border-[#ddd1bd]">
               <form onSubmit={e => void handleSendMessage(e)} className="flex gap-3">
                 <input
                   type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
                   placeholder={`Message ${activeChatTitle}...`}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl py-3.5 px-5 text-sm text-white focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-600"
+                  className="flex-1 bg-[#f6f1e8] border border-[#d7c8b2] rounded-2xl py-3.5 px-5 text-sm text-slate-900 focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-500"
                 />
                 <button type="submit" disabled={!newMessage.trim()}
-                  className="w-12 h-12 bg-[#4ea59d] text-white rounded-2xl flex items-center justify-center hover:bg-[#3d8c85] transition-all shadow-lg disabled:opacity-40 group shrink-0">
+                  className="w-12 h-12 bg-[#4ea59d] text-slate-900 rounded-2xl flex items-center justify-center hover:bg-[#3d8c85] transition-all shadow-lg disabled:opacity-40 group shrink-0">
                   <i className="fa-solid fa-paper-plane group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform text-sm"></i>
                 </button>
               </form>
@@ -723,7 +723,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
             <div className="w-32 h-32 bg-[#4ea59d]/20 rounded-[40px] flex items-center justify-center text-[60px] text-[#4ea59d] mb-8 animate-pulse">
               <i className="fa-solid fa-comments"></i>
             </div>
-            <h3 className="text-2xl font-black text-white uppercase tracking-[0.3em]">Select a chat</h3>
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-[0.3em]">Select a chat</h3>
             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">Direct message or group chat</p>
           </div>
         )}
@@ -738,9 +738,9 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                 <div className="w-9 h-9 bg-indigo-500/20 rounded-xl flex items-center justify-center">
                   <i className="fa-solid fa-user-group text-indigo-400"></i>
                 </div>
-                <h3 className="text-base font-black text-white uppercase tracking-tight">Create Group</h3>
+                <h3 className="text-base font-black text-slate-900 uppercase tracking-tight">Create Group</h3>
               </div>
-              <button onClick={() => setIsCreateGroupOpen(false)} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all">
+              <button onClick={() => setIsCreateGroupOpen(false)} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -750,7 +750,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                 <input
                   type="text" value={newGroupName} onChange={e => setNewGroupName(e.target.value)}
                   placeholder="e.g. Grade 5 Science Team"
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-sm text-slate-900 focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600"
                 />
               </div>
               <div>
@@ -768,11 +768,11 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                         <img src={c.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=4ea59d&color=fff`}
                           className="w-8 h-8 rounded-lg object-cover shrink-0" alt={c.name} />
                         <div className="flex-1 text-left">
-                          <p className="text-xs font-black text-white">{c.name}</p>
+                          <p className="text-xs font-black text-slate-900">{c.name}</p>
                           <p className={`text-[9px] font-bold uppercase ${getRoleColor(c.role)}`}>{c.role.replace('_', ' ')}</p>
                         </div>
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${selected ? 'bg-indigo-500 border-indigo-500' : 'border-white/20'}`}>
-                          {selected && <i className="fa-solid fa-check text-[8px] text-white"></i>}
+                          {selected && <i className="fa-solid fa-check text-[8px] text-slate-900"></i>}
                         </div>
                       </button>
                     );
@@ -785,7 +785,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
               <button
                 onClick={() => void handleCreateGroup()}
                 disabled={isCreatingGroup || !newGroupName.trim() || selectedMemberIds.size === 0}
-                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl text-sm font-black uppercase tracking-widest transition-all disabled:opacity-40 shadow-lg shadow-indigo-500/20"
+                className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 text-slate-900 rounded-2xl text-sm font-black uppercase tracking-widest transition-all disabled:opacity-40 shadow-lg shadow-indigo-500/20"
               >
                 {isCreatingGroup ? <span className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Creating...</span> : 'Create Group'}
               </button>
@@ -799,8 +799,8 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-[40px]">
           <div className="bg-[#0d2624] border border-white/20 rounded-[32px] shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
             <div className="p-5 border-b border-white/10 flex items-center justify-between">
-              <h3 className="text-sm font-black text-white uppercase tracking-tight">Add Members</h3>
-              <button onClick={() => setIsAddMemberOpen(false)} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Add Members</h3>
+              <button onClick={() => setIsAddMemberOpen(false)} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all">
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -812,7 +812,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                   <div key={m.user_id} className="flex items-center gap-1.5 bg-white/5 rounded-xl px-2.5 py-1.5">
                     <img src={m.user_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user_name)}&background=4ea59d&color=fff`}
                       className="w-5 h-5 rounded-md object-cover" alt="" />
-                    <span className="text-[10px] font-bold text-white">{m.user_name.split(' ')[0]}</span>
+                    <span className="text-[10px] font-bold text-slate-900">{m.user_name.split(' ')[0]}</span>
                     {m.user_id !== currentUser.id && activeChat.group.created_by === currentUser.id && (
                       <button onClick={() => void handleRemoveMember(m.user_id)} className="text-slate-500 hover:text-rose-400 transition-colors ml-0.5">
                         <i className="fa-solid fa-xmark text-[8px]"></i>
@@ -835,7 +835,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                       <img src={c.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=4ea59d&color=fff`}
                         className="w-8 h-8 rounded-lg object-cover shrink-0" alt="" />
                       <div className="flex-1 text-left">
-                        <p className="text-xs font-black text-white">{c.name}</p>
+                        <p className="text-xs font-black text-slate-900">{c.name}</p>
                         <p className={`text-[9px] font-bold uppercase ${getRoleColor(c.role)}`}>{c.role.replace('_', ' ')}</p>
                       </div>
                       {addingMemberId === c.id

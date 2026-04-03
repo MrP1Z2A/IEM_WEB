@@ -345,10 +345,10 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
   }
 
   return (
-    <div className="space-y-12 animate-fadeIn text-slate-100 pb-20">
+    <div className="space-y-12 animate-fadeIn text-slate-800 pb-20">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
         <div className="space-y-2">
-          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Evaluation Center</h2>
+          <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter">Evaluation Center</h2>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#4ea59d] animate-pulse"></span>
             <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Exam Management & Student Grading</p>
@@ -356,7 +356,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
         </div>
         <button
           onClick={() => { setIsEditorOpen(true); setEditingExamId(null); }}
-          className="px-8 py-4 bg-[#4ea59d] text-white rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3"
+          className="px-8 py-4 bg-[#4ea59d] text-slate-900 rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3"
         >
           <i className="fa-solid fa-plus"></i> Create New Exam
         </button>
@@ -369,7 +369,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
             <select
               value={selectedCourseId}
               onChange={(e) => setSelectedCourseId(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-[#4ea59d] transition-all outline-none appearance-none"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none appearance-none"
             >
               <option value="" className="bg-[#0a1a19]">All Assigned Courses</option>
               {assignedCourses.map(c => (
@@ -387,7 +387,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by title, description, or class..."
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-14 py-4 text-white font-medium focus:border-[#4ea59d] transition-all outline-none"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-14 py-4 text-slate-900 font-medium focus:border-[#4ea59d] transition-all outline-none"
               />
             </div>
           </div>
@@ -423,21 +423,21 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                     <span className="px-3 py-1 bg-[#4ea59d]/10 text-[#4ea59d] text-[8px] font-black uppercase tracking-widest rounded-full">{assignedCourses.find(c => c.id === exam.class_course_id)?.className || 'Evaluation'}</span>
                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest ">{new Date(exam.exam_date || exam.created_at).toLocaleDateString()}</span>
                   </div>
-                  <h4 className="text-xl font-black text-white group-hover:text-[#4ea59d] transition-colors">{exam.title}</h4>
+                  <h4 className="text-xl font-black text-slate-900 group-hover:text-[#4ea59d] transition-colors">{exam.title}</h4>
                   <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{exam.location || 'Intelligence Center'} • {exam.exam_time || '10:00 AM'}</p>
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-white/5 grid grid-cols-2 gap-3">
                   <button
                     onClick={() => loadGradingData(exam)}
-                    className="flex-1 py-3 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-[#3d8c85] shadow-lg shadow-[#4ea59d]/20"
+                    className="flex-1 py-3 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-[#3d8c85] shadow-lg shadow-[#4ea59d]/20"
                   >
                     Grade Students
                   </button>
                   {exam.file_url ? (
                     <button
                       onClick={() => window.open(exam.file_url!, '_blank')}
-                      className="py-3 bg-white/5 border border-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                      className="py-3 bg-white/5 border border-white/10 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
                     >
                       Question Paper
                     </button>
@@ -462,9 +462,9 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
                   <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.4em]">{editingExamId ? 'Update Record' : 'Fresh Evaluation'}</p>
-                  <h3 className="text-3xl font-black text-white uppercase tracking-tight">{editingExamId ? 'Modify Assessment' : 'New Exam Protocol'}</h3>
+                  <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tight">{editingExamId ? 'Modify Assessment' : 'New Exam Protocol'}</h3>
                 </div>
-                <button onClick={closeEditor} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 transition-all"><i className="fa-solid fa-xmark"></i></button>
+                <button onClick={closeEditor} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-slate-900 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 transition-all"><i className="fa-solid fa-xmark"></i></button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -475,7 +475,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. Mid-Term Physics Challenge"
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-[#4ea59d] transition-all outline-none"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none"
                   />
                 </div>
 
@@ -484,7 +484,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                   <select
                     value={selectedCourseId}
                     onChange={(e) => setSelectedCourseId(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-[#4ea59d] transition-all outline-none"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none"
                   >
                     <option value="" className="bg-[#0a1a19]">Select Evaluation Target</option>
                     {assignedCourses.map(c => (
@@ -511,12 +511,12 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Exam Date</label>
-                  <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-[#4ea59d] transition-all outline-none" />
+                  <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none" />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Starting Time</label>
-                  <input type="time" value={examTime} onChange={(e) => setExamTime(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-[#4ea59d] transition-all outline-none" />
+                  <input type="time" value={examTime} onChange={(e) => setExamTime(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none" />
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
@@ -526,7 +526,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                     onChange={(e) => setDescription(e.target.value)}
                     rows={4}
                     placeholder="Enter special instructions or curriculum coverage..."
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-medium focus:border-[#4ea59d] transition-all outline-none resize-none"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-medium focus:border-[#4ea59d] transition-all outline-none resize-none"
                   ></textarea>
                 </div>
               </div>
@@ -535,7 +535,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                 <button
                   onClick={saveExam}
                   disabled={isSavingExam}
-                  className="w-full py-5 bg-[#4ea59d] text-white rounded-[24px] text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-[#4ea59d]/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+                  className="w-full py-5 bg-[#4ea59d] text-slate-900 rounded-[24px] text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-[#4ea59d]/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
                 >
                   {isSavingExam ? <span className="flex items-center justify-center gap-3"><i className="fa-solid fa-spinner animate-spin"></i> Finalizing Details...</span> : (editingExamId ? 'Update Assessment Protocol' : 'Deploy Assessment Protocol')}
                 </button>

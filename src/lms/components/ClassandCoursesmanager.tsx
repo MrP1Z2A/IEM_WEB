@@ -755,19 +755,19 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
   };
 
   return (
-    <div className="space-y-12 animate-fadeIn text-slate-100">
+    <div className="space-y-12 animate-fadeIn text-slate-800">
       {/* HEADER SECTION */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
         <div className="space-y-4 flex-1">
-          <h2 className="text-5xl font-black text-white uppercase tracking-tight leading-none">Campus Formations</h2>
+          <h2 className="text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">Campus Formations</h2>
           <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Integrated Class & Curriculum Control</p>
         </div>
         {userRole === 'teacher' && (
           <button
             onClick={() => { setEditingClassId(null); setClassName(''); setIsClassFormOpen(true); }}
-            className="group relative px-10 py-5 rounded-[24px] bg-[#4ea59d] text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+            className="group relative px-10 py-5 rounded-[24px] bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
           >
-            <i className="fa-solid fa-plus-circle text-white/50 group-hover:text-white transition-colors"></i> 
+            <i className="fa-solid fa-plus-circle text-slate-600 group-hover:text-slate-900 transition-colors"></i> 
             Form Hub
           </button>
         )}
@@ -785,7 +785,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                   placeholder="e.g. Grade 10-A, Computer Science 2024"
                   value={className}
                   onChange={(e) => setClassName(e.target.value)}
-                  className="w-full bg-[#0a1a19] border border-white/10 p-5 rounded-[24px] outline-none font-bold text-white focus:border-[#4ea59d] transition-all"
+                  className="w-full bg-[#0a1a19] border border-white/10 p-5 rounded-[24px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all"
                 />
               </div>
 
@@ -797,7 +797,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                      style={{ backgroundColor: classOuterColor }}
                      onClick={() => document.getElementById('colorPicker')?.click()}
                   >
-                    <i className="fas fa-palette text-white/50"></i>
+                    <i className="fas fa-palette text-slate-600"></i>
                     <input
                       id="colorPicker"
                       type="color"
@@ -810,7 +810,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => classImageInputRef.current?.click()}
-                      className="w-full py-4 rounded-xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                      className="w-full py-4 rounded-xl bg-white/5 border border-white/10 text-slate-900 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
                     >
                       {classImage ? 'Change Image' : 'Add Cover Image'}
                     </button>
@@ -831,7 +831,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
 
             <div className="p-8 bg-[#0a1a19]/50 rounded-[32px] border border-white/5 flex flex-col justify-between">
               <div>
-                <h4 className="text-sm font-black text-white uppercase mb-4">Creation Preview</h4>
+                <h4 className="text-sm font-black text-slate-900 uppercase mb-4">Creation Preview</h4>
                 <div className="p-6 rounded-3xl border border-white/10" style={{ backgroundColor: '#0a1a19' }}>
                    <div 
                       className="w-full aspect-video rounded-2xl mb-4 border border-white/5 flex items-center justify-center overflow-hidden" 
@@ -840,7 +840,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                       {classImage ? (
                         <img src={URL.createObjectURL(classImage)} className="w-full h-full object-cover" alt="preview" />
                       ) : (
-                        <i className="fas fa-graduation-cap text-3xl text-white/20"></i>
+                        <i className="fas fa-graduation-cap text-3xl text-slate-400"></i>
                       )}
                    </div>
                    <p className="font-black text-lg">{className || 'Your Class Name'}</p>
@@ -851,13 +851,13 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
               <div className="flex gap-4 mt-8">
                  <button
                     onClick={resetClassForm}
-                    className="flex-1 py-4 rounded-[20px] bg-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all"
+                    className="flex-1 py-4 rounded-[20px] bg-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-900 transition-all"
                   >
                     Discard
                   </button>
                   <button
                     onClick={() => void createOrUpdateClass()}
-                    className="flex-[2] py-4 rounded-[20px] bg-[#4ea59d] text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-[#4ea59d]/20 active:scale-95 transition-all"
+                    className="flex-[2] py-4 rounded-[20px] bg-[#4ea59d] text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-[#4ea59d]/20 active:scale-95 transition-all"
                   >
                     {editingClassId ? 'Save Changes' : 'Confirm Registration'}
                   </button>
@@ -878,7 +878,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                 value={classSearchQuery}
                 onChange={(e) => setClassSearchQuery(e.target.value)}
                 placeholder="Lookup classes..."
-                className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-[20px] outline-none font-bold text-white focus:border-[#4ea59d] transition-all text-sm"
+                className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-[20px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all text-sm"
               />
            </div>
         </div>
@@ -902,13 +902,13 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                   <div className="absolute top-4 right-4 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100">
                     <button
                       onClick={(e) => { e.stopPropagation(); startEditClass(classItem); }}
-                      className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-[#4ea59d] flex items-center justify-center transition-all"
+                      className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-slate-900 border border-white/20 hover:bg-[#4ea59d] flex items-center justify-center transition-all"
                     >
                       <i className="fas fa-pen text-[10px]"></i>
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); void deleteClass(String(classItem.id)); }}
-                      className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-rose-500 flex items-center justify-center transition-all"
+                      className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-slate-900 border border-white/20 hover:bg-rose-500 flex items-center justify-center transition-all"
                     >
                       <i className="fas fa-trash text-[10px]"></i>
                     </button>
@@ -922,13 +922,13 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                   {classItem.image_url ? (
                     <img src={classItem.image_url} alt={classItem.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   ) : (
-                    <div className="text-white/20 text-4xl"><i className="fas fa-building-columns"></i></div>
+                    <div className="text-slate-400 text-4xl"><i className="fas fa-building-columns"></i></div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
                 </div>
 
                 <div className="p-6 space-y-3 relative">
-                  <h4 className="font-black text-white text-lg tracking-tight truncate">{classItem.name}</h4>
+                  <h4 className="font-black text-slate-900 text-lg tracking-tight truncate">{classItem.name}</h4>
                   <div className="flex flex-wrap gap-2">
                     <span className="px-3 py-1 rounded-lg bg-black/20 border border-white/5 text-[8px] font-black uppercase text-slate-400 tracking-widest">{classItem.class_code || 'CLASS-ID'}</span>
                     <span className="px-3 py-1 rounded-lg bg-[#4ea59d]/20 border border-[#4ea59d]/20 text-[8px] font-black uppercase text-[#4ea59d] tracking-widest">{classItem.student_count || 0} Students</span>
@@ -947,13 +947,13 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
         <div className="space-y-8 p-10 bg-white/5 backdrop-blur-3xl rounded-[48px] border border-white/10 animate-fadeIn">
           <header className="flex justify-between items-center">
              <div>
-                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Academic Curricula</h3>
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Academic Curricula</h3>
                 <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.3em] mt-1">Managed Courses for {selectedClass.name}</p>
              </div>
              {userRole === 'teacher' && (
                <button
                   onClick={() => setIsCreateCourseModalOpen(true)}
-                  className="w-12 h-12 rounded-2xl bg-[#4ea59d] text-white shadow-lg shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                  className="w-12 h-12 rounded-2xl bg-[#4ea59d] text-slate-900 shadow-lg shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
                 >
                   <i className="fas fa-plus"></i>
                 </button>
@@ -978,7 +978,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
               >
                 {userRole === 'teacher' && (
                   <div className="absolute top-8 right-8 z-10 flex gap-4 opacity-0 group-hover:opacity-100 transition-all">
-                     <button onClick={() => openEditCourseModal(course)} className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-[#4ea59d] flex items-center justify-center transition-all shadow-xl">
+                     <button onClick={() => openEditCourseModal(course)} className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md text-slate-900 border border-white/20 hover:bg-[#4ea59d] flex items-center justify-center transition-all shadow-xl">
                         <i className="fas fa-pen text-[14px]"></i>
                      </button>
                   </div>
@@ -998,16 +998,16 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                     {course.image_url ? (
                       <img src={course.image_url} alt={course.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
                     ) : (
-                      <i className="fas fa-book-open text-white/10 text-6xl"></i>
+                      <i className="fas fa-book-open text-slate-600 text-6xl"></i>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a19] via-[#0a1a19]/10 to-transparent"></div>
                   </div>
                   <div>
                     <p className="text-[#4ea59d] text-[10px] font-black uppercase tracking-[0.5em] mb-4">Core Curriculum</p>
-                    <p className="text-4xl font-black text-white leading-none group-hover:text-[#4ea59d] transition-colors line-clamp-2 uppercase tracking-tighter">{course.name}</p>
+                    <p className="text-4xl font-black text-slate-900 leading-none group-hover:text-[#4ea59d] transition-colors line-clamp-2 uppercase tracking-tighter">{course.name}</p>
                     <div className="flex items-center justify-between pt-8 border-t border-white/5 mt-8">
-                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-white transition-colors">Curriculum Portal</span>
-                       <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-[#4ea59d] group-hover:bg-[#4ea59d] group-hover:text-white transition-all shadow-xl">
+                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-900 transition-colors">Curriculum Portal</span>
+                       <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-[#4ea59d] group-hover:bg-[#4ea59d] group-hover:text-slate-900 transition-all shadow-xl">
                           <i className="fas fa-arrow-right text-[12px]"></i>
                        </div>
                     </div>
@@ -1024,8 +1024,8 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
         <div className="fixed inset-0 z-[1000] glass-panel bg-black/60 backdrop-blur-xl flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-[#0a1a19] rounded-[40px] border border-white/10 p-10 space-y-8 animate-fadeIn">
              <header className="flex justify-between items-center">
-                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Add Course</h3>
-                <button onClick={() => setIsCreateCourseModalOpen(false)} className="text-slate-500 hover:text-white transition-colors"><i className="fas fa-times"></i></button>
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Add Course</h3>
+                <button onClick={() => setIsCreateCourseModalOpen(false)} className="text-slate-500 hover:text-slate-900 transition-colors"><i className="fas fa-times"></i></button>
              </header>
              <div className="space-y-6">
                 <div className="space-y-3">
@@ -1035,7 +1035,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                     value={newCourseName}
                     onChange={(e) => { setNewCourseName(e.target.value); if (newCourseError) setNewCourseError(null); }}
                     placeholder="Enter course name"
-                    className="w-full bg-white/5 border border-white/10 p-5 rounded-[24px] outline-none font-bold text-white focus:border-[#4ea59d] transition-all"
+                    className="w-full bg-white/5 border border-white/10 p-5 rounded-[24px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all"
                   />
                   {newCourseError && <p className="text-[10px] font-bold text-rose-500 px-2">{newCourseError}</p>}
                 </div>
@@ -1045,7 +1045,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => newCourseImageInputRef.current?.click()}
-                      className="w-full py-4 rounded-xl bg-white/5 text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                      className="w-full py-4 rounded-xl bg-white/5 text-slate-900 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
                     >
                       {newCourseImage ? 'Change Image' : 'Select Graphic'}
                     </button>
@@ -1063,7 +1063,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
              <button
                 onClick={() => void createClassCourse()}
                 disabled={isClassCourseCreating}
-                className="w-full py-5 rounded-[24px] bg-[#4ea59d] text-white font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 transition-all active:scale-95 disabled:opacity-50"
+                className="w-full py-5 rounded-[24px] bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 transition-all active:scale-95 disabled:opacity-50"
               >
                 {isClassCourseCreating ? 'Registering...' : 'Add to Catalog'}
               </button>

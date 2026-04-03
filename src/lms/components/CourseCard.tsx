@@ -21,13 +21,13 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onClick }) => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a19]/90 to-transparent"></div>
         <div className="absolute top-4 left-4">
-          <span className="px-3 py-1 bg-[#4ea59d] backdrop-blur rounded-lg text-[10px] font-bold text-white shadow-lg uppercase tracking-wider">
+          <span className="px-3 py-1 bg-[#4ea59d] backdrop-blur rounded-lg text-[10px] font-bold text-slate-900 shadow-lg uppercase tracking-wider">
             {course.category}
           </span>
         </div>
       </div>
       <div className="p-6">
-        <h3 className="text-lg font-bold text-white mb-2 group-hover:text-[#4ea59d] transition-colors line-clamp-1">
+        <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-[#4ea59d] transition-colors line-clamp-1">
           {course.title}
         </h3>
         <p className="text-[#4ea59d]/60 text-sm line-clamp-2 mb-6 leading-relaxed">

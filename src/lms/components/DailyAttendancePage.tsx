@@ -262,14 +262,14 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                 type="date"
                 value={attendanceDate}
                 onChange={(e) => setAttendanceDate(e.target.value)}
-                className="bg-transparent outline-none text-white font-bold text-xs"
+                className="bg-transparent outline-none text-slate-900 font-bold text-xs"
               />
             </div>
             
             <button
               onClick={() => void loadAttendance()}
               disabled={isLoading || isSaving}
-              className="p-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 transition-all flex items-center justify-center"
+              className="p-3 rounded-xl bg-white/5 border border-white/10 text-slate-600 hover:bg-white/10 transition-all flex items-center justify-center"
               title="Reload Records"
             >
               {isLoading ? <i className="fas fa-spinner fa-spin text-sm"></i> : <i className="fas fa-rotate text-sm"></i>} 
@@ -280,7 +280,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
             <button
               onClick={() => void markAllPresent()}
               disabled={isLoading || isSaving || activeStudents.length === 0}
-              className="flex-1 md:flex-none px-8 py-4 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-30 flex items-center justify-center gap-3"
+              className="flex-1 md:flex-none px-8 py-4 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-30 flex items-center justify-center gap-3"
             >
               <i className="fa-solid fa-users-check"></i>
               {isSaving ? 'Synching...' : 'Bulk Mark Present'}
@@ -300,7 +300,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                   <i className="fas fa-chevron-down text-[10px]"></i>
                </div>
                <div>
-                  <h3 className="text-xl font-black text-white uppercase tracking-tight">Student Roster</h3>
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Student Roster</h3>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
                     {isRosterLoading ? (
                       <span className="flex items-center gap-2"><i className="fas fa-spinner fa-spin"></i> Syncing Records...</span>
@@ -328,7 +328,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                             {student.name.charAt(0)}
                          </div>
                          <div>
-                            <p className="font-bold text-white text-base tracking-tight">{student.name}</p>
+                            <p className="font-bold text-slate-900 text-base tracking-tight">{student.name}</p>
                             <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-0.5">{student.email || 'Independent ID'}</p>
                          </div>
                       </div>
@@ -336,16 +336,16 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                       <div className="flex items-center gap-4">
                         {(['P', 'A', 'L'] as AttendanceStatus[]).map(status => {
                           const active = currentStatus === status;
-                          let activeClass = 'bg-[#4ea59d] text-white shadow-lg shadow-[#4ea59d]/20 scale-110';
-                          if (status === 'A') activeClass = 'bg-rose-500 text-white shadow-lg shadow-rose-500/20 scale-110';
-                          if (status === 'L') activeClass = 'bg-orange-500 text-white shadow-lg shadow-orange-500/20 scale-110';
+                          let activeClass = 'bg-[#4ea59d] text-slate-900 shadow-lg shadow-[#4ea59d]/20 scale-110';
+                          if (status === 'A') activeClass = 'bg-rose-500 text-slate-900 shadow-lg shadow-rose-500/20 scale-110';
+                          if (status === 'L') activeClass = 'bg-orange-500 text-slate-900 shadow-lg shadow-orange-500/20 scale-110';
 
                           return (
                             <button
                               key={status}
                               onClick={() => void saveSingle(String(student.id), status)}
                               disabled={isSaving}
-                              className={`w-12 h-12 rounded-2xl text-[10px] font-black transition-all ${active ? activeClass : 'bg-white/5 text-slate-500 hover:text-white border border-white/5'}`}
+                              className={`w-12 h-12 rounded-2xl text-[10px] font-black transition-all ${active ? activeClass : 'bg-white/5 text-slate-500 hover:text-slate-900 border border-white/5'}`}
                             >
                               {status}
                             </button>
@@ -359,7 +359,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
           )}
          {!isRosterCollapsed && activeStudents.length === 0 && (
             <div className="p-20 text-center space-y-4">
-               <i className="fas fa-users-slash text-4xl text-white/5"></i>
+               <i className="fas fa-users-slash text-4xl text-slate-700"></i>
                <p className="text-slate-500 text-[11px] font-black uppercase tracking-[0.3em]">No Personnel Records Found</p>
             </div>
          )}

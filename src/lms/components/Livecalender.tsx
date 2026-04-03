@@ -279,7 +279,7 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    {event.isInstitutional && <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase tracking-widest">Institutional Event</span>}
+                    {event.isInstitutional && <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-slate-900 uppercase tracking-widest">Institutional Event</span>}
                     <p className={`text-sm font-black truncate ${event.isInstitutional ? 'text-emerald-700 dark:text-emerald-300' : 'text-brand-700 dark:text-brand-300'}`}>{event.title}</p>
                   </div>
                   <p className={`text-[11px] font-semibold truncate ${event.isInstitutional ? 'text-emerald-600 dark:text-emerald-400' : 'text-brand-600 dark:text-brand-400'}`}>

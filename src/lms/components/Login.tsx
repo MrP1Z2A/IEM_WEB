@@ -135,7 +135,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="w-24 h-24 bg-white rounded-[32px] flex items-center justify-center p-2 shadow-2xl mb-6 overflow-hidden">
             <img src={logoIem} alt="IEM Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-5xl font-black tracking-tighter text-white uppercase ">
+          <h1 className="text-5xl font-black tracking-tighter text-slate-900 uppercase ">
             IEM
           </h1>
           <p className="text-[#4ea59d] text-sm font-bold uppercase tracking-[0.3em] mt-2">
@@ -195,14 +195,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <button
             onClick={handleAuth}
             disabled={loading}
-            className="w-full py-4 bg-[#4ea59d] text-white rounded-2xl font-black uppercase"
+            className="w-full py-4 bg-[#4ea59d] text-slate-900 rounded-2xl font-black uppercase"
           >
             {loading ? 'Please wait...' : 'Sign In'}
           </button>
         </div>
 
         {/* Bottom copyright notice */}
-        <p className="mt-10 text-center text-white/40 text-[10px] font-bold uppercase tracking-[0.3em]">
+        <p className="mt-10 text-center text-slate-500 text-[10px] font-bold uppercase tracking-[0.3em]">
           © 2025 IEM Global Academy
         </p>
       </div>
