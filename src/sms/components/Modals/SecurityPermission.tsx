@@ -379,10 +379,10 @@ const SecurityPermission: React.FC<SecurityPermissionProps> = ({ role = 'super_a
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/70 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
+        <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
+          <table className="w-full min-w-[720px] text-left border-separate border-spacing-0">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-slate-50 dark:bg-slate-800 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] shadow-sm">
                 <th className="px-6 py-4">User</th>
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Status</th>

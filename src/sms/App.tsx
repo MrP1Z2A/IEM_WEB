@@ -3923,15 +3923,15 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <AboutSchool schoolId={schoolId} />
           )}
 
-          {currentPage === 'messages' && (
+          {currentPage === 'messages' && schoolId && (
             <MessagesOversight schoolId={schoolId} />
           )}
 
-          {currentPage === 'class-group-management' && (
+          {currentPage === 'class-group-management' && schoolId && (
             <ClassGroupManagement schoolId={schoolId} />
           )}
 
-          {currentPage === 'sms-attendance' && (
+          {currentPage === 'sms-attendance' && schoolId && (
             <AttendanceTaker schoolId={schoolId} />
           )}
 

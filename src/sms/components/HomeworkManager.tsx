@@ -1342,7 +1342,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
                                       <div className="flex items-center gap-2">
                                         {sub.submission_url && (
                                           <button
-                                            onClick={() => window.open(sub.submission_url, '_blank')}
+                                            onClick={() => window.open(sub.submission_url ?? undefined, '_blank')}
                                             className="w-7 h-7 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-brand-500 flex items-center justify-center transition-all"
                                             title="View Submission"
                                           >

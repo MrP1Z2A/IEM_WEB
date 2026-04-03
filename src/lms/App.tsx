@@ -897,9 +897,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   useEffect(() => {
     if (!isLoggedIn || !supabase || !user.id) return;
+    const client = supabase;
 
     const fetchUnreadCount = async () => {
-      const { count, error } = await supabase
+      const { count, error } = await client
         .from('messages')
         .select('*', { count: 'exact', head: true })
         .eq('receiver_id', user.id)
@@ -912,7 +913,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
     void fetchUnreadCount();
 
-    const channel = supabase
+    const channel = client
       .channel('global-unread-messages')
       .on(
         'postgres_changes',
@@ -929,7 +930,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       .subscribe();
 
     return () => {
-      void supabase.removeChannel(channel);
+      void client.removeChannel(channel);
     };
   }, [isLoggedIn, user.id]);
 
