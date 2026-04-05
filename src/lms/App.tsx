@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Login from './components/Login';
 import COURSES from './components/ClassandCoursesmanager';
 import LiveCalendar from './components/Livecalender';
 import SchoolInfo from './components/SchoolInfo';
+import PdfViewer from './components/PdfViewer';
 import { Course, User, UserRole, View, Note, Quiz, ReportCard } from './types';
 import { INITIAL_USER, INITIAL_COURSES, SCHOOL_EVENTS, SCHOOL_ACTIVITIES, DETAILED_GRADES, STUDENT_ACHIEVEMENTS, SCHOOL_HIVE_POSTS, SCHOOL_CONTACTS } from './constants';
 import { summarizeNotes, generateQuizFromNotes } from './services/aiService';
@@ -311,7 +312,28 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [resourceFile, setResourceFile] = useState<File | null>(null);
   const [selectedUploadFolder, setSelectedUploadFolder] = useState<string>('');
 
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewPdfTitle, setPreviewPdfTitle] = useState('');
+
   const hasNewNotices = dynamicAnnouncements.some(notice => !viewedNoticeIds.includes(notice.id));
+
+  // Find the full exam schedule PDF URL from Events or Notices
+  const fullExamScheduleUrl = useMemo(() => {
+    // 1. Try to find in dynamicSchoolEvents (Type: Exam)
+    // In SMS, Exam Schedules are often uploaded as Events with type 'Exam' or 'Exam Schedule'
+    const examEvent = [...dynamicSchoolEvents]
+      .filter(ev => (ev.type === 'Exam' || (ev.type && ev.type.toLowerCase().includes('exam'))))
+      .find(ev => ev.image && !ev.image.includes('unsplash.com'));
+
+    if (examEvent) return examEvent.image;
+
+    // 2. Fallback to dynamicAnnouncements (Notice Board)
+    const examNotice = dynamicAnnouncements.find(ann => 
+      ann.title && ann.title.toLowerCase().includes('exam schedule') && ann.fileUrl
+    );
+
+    return examNotice?.fileUrl;
+  }, [dynamicSchoolEvents, dynamicAnnouncements]);
 
   const performSmsSync = useCallback(async (isSilent = false) => {
     if (!isSilent) setIsLoading(true);
@@ -570,7 +592,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   if (rc.file_path && supabase) {
                     const { data } = supabase.storage.from('report_cards').getPublicUrl(rc.file_path);
                     fileUrl = data.publicUrl;
+                  } else if (rc.file_url) {
+                    fileUrl = rc.file_url;
                   }
+
                   return {
                     id: rc.id,
                     title: rc.file_name || rc.title || 'Official Report Card',
@@ -2124,15 +2149,18 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <p className="text-base text-slate-600 leading-relaxed whitespace-pre-wrap">{selectedNotice.content}</p>
 
           {selectedNotice.fileUrl && (
-            <a
-              href={selectedNotice.fileUrl}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              onClick={() => {
+                if (selectedNotice.fileUrl) {
+                  setPreviewPdfUrl(selectedNotice.fileUrl);
+                  setPreviewPdfTitle(selectedNotice.title || 'Announcement Attachment');
+                }
+              }}
               className="inline-flex items-center gap-2 mt-6 text-xs font-black uppercase tracking-wider text-[#4ea59d] hover:underline"
             >
               <i className="fa-solid fa-paperclip"></i>
-              {selectedNotice.fileName || 'Open Attachment'}
-            </a>
+              {selectedNotice.fileName || 'View Attachment'}
+            </button>
           )}
         </section>
       </div>
@@ -2302,13 +2330,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                           {ass.submissions.map((sub: any, idx: number) => (
                             <button
                               key={sub.id || idx}
-                              onClick={() => window.open(sub.url, '_blank')}
+                              onClick={() => {
+                                setPreviewPdfUrl(sub.url);
+                                setPreviewPdfTitle(`Submission: ${sub.studentName}`);
+                              }}
                               className="group flex items-center gap-2 px-3 py-1.5 bg-[#4ea59d]/10 hover:bg-[#4ea59d]/20 border border-[#4ea59d]/20 rounded-xl transition-all hover:scale-105 active:scale-95"
                               title={`View submission from ${sub.studentName}`}
                             >
                               <div className="w-1.5 h-1.5 rounded-full bg-[#4ea59d]"></div>
                               <span className="text-[10px] font-bold text-slate-700 group-hover:text-slate-900">{sub.studentName}</span>
-                              <i className="fa-solid fa-arrow-up-right-from-square text-[8px] text-[#4ea59d] ml-1 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                              <i className="fa-solid fa-eye text-[8px] text-[#4ea59d] ml-1 opacity-0 group-hover:opacity-100 transition-opacity"></i>
                             </button>
                           ))}
                         </div>
@@ -2339,7 +2370,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       ) : (
                         <button
                           onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
-                          className="flex-1 px-6 py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
+                          className="flex-1 px-6 py-3 bg-[#7fc9c2] hover:bg-[#3d8c85] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
                         >
                           Submit Homework
                         </button>
@@ -2348,19 +2379,25 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         {/* Standardized Download Buttons */}
                         {ass.submissionUrl ? (
                           <button
-                            onClick={() => window.open(ass.submissionUrl, '_blank')}
+                            onClick={() => {
+                              setPreviewPdfUrl(ass.submissionUrl);
+                              setPreviewPdfTitle(`My Submission: ${ass.title}`);
+                            }}
                             className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
                             title="View Submission"
                           >
-                            <i className="fa-solid fa-cloud-arrow-down shadow-sm"></i>
+                            <i className="fa-solid fa-eye shadow-sm"></i>
                           </button>
                         ) : ass.fileUrl ? (
                           <button
-                            onClick={() => window.open(ass.fileUrl, '_blank')}
+                            onClick={() => {
+                              setPreviewPdfUrl(ass.fileUrl);
+                              setPreviewPdfTitle(`Work: ${ass.title}`);
+                            }}
                             className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
-                            title="Download Instructions"
+                            title="View Instructions"
                           >
-                            <i className="fa-solid fa-download"></i>
+                            <i className="fa-solid fa-eye shadow-sm"></i>
                           </button>
                         ) : null}
                       </div>
@@ -2392,7 +2429,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8 flex items-center gap-4">
               <i className="fa-solid fa-clipboard-list text-[#4ea59d]"></i> Pending Assignments
             </h3>
-            <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-4 max-h-80 overflow-y-auto rounded-[36px] bg-[#e9decd] border border-[#d7c8b2] p-4 pr-3 custom-scrollbar shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
               {dynamicAssignments.map(ass => (
                 <div key={ass.id} className="p-6 md:p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[32px] border border-white/20 flex flex-col sm:flex-row justify-between items-center gap-6 group scale-[0.98] sm:scale-100 origin-center">
                   <div className="flex-1">
@@ -2412,7 +2449,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         {ass.submissions.map((sub: any, idx: number) => (
                           <button
                             key={sub.id || idx}
-                            onClick={() => window.open(sub.url, '_blank')}
+                            onClick={() => {
+                              setPreviewPdfUrl(sub.url);
+                              setPreviewPdfTitle(`Submission: ${sub.studentName}`);
+                            }}
                             className="group flex items-center gap-2 px-3 py-1.5 bg-[#4ea59d]/10 hover:bg-[#4ea59d]/20 border border-[#4ea59d]/20 rounded-xl transition-all hover:scale-105 active:scale-95"
                             title={`View submission from ${sub.studentName}`}
                           >
@@ -2455,28 +2495,35 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                           setSelectedAssignment(ass);
                           setIsSubmissionModalOpen(true);
                         }}
-                        className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        className="group px-6 py-3 bg-[#a9ddd7] hover:bg-[#3d8c85] border-2 border-[#5fa79f] hover:border-[#2f6f69] text-slate-900 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-[0_8px_20px_rgba(78,165,157,0.12)]"
                       >
-                        Submit Task
+                        <span>Submit Task</span>
+                        <i className="fa-solid fa-arrow-right text-[10px] transition-all group-hover:translate-x-0.5 group-hover:text-white"></i>
                       </button>
                     ))}
 
                     {/* Standardized Download Buttons */}
                     {ass.submissionUrl ? (
                       <button
-                        onClick={() => window.open(ass.submissionUrl, '_blank')}
+                        onClick={() => {
+                          setPreviewPdfUrl(ass.submissionUrl);
+                          setPreviewPdfTitle(`Your Submission: ${ass.title}`);
+                        }}
                         className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
                         title="View Submission"
                       >
-                        <i className="fa-solid fa-cloud-arrow-down shadow-sm"></i>
+                        <i className="fa-solid fa-eye shadow-sm"></i>
                       </button>
                     ) : ass.fileUrl ? (
                       <button
-                        onClick={() => window.open(ass.fileUrl, '_blank')}
+                        onClick={() => {
+                          setPreviewPdfUrl(ass.fileUrl);
+                          setPreviewPdfTitle(`Instructions: ${ass.title}`);
+                        }}
                         className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
-                        title="Download Instructions"
+                        title="View Instructions"
                       >
-                        <i className="fa-solid fa-download"></i>
+                        <i className="fa-solid fa-eye shadow-sm"></i>
                       </button>
                     ) : null}
                   </div>
@@ -2531,7 +2578,17 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </div>
             ))}
           </div>
-          <button className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-slate-900 transition-all flex items-center justify-center gap-2">
+          <button 
+            onClick={() => {
+              if (fullExamScheduleUrl) {
+                setPreviewPdfUrl(fullExamScheduleUrl);
+                setPreviewPdfTitle('Full Exam Schedule');
+              } else {
+                alert('Official Exam Schedule has not been published yet. Please contact the administration.');
+              }
+            }}
+            className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-slate-900 transition-all flex items-center justify-center gap-2"
+          >
             <i className="fa-solid fa-cloud-arrow-down"></i> Download Full Schedule
           </button>
         </section>
@@ -2842,7 +2899,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       </span>
                       {rc.fileUrl && (
                         <button
-                          onClick={() => window.open(rc.fileUrl, '_blank')}
+                          onClick={() => {
+                            if (rc.fileUrl) {
+                              setPreviewPdfUrl(rc.fileUrl);
+                              setPreviewPdfTitle(rc.title || `${rc.reportType} Report Card`);
+                            }
+                          }}
                           className="px-6 py-3 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#3d8c85] transition-all shadow-lg shadow-[#4ea59d]/20 flex items-center gap-2"
                         >
                           <i className="fa-solid fa-cloud-arrow-down"></i> Download
@@ -3915,6 +3977,15 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </div>
           </div>
         </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {previewPdfUrl && (
+        <PdfViewer 
+          url={previewPdfUrl} 
+          title={previewPdfTitle} 
+          onClose={() => setPreviewPdfUrl(null)} 
+        />
       )}
     </div>
   );

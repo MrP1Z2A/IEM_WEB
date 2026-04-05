@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import PdfViewer from './Modals/PdfViewer';
 
 type NoticeItem = {
   id: string;
@@ -55,6 +56,7 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
     message: string;
     onConfirm: () => void;
   } | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const canRenderNotice = useMemo(() => !!noticeId && !!notice, [noticeId, notice]);
 
@@ -102,7 +104,7 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
     void loadNotice();
   }, [noticeId]);
 
-  const downloadAttachment = async () => {
+  const openAttachment = async () => {
     if (!notice?.file_path) return;
 
     setIsDownloading(true);
@@ -115,25 +117,17 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
       return;
     }
 
-    const { data, error: downloadError } = await supabase.storage
+    const { data: urlData } = supabase.storage
       .from(NOTICE_FILES_BUCKET)
-      .download(path);
+      .getPublicUrl(path);
 
     setIsDownloading(false);
 
-    if (downloadError || !data) {
-      setError(downloadError?.message || 'Failed to download attachment.');
-      return;
+    if (urlData?.publicUrl) {
+      setPreviewUrl(urlData.publicUrl);
+    } else {
+      setError('Failed to generate preview URL.');
     }
-
-    const objectUrl = URL.createObjectURL(data);
-    const anchor = document.createElement('a');
-    anchor.href = objectUrl;
-    anchor.download = notice.file_name || 'notice-attachment';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(objectUrl);
   };
 
   const deleteNotice = () => {
@@ -228,11 +222,11 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => void downloadAttachment()}
+                onClick={() => void openAttachment()}
                 disabled={isDownloading}
                 className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-200 disabled:opacity-60"
               >
-                {isDownloading ? 'Downloading...' : `Download ${notice.file_name || 'Attachment'}`}
+                {isDownloading ? 'Opening...' : `View ${notice.file_name || 'Attachment'}`}
               </button>
             </div>
           )}
@@ -268,6 +262,14 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
             </div>
           </div>
         </div>
+      )}
+
+      {previewUrl && (
+        <PdfViewer
+          url={previewUrl}
+          title={notice?.title || 'Notice Attachment'}
+          onClose={() => setPreviewUrl(null)}
+        />
       )}
     </div>
   );

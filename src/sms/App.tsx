@@ -10,6 +10,7 @@ import { supabase } from './supabaseClient';
 import { authService } from './services/authService';
 import { getCurrentTenantContext, withSchoolId } from './services/tenantService';
 import CreateSchoolPage from './components/CreateSchoolPage';
+import StaffLogin from './components/StaffLogin';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import StudentDirectory from './components/StudentDirectory';
@@ -142,7 +143,7 @@ interface AppProps {
 
 const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdChange, isStudentService }) => {
   const [allowedPages, setAllowedPages] = useState<string[] | undefined>(undefined);
-  const [onboardingStatus, setOnboardingStatus] = useState<'loading' | 'needs-school' | 'ready'>('loading');
+  const [onboardingStatus, setOnboardingStatus] = useState<'loading' | 'needs-school' | 'needs-auth' | 'ready'>('loading');
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
@@ -239,6 +240,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [globalCreateData, setGlobalCreateData] = useState<any>({});
   const [globalCreateFile, setGlobalCreateFile] = useState<File | null>(null);
   const [globalEditId, setGlobalEditId] = useState<string | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewPdfTitle, setPreviewPdfTitle] = useState('');
 
   const handleGlobalSave = async (type: string, payload: any) => {
     if (!schoolId) return;
@@ -422,8 +425,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       setSelectedDate('');
 
       await authService.signOut();
-      if (onSchoolIdChange) onSchoolIdChange(undefined);
-      setOnboardingStatus('needs-school');
+      
+      // If student service, preserve school context but require re-auth
+      if (isStudentService && schoolId) {
+        setOnboardingStatus('needs-auth');
+      } else {
+        if (onSchoolIdChange) onSchoolIdChange(undefined);
+        setOnboardingStatus('needs-school');
+      }
+
+      notify('Logged out successfully.');
       notify('Logged out successfully.');
     } catch (error: any) {
       notify(error?.message || 'Failed to log out.');
@@ -442,7 +453,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          setOnboardingStatus('needs-school');
+          // If we have a school context in Student Service mode, require staff login
+          if (isStudentService && schoolId) {
+            setOnboardingStatus('needs-auth');
+          } else {
+            setOnboardingStatus('needs-school');
+          }
           return;
         }
 
@@ -3341,6 +3357,19 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     );
   }
 
+  if (onboardingStatus === 'needs-auth') {
+    return (
+      <StaffLogin 
+        schoolName={schoolName}
+        onLoginSuccess={() => setOnboardingStatus('loading')}
+        onBackToSchoolSelect={() => {
+          if (onSchoolIdChange) onSchoolIdChange(undefined);
+          setOnboardingStatus('needs-school');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-[#f8fafc] dark:bg-slate-950 transition-colors duration-500 relative">
 
@@ -4378,7 +4407,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>
-              <button onClick={() => setCurrentPage('dashboard')} className="mt-8 sm:mt-12 lg:mt-16 px-8 sm:px-14 lg:px-24 py-4 sm:py-6 lg:py-8 bg-brand-500 text-white font-black rounded-[24px] sm:rounded-[40px] lg:rounded-[64px] text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.2em] sm:tracking-[0.35em] lg:tracking-[0.5em] shadow-2xl active:scale-95 transition-all">Initialize Core</button>
+              <button onClick={() => setCurrentPage('dashboard')} className="mt-8 sm:mt-12 lg:mt-16 px-8 sm:px-14 lg:px-24 py-4 sm:py-6 lg:py-8 bg-brand-500 text-white font-black rounded-[24px] sm:rounded-[40px] lg:rounded-[64px] text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.2em] sm:tracking-[0.35em] lg:tracking-[0.5em] shadow-2xl active:scale-95 transition-all">Registeration</button>
             </div>
           )}
 
@@ -4610,3 +4639,4 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
 
 export default App;
+

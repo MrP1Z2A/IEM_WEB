@@ -37,7 +37,7 @@ const PermissionsModal: React.FC<PermissionsModalProps> = ({
         
         {/* Modal Header */}
         <div className="p-5 sm:p-8 lg:p-10 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center gap-4">
-          <h3 className="text-xl sm:text-2xl font-black tracking-tight">Node Access Protocol</h3>
+          <h3 className="text-xl sm:text-2xl font-black tracking-tight">Registration Access Protocol</h3>
           <button 
             onClick={onClose} 
             className="w-10 h-10 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400"
@@ -88,7 +88,7 @@ const PermissionsModal: React.FC<PermissionsModalProps> = ({
             onClick={onClose} 
             className="w-full py-6 bg-brand-500 text-white font-black rounded-3xl text-[12px] uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all"
           >
-            Finalize Node Protocol
+            Finalize Registration
           </button>
         </div>
       </div>

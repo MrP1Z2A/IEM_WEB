@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { getCurrentTenantContext, withSchoolId } from '../services/tenantService';
 import GradingModal from './Modals/Grading';
+import PdfViewer from './Modals/PdfViewer';
 
 type AppClass = {
   id: string;
@@ -98,6 +99,11 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [savingNoteStudentId, setSavingNoteStudentId] = useState<string | null>(null);
   const [isLoadingGrading, setIsLoadingGrading] = useState(false);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewPdfTitle, setPreviewPdfTitle] = useState('');
+
+  const [isUploadingFullSchedule, setIsUploadingFullSchedule] = useState(false);
+  const fullScheduleInputRef = useRef<HTMLInputElement | null>(null);
 
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -699,6 +705,74 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
     });
   };
 
+  const handleFullScheduleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !schoolId) return;
+
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setError('Only PDF files are allowed for the full schedule.');
+      return;
+    }
+
+    setIsUploadingFullSchedule(true);
+    setStatus(null);
+    setError(null);
+
+    try {
+      const sanitizedName = sanitizeFileName(file.name || 'full-exam-schedule.pdf');
+      const path = `full_schedules/${schoolId}/${Date.now()}-${sanitizedName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from(EXAM_FILES_BUCKET)
+        .upload(path, file, { upsert: true, contentType: 'application/pdf' });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from(EXAM_FILES_BUCKET).getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl;
+      if (!publicUrl) throw new Error('Failed to get public URL');
+
+      const { data: existingEvents } = await supabase
+        .from('events')
+        .select('id')
+        .eq('school_id', schoolId)
+        .eq('type', 'Exam')
+        .eq('title', 'Full Exam Schedule')
+        .limit(1);
+
+      const eventPayload = {
+        school_id: schoolId,
+        type: 'Exam',
+        title: 'Full Exam Schedule',
+        description: 'Official school-wide examination schedule.',
+        image_url: publicUrl,
+        event_date: new Date().toISOString().split('T')[0],
+      };
+
+      if (existingEvents && existingEvents.length > 0) {
+        const { error: updateError } = await supabase
+          .from('events')
+          .update(eventPayload)
+          .eq('id', existingEvents[0].id);
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('events')
+          .insert([eventPayload]);
+        if (insertError) throw insertError;
+      }
+
+      setStatus('Full Exam Schedule updated successfully!');
+    } catch (uploadErr: any) {
+      console.error('Full schedule upload failed:', uploadErr);
+      setError(uploadErr.message || 'Failed to upload full schedule.');
+    } finally {
+      setIsUploadingFullSchedule(false);
+      if (fullScheduleInputRef.current) fullScheduleInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-700">
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-brand-700 rounded-[40px] p-6 sm:p-8 lg:p-10 text-white shadow-premium">
@@ -708,12 +782,23 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter mt-2">Exam Management</h2>
             <p className="text-slate-200 mt-3 text-sm sm:text-base">Select class and course from Supabase, then create, grade, and manage exams.</p>
           </div>
-          <button
-            onClick={() => setRole(role === 'teacher' ? 'student' : 'teacher')}
-            className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-black uppercase tracking-wider"
-          >
-            Role: {role} (switch)
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <input
+              type="file"
+              ref={fullScheduleInputRef}
+              onChange={handleFullScheduleUpload}
+              accept=".pdf"
+              className="hidden"
+            />
+            <button
+              onClick={() => fullScheduleInputRef.current?.click()}
+              disabled={isUploadingFullSchedule}
+              className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-black uppercase tracking-wider flex items-center gap-2"
+            >
+              <i className={`fa-solid ${isUploadingFullSchedule ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'}`}></i>
+              {isUploadingFullSchedule ? 'Uploading...' : 'Update Full Schedule'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -849,10 +934,13 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
                 {exam.file_url && (
                   <button
                     type="button"
-                    onClick={() => void downloadFileDirectly(exam.file_url || '')}
-                    className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-200"
+                    onClick={() => {
+                      setPreviewPdfUrl(exam.file_url);
+                      setPreviewPdfTitle(exam.title);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-200 flex items-center gap-2"
                   >
-                    Download File
+                    <i className="fa-solid fa-eye"></i> View File
                   </button>
                 )}
 
@@ -1059,6 +1147,15 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
             </div>
           </div>
         </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {previewPdfUrl && (
+        <PdfViewer 
+          url={previewPdfUrl} 
+          title={previewPdfTitle} 
+          onClose={() => setPreviewPdfUrl(null)} 
+        />
       )}
     </div>
   );

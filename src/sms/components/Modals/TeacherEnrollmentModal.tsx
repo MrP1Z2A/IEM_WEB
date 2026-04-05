@@ -41,11 +41,11 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[28px] sm:rounded-[40px] lg:rounded-[56px] shadow-2xl overflow-y-auto border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300">
-        <div className="p-6 sm:p-8 lg:p-12 border-b border-slate-50 dark:border-slate-800 flex items-start justify-between gap-4">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[24px] sm:rounded-[32px] lg:rounded-[40px] shadow-2xl overflow-y-auto border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300">
+        <div className="p-5 sm:p-6 lg:p-10 border-b border-slate-50 dark:border-slate-800 flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-2xl sm:text-3xl font-black tracking-tighter">Initialize Teacher Node</h3>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2">Faculty Identity Registration</p>
+            <h3 className="text-xl sm:text-2xl font-black tracking-tighter">Teacher Registration</h3>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Faculty Identity Registration</p>
           </div>
           <button
             onClick={onClose}
@@ -56,11 +56,11 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
           </button>
         </div>
 
-        <div className="p-6 sm:p-8 lg:p-12 space-y-6 sm:space-y-8">
+        <div className="p-5 sm:p-6 lg:p-10 space-y-4 sm:space-y-6">
           {/* Profile Photo Upload */}
-          <div className="flex flex-col items-center gap-6 pb-6 border-b border-slate-50 dark:border-slate-800">
+          <div className="flex flex-col items-center gap-4 pb-4 border-b border-slate-50 dark:border-slate-800">
             <div className="relative group">
-              <div className="w-32 h-32 rounded-[40px] bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden border-2 border-dashed border-slate-200 dark:border-slate-700 group-hover:border-brand-500 transition-all">
+              <div className="w-24 h-24 rounded-[32px] bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden border-2 border-dashed border-slate-200 dark:border-slate-700 group-hover:border-brand-500 transition-all">
                 {previewUrl ? (
                   <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
@@ -87,69 +87,71 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
             <div className="text-center">
               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Profile Identity</p>
               <p className="text-[9px] font-bold text-slate-500 mt-1 uppercase">Recommended: Square 512x512</p>
+              <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Profile Identity</p>
+              <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase">Recommended: Square 512x512</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Full Legal Name</label>
-              <input
-                type="text"
-                placeholder="Enter name..."
-                className="w-full bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
-                value={enrollData.name}
-                onChange={(e) => setEnrollData({ ...enrollData, name: e.target.value })}
-              />
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Full Legal Name</label>
+                <input
+                  type="text"
+                  placeholder="Enter name..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
+                  value={enrollData.name}
+                  onChange={(e) => setEnrollData({ ...enrollData, name: e.target.value })}
+                />
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Network Email</label>
-              <input
-                type="email"
-                placeholder="staff@iem.io"
-                className={`w-full bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl outline-none border-2 font-bold transition-all text-sm ${isTeacherEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
-                value={enrollData.email}
-                onChange={(e) => setEnrollData({ ...enrollData, email: e.target.value })}
-              />
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Network Email</label>
+                <input
+                  type="email"
+                  placeholder="staff@iem.io"
+                  className={`w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 font-bold transition-all text-xs ${isTeacherEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
+                  value={enrollData.email}
+                  onChange={(e) => setEnrollData({ ...enrollData, email: e.target.value })}
+                />
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Phone Line</label>
-              <input
-                type="tel"
-                placeholder="+1 234 567 890"
-                className="w-full bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
-                value={enrollData.phone}
-                onChange={(e) => setEnrollData({ ...enrollData, phone: e.target.value })}
-              />
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Phone Line</label>
+                <input
+                  type="tel"
+                  placeholder="+1 234 567 890"
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
+                  value={enrollData.phone}
+                  onChange={(e) => setEnrollData({ ...enrollData, phone: e.target.value })}
+                />
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Residential Address</label>
-              <input
-                type="text"
-                placeholder="City, Country"
-                className="w-full bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
-                value={enrollData.address}
-                onChange={(e) => setEnrollData({ ...enrollData, address: e.target.value })}
-              />
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Residential Address</label>
+                <input
+                  type="text"
+                  placeholder="City, Country"
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
+                  value={enrollData.address}
+                  onChange={(e) => setEnrollData({ ...enrollData, address: e.target.value })}
+                />
             </div>
           </div>
 
-          <div className="p-6 bg-brand-50 dark:bg-brand-500/10 rounded-3xl border border-brand-100 dark:border-brand-500/20">
-            <p className="text-[10px] text-brand-600 dark:text-brand-400 font-bold leading-relaxed">
+          <div className="p-3 bg-brand-50 dark:bg-brand-500/10 rounded-2xl border border-brand-100 dark:border-brand-500/20">
+            <p className="text-[9px] text-brand-600 dark:text-brand-400 font-bold leading-relaxed">
               <i className="fas fa-info-circle mr-2"></i>
-              A secure node will be generated. Identity credentials will be issued upon successful initialization.
+              A secure registration will be generated. Identity credentials will be issued upon successful registration.
             </p>
           </div>
         </div>
 
-        <div className="p-6 sm:p-8 lg:p-12 bg-slate-50 dark:bg-slate-900/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
+        <div className="p-5 sm:p-6 lg:p-10 bg-slate-50 dark:bg-slate-900/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
           <button
             onClick={onSubmit}
-            className="flex-1 py-6 bg-brand-500 text-white font-black rounded-[32px] text-sm uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all"
+            className="flex-1 py-4 bg-brand-500 text-white font-black rounded-[24px] text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all"
           >
-            Initialize Node
+            Registeration
           </button>
         </div>
       </div>

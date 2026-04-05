@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import PdfViewer from './Modals/PdfViewer';
 
 type AppClass = {
   id: string;
@@ -99,6 +100,8 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
   const [existingAttachmentPath, setExistingAttachmentPath] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; onConfirm: () => Promise<void> | void } | null>(null);
   const [isConfirmActionSubmitting, setIsConfirmActionSubmitting] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState('');
   const [courseFolders, setCourseFolders] = useState<CourseFolder[]>([]);
   const [openCourseFolders, setOpenCourseFolders] = useState<Record<string, boolean>>({});
   const [courseFolderFiles, setCourseFolderFiles] = useState<Record<string, CourseFolderFile[]>>({});
@@ -1196,7 +1199,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
                     <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => void downloadFileDirectly(existingAttachmentUrl, 'homework-attachment')}
+                        onClick={() => { setPreviewUrl(existingAttachmentUrl); setPreviewTitle('Homework Instructions'); }}
                         className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-500"
                       >
                         <i className="fas fa-paperclip"></i>
@@ -1289,7 +1292,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
                               <div className="flex flex-wrap items-center gap-3">
                                 <button
                                   type="button"
-                                  onClick={() => void downloadFileDirectly(item.attachment_url || '', 'homework-attachment')}
+                                  onClick={() => { setPreviewUrl(item.attachment_url || ''); setPreviewTitle(`Instructions: ${item.title}`); }}
                                   className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-brand-500"
                                 >
                                   <i className="fas fa-paperclip"></i>
@@ -1342,7 +1345,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
                                       <div className="flex items-center gap-2">
                                         {sub.submission_url && (
                                           <button
-                                            onClick={() => window.open(sub.submission_url ?? undefined, '_blank')}
+                                            onClick={() => { setPreviewUrl(sub.submission_url || ''); setPreviewTitle(`Submission: ${sub.student?.name || 'Student'}`); }}
                                             className="w-7 h-7 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-brand-500 flex items-center justify-center transition-all"
                                             title="View Submission"
                                           >
@@ -1402,6 +1405,14 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
           </div>
         </div>
       )}
+      {previewUrl && (
+        <PdfViewer
+          url={previewUrl}
+          title={previewTitle}
+          onClose={() => setPreviewUrl(null)}
+        />
+      )}
     </div>
   );
 }
+

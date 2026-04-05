@@ -246,13 +246,13 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-lg max-h-[90vh] rounded-[28px] sm:rounded-[40px] lg:rounded-[56px] shadow-2xl overflow-y-auto border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md max-h-[90vh] rounded-[24px] sm:rounded-[32px] lg:rounded-[40px] shadow-2xl overflow-y-auto border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300">
 
         {/* Modal Header */}
-        <div className="p-6 sm:p-8 lg:p-12 border-b border-slate-50 dark:border-slate-800 flex items-start justify-between gap-4">
+        <div className="p-5 sm:p-6 lg:p-10 border-b border-slate-50 dark:border-slate-800 flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-2xl sm:text-3xl font-black tracking-tighter">Initialize {enrollData.type} Node</h3>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-2"></p>
+            <h3 className="text-xl sm:text-2xl font-black tracking-tighter">{enrollData.type} Registration</h3>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1"></p>
           </div>
           <button
             onClick={onClose}
@@ -264,7 +264,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
         </div>
 
         {/* Form Content */}
-        <div className="p-6 sm:p-8 lg:p-12 space-y-6 sm:space-y-8">
+        <div className="p-5 sm:p-6 lg:p-10 space-y-4 sm:space-y-6">
           {enrollData.type === 'Old' && (
             <div>
               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Select Existing Student</label>
@@ -284,22 +284,22 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
           {enrollData.type === 'New' && (
             <>
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Full Legal Name</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Full Legal Name</label>
                 <input
                   type="text"
                   placeholder="Enter student name..."
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
                   value={enrollData.name}
                   onChange={(e) => setEnrollData({ ...enrollData, name: e.target.value })}
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Network Email (Verification Hub)</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Network Email (Verification Hub)</label>
                 <input
                   type="email"
                   placeholder="student@iem.io"
-                  className={`w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 font-bold transition-all ${isStudentEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
+                  className={`w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 font-bold transition-all text-sm ${isStudentEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
                   value={enrollData.email}
                   onChange={(e) => setEnrollData({ ...enrollData, email: e.target.value })}
                 />
@@ -307,10 +307,10 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Student Phone Number</label>
-                <div className="flex gap-3">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Student Phone Number</label>
+                <div className="flex gap-2">
                   <select
-                    className="w-40 bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
+                    className="w-32 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
                     value={enrollData.studentCountryCode}
                     onChange={(e) => setEnrollData({ ...enrollData, studentCountryCode: e.target.value })}
                   >
@@ -321,8 +321,8 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                   <input
                     type="tel"
                     inputMode="numeric"
-                    placeholder="Enter student phone number..."
-                    className="flex-1 bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
+                    placeholder="Enter phone number..."
+                    className="flex-1 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
                     value={enrollData.phone}
                     onChange={(e) => setEnrollData({ ...enrollData, phone: e.target.value.replace(/\D/g, '') })}
                   />
@@ -425,10 +425,10 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
           {enrollData.type === 'New' && (
             <>
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Date of Birth</label>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Date of Birth</label>
                 <input
                   type="date"
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
                   value={enrollData.dateOfBirth}
                   onChange={(e) => setEnrollData({ ...enrollData, dateOfBirth: e.target.value })}
                 />
@@ -557,12 +557,12 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="p-6 sm:p-8 lg:p-12 bg-slate-50 dark:bg-slate-900/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
+        <div className="p-5 sm:p-6 lg:p-10 bg-slate-50 dark:bg-slate-900/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
           <button
             onClick={onSubmit}
-            className="flex-1 py-6 bg-brand-500 text-white font-black rounded-[32px] text-sm uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all outline-none"
+            className="flex-1 py-4 bg-brand-500 text-white font-black rounded-[24px] text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all outline-none"
           >
-            Initialize Node
+            Registeration
           </button>
         </div>
       </div>
