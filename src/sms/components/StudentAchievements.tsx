@@ -9,7 +9,7 @@ interface StudentAchievement {
   description: string;
   icon: string;
   color: string;
-  achievement_date: string;
+  date: string;
   created_at: string;
 }
 
@@ -33,7 +33,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
     description: '',
     icon: 'fa-trophy',
     color: 'emerald',
-    achievement_date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0]
   });
 
   const fetchAchievements = async () => {
@@ -43,7 +43,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
       .from('student_achievements')
       .select('*')
       .eq('school_id', schoolId)
-      .order('achievement_date', { ascending: false });
+      .order('date', { ascending: false });
 
     if (error) {
       console.error('Error fetching achievements:', error);
@@ -77,7 +77,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
         description: '',
         icon: 'fa-trophy',
         color: 'emerald',
-        achievement_date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0]
       });
       fetchAchievements();
     }
@@ -198,7 +198,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
                         </div>
                       </td>
                       <td className="px-8 py-5">
-                        <p className="text-sm font-bold text-slate-600">{new Date(ach.achievement_date).toLocaleDateString()}</p>
+                        <p className="text-sm font-bold text-slate-600">{new Date(ach.date).toLocaleDateString()}</p>
                       </td>
                       <td className="px-8 py-5 text-right">
                         <button
@@ -313,8 +313,8 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
                 <input
                   type="date"
                   className="w-full bg-slate-50 border border-slate-100 px-5 py-4 rounded-2xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-bold text-sm"
-                  value={formData.achievement_date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, achievement_date: e.target.value }))}
+                  value={formData.date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                 />
               </div>
 

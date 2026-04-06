@@ -4393,14 +4393,15 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               )}
             </div>
           )}
-          {currentPage === 'student-achievements' && (
-            <StudentAchievements
-              schoolId={schoolId}
-              students={allStudents.length > 0 ? allStudents : students}
-              notify={notify}
-              onConfirm={(msg, action) => setConfirmDialog({ message: msg, onConfirm: action })}
-            />
-          )}
+
+
+
+
+
+
+
+
+
 
           {/* FALLBACK HUB */}
           {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'about-school', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel', 'class-announcements', 'messages', 'class-group-management', 'sms-attendance', 'student-achievements'].includes(currentPage) && (
