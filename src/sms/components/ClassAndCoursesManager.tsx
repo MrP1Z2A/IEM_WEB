@@ -2,6 +2,7 @@ import React from 'react';
 import { supabase } from '../supabaseClient';
 import { getCurrentTenantContext, withSchoolId } from '../services/tenantService';
 import { Student } from '../types';
+import ImageCropper from './Modals/ImageCropper';
 
 type AttendanceContextType = 'class' | 'subject';
 type AttendanceStatus = 'P' | 'A' | 'L';
@@ -104,6 +105,10 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
   const [linkedAttendanceStudents, setLinkedAttendanceStudents] = React.useState<AttendanceStudent[]>([]);
   const [isLinkedAttendanceStudentsLoading, setIsLinkedAttendanceStudentsLoading] = React.useState(false);
 
+  const [cropperOpen, setCropperOpen] = React.useState(false);
+  const [cropperImage, setCropperImage] = React.useState<string | null>(null);
+  const [cropperType, setCropperType] = React.useState<'class' | 'course-create' | 'course-edit' | null>(null);
+
   const safeNotify = React.useCallback((message: string) => {
     if (notify) notify(message);
   }, [notify]);
@@ -122,6 +127,33 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
 
     return publicResult.data.publicUrl;
   }, []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'class' | 'course-create' | 'course-edit') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperImage(reader.result as string);
+        setCropperType(type);
+        setCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const onCropComplete = (croppedBlob: Blob) => {
+    const croppedFile = new File([croppedBlob], 'cropped_image.jpg', { type: 'image/jpeg' });
+    if (cropperType === 'class') {
+      setClassImage(croppedFile);
+    } else if (cropperType === 'course-create') {
+      setNewCourseImage(croppedFile);
+    } else if (cropperType === 'course-edit') {
+      setEditCourseImage(croppedFile);
+    }
+    setCropperOpen(false);
+    setCropperImage(null);
+    setCropperType(null);
+  };
 
   const loadClasses = React.useCallback(async () => {
     const { data, error } = await supabase
@@ -699,9 +731,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
                   ref={classImageInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) setClassImage(e.target.files[0]);
-                  }}
+                  onChange={(e) => handleFileChange(e, 'class')}
                   className="w-full text-xs font-semibold text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-brand-500 file:text-white"
                 />
               </div>
@@ -941,9 +971,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
                   ref={newCourseImageInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) setNewCourseImage(e.target.files[0]);
-                  }}
+                  onChange={(e) => handleFileChange(e, 'course-create')}
                   className="hidden"
                 />
                 {newCourseImage && (
@@ -1035,9 +1063,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
                   ref={editCourseImageInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) setEditCourseImage(e.target.files[0]);
-                  }}
+                  onChange={(e) => handleFileChange(e, 'course-edit')}
                   className="hidden"
                 />
               </div>
@@ -1169,6 +1195,19 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ student
           )}
         </div>
       </section>
+
+      {cropperOpen && cropperImage && (
+        <ImageCropper
+          image={cropperImage}
+          onCropComplete={onCropComplete}
+          onCancel={() => {
+            setCropperOpen(false);
+            setCropperImage(null);
+            setCropperType(null);
+          }}
+          aspect={cropperType === 'class' ? 1 : 1} // Can adjust aspect ratios here
+        />
+      )}
     </div>
   );
 };

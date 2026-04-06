@@ -17,6 +17,7 @@ interface SidebarProps {
   onCollapse?: () => void;
   onSwitch?: () => void;
   schoolName?: string;
+  avatarUrl?: string | null;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -32,7 +33,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   onCollapse,
   onSwitch,
-  schoolName
+  schoolName,
+  avatarUrl
 }) => {
   const handleNavClick = (view: View) => {
     onViewChange(view);
@@ -127,8 +129,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="p-6 mt-auto space-y-4">
           <div className={`bg-[#4ea59d]/5 border border-[#4ea59d]/20 rounded-[24px] p-4 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-            <div className="w-8 h-8 rounded-full bg-[#4ea59d] flex items-center justify-center text-white shrink-0 shadow-lg shadow-[#4ea59d]/20">
-              <i className="fa-solid fa-user text-xs"></i>
+            <div className="w-8 h-8 rounded-full bg-[#4ea59d] flex items-center justify-center text-white shrink-0 shadow-lg shadow-[#4ea59d]/20 overflow-hidden">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={userName || 'User'} className="w-full h-full object-cover" />
+              ) : (
+                <i className="fa-solid fa-user text-xs"></i>
+              )}
             </div>
             {!isCollapsed && (
               <div className="flex-1 overflow-hidden">

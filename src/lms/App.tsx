@@ -3512,6 +3512,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         onCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onSwitch={onSwitch}
         schoolName={schoolName}
+        avatarUrl={getStudentAvatarUrl(user.avatar)}
       />
       <main className={`flex-1 transition-all duration-300 p-6 md:p-8 overflow-x-hidden bg-[#f3f0e8] ${isSidebarOpen ? 'hidden md:block' : 'block'} ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-72'}`}>
         {currentView === 'dashboard' && renderDashboard()}

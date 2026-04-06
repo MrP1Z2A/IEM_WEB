@@ -56,7 +56,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
     if (!supabase || !currentUser.id) return;
     const channel = supabase
       .channel(`global-dm:${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUser.id}` }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.'${currentUser.id}'` }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const msg = payload.new as Message;
           if (activeChat?.kind === 'dm' && msg.sender_id === activeChat.contact.id) {
@@ -78,7 +78,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
     const gid = activeChat.group.id;
     const channel = supabase
       .channel(`group-msgs:${gid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `group_id=eq.${gid}` }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `group_id=eq.'${gid}'` }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const msg = payload.new as Message;
           setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
@@ -117,7 +117,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
       const { data: allMessages } = await supabase
         .from('messages')
         .select('id, sender_id, receiver_id, content, created_at, read_at')
-        .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+        .or(`sender_id.eq.'${currentUser.id}',receiver_id.eq.'${currentUser.id}'`)
         .is('group_id', null)
         .order('created_at', { ascending: false });
 
@@ -214,7 +214,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
         query = supabase
           .from('messages')
           .select('*')
-          .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${chat.contact.id}),and(sender_id.eq.${chat.contact.id},receiver_id.eq.${currentUser.id})`)
+          .or(`and(sender_id.eq.'${currentUser.id}',receiver_id.eq.'${chat.contact.id}'),and(sender_id.eq.'${chat.contact.id}',receiver_id.eq.'${currentUser.id}')`)
           .order('created_at', { ascending: true });
       } else {
         query = supabase
