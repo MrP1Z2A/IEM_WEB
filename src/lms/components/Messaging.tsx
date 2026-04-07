@@ -10,7 +10,8 @@ interface MessagingProps {
 
 type ActiveChat =
   | { kind: 'dm'; contact: Contact }
-  | { kind: 'group'; group: MessageGroup };
+  | { kind: 'group'; group: MessageGroup }
+  | { kind: 'system' };
 
 const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
   // ── Contacts & Groups ──────────────────────────────────────
@@ -266,7 +267,11 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
       const { data, error } = await supabase.from('messages').insert([messageData]).select().single();
       if (error) throw error;
       setMessages(prev => prev.map(m => m.id === optimistic.id ? data : m));
-      if (isGroup) void fetchGroups(); else void fetchContacts();
+      if (isGroup) {
+        void fetchGroups();
+      } else {
+        void fetchContacts();
+      }
     } catch (err) {
       console.error('sendMessage:', err);
       setMessages(prev => prev.filter(m => m.id !== optimistic.id));
@@ -281,7 +286,11 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
       if (error) throw error;
       setMessages(prev => prev.filter(m => m.id !== messageId));
       setDeletingMessageId(null);
-      if (activeChat?.kind === 'group') void fetchGroups(); else void fetchContacts();
+      if (activeChat?.kind === 'group') {
+        void fetchGroups();
+      } else {
+        void fetchContacts();
+      }
     } catch (err) { console.error('deleteMessage:', err); }
   };
 
@@ -580,6 +589,22 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
 
       {/* ──────────────── MAIN CHAT AREA ──────────────── */}
       <div className="flex-1 flex flex-col relative">
+        {/* Monitoring Alert Banner */}
+        <div className="bg-[#f6f1e8] border-b border-[#ddd1bd] px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <i className="fa-solid fa-shield-check text-amber-600 text-sm"></i>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-amber-700/80 mb-0.5">Safeguarding Active</p>
+              <p className="text-[9px] font-bold text-slate-500/80">Communications are monitored by school administration for safety and compliance.</p>
+            </div>
+          </div>
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-500/5 border border-slate-500/10">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">System Secure</span>
+          </div>
+        </div>
         {activeChat ? (
           <>
             {/* Chat Header */}

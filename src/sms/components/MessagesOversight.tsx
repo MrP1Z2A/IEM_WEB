@@ -54,7 +54,7 @@ const MessagesOversight: React.FC<MessagesOversightProps> = ({ schoolId }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeConv, setActiveConv] = useState<ConversationSummary | null>(null);
   const [convMessages, setConvMessages] = useState<MessageRecord[]>([]);
-  const [filterRole, setFilterRole] = useState<'all' | 'teacher' | 'student' | 'student_service'>('all');
+  const [filterRole, setFilterRole] = useState<'all' | 'teacher' | 'student' | 'student_service' | 'cross_role'>('all');
   const [filterKind, setFilterKind] = useState<'all' | 'dm' | 'group'>('all');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -163,12 +163,21 @@ const MessagesOversight: React.FC<MessagesOversightProps> = ({ schoolId }) => {
   const filteredConversations = useMemo(() => {
     let result = conversations;
     if (filterKind !== 'all') result = result.filter(c => c.kind === filterKind);
-    if (filterRole !== 'all') result = result.filter(c =>
-      c.participantNames.some(name => {
-        const user = allUsers.find(u => u.name === name);
-        return user?.role === filterRole;
-      })
-    );
+    if (filterRole !== 'all') {
+      if (filterRole === 'cross_role') {
+        result = result.filter(c => {
+          const roles = c.participantNames.map(name => allUsers.find(u => u.name === name)?.role);
+          return roles.includes('student') && roles.includes('teacher');
+        });
+      } else {
+        result = result.filter(c =>
+          c.participantNames.some(name => {
+            const user = allUsers.find(u => u.name === name);
+            return user?.role === filterRole;
+          })
+        );
+      }
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(c =>
@@ -209,9 +218,9 @@ const MessagesOversight: React.FC<MessagesOversightProps> = ({ schoolId }) => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-black tracking-tighter text-slate-800 dark:text-white flex items-center gap-3">
-            <i className="fas fa-comments text-brand-500"></i> Message Oversight
+            <i className="fas fa-shield-halved text-brand-500"></i> Institutional Oversight
           </h2>
-          <p className="text-slate-400 text-sm mt-1 dark:text-slate-500">Monitor all platform communications across the school</p>
+          <p className="text-slate-400 text-sm mt-1 dark:text-slate-500 font-medium">Platform-wide message monitoring for safeguarding and institutional compliance</p>
         </div>
         <button
           onClick={() => void loadAll()}
@@ -274,11 +283,11 @@ const MessagesOversight: React.FC<MessagesOversightProps> = ({ schoolId }) => {
                 </button>
               ))}
               <div className="w-px bg-slate-200 dark:bg-slate-700 mx-0.5 self-stretch"></div>
-              {(['all', 'teacher', 'student', 'student_service'] as const).map(r => (
+              {(['all', 'teacher', 'student', 'student_service', 'cross_role'] as const).map(r => (
                 <button key={r} onClick={() => setFilterRole(r)}
-                  className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${filterRole === r ? 'bg-purple-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                  className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${filterRole === r ? 'bg-indigo-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
                 >
-                  {r === 'all' ? 'All roles' : r === 'student_service' ? 'Services' : r}
+                  {r === 'all' ? 'All roles' : r === 'student_service' ? 'Services' : r === 'cross_role' ? 'Student ↔ Teacher' : r}
                 </button>
               ))}
             </div>
@@ -443,10 +452,15 @@ const MessagesOversight: React.FC<MessagesOversightProps> = ({ schoolId }) => {
 
               {/* Read-only notice */}
               <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl">
-                  <i className="fas fa-shield-halved text-amber-500 text-sm"></i>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">
-                    Admin Read-Only View · Messages cannot be sent from this panel
+                <div className="flex flex-col gap-2 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl">
+                  <div className="flex items-center gap-3">
+                    <i className="fas fa-shield-halved text-amber-500 text-sm"></i>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                      Administrative Policy: Secure Observation Active
+                    </p>
+                  </div>
+                  <p className="text-[9px] font-bold text-amber-700/70 dark:text-amber-500/50 ml-7 leading-relaxed">
+                    This session is being recorded for administrative audit. All access to student-teacher communication is logged. Messages in this view are read-only.
                   </p>
                 </div>
               </div>

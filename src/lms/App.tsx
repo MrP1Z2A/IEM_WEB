@@ -298,6 +298,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [noticeFile, setNoticeFile] = useState<File | null>(null);
   const [selectedNoticeTargets, setSelectedNoticeTargets] = useState<Array<{ classId: string, courseId: string, displayName: string }>>([]);
   const [isSavingTeacherData, setIsSavingTeacherData] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [assignedClassId, setAssignedClassId] = useState('');
   const [assignedCourseId, setAssignedCourseId] = useState('');
   const [assignedCoursesList, setAssignedCoursesList] = useState<any[]>([]);
@@ -349,332 +356,265 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
     try {
       // Debug log for schoolId
-      console.log('[NoticeBoard] Fetching notices for schoolId:', schoolId);
-      const notices = await fetchNoticeBoardData(schoolId, user.studentId, assignedClassIds, assignedCourseIds, user.id);
-
-      console.log('[NoticeBoard] Notices fetched:', notices);
-      setDynamicAnnouncements(notices);
-
-      if (supabase && isSupabaseConfigured) {
-        if (user.role === UserRole.TEACHER) {
-          // TEACHER SCOPING
-          const courseIds = assignedCourseIds;
-          const classIds = assignedClassIds;
-
-          if (courseIds.length > 0 || classIds.length > 0) {
-            const client = supabase;
-            if (!client) return;
-            // 1. Fetch Students in these courses
-            const { data: studentsEnrolled } = await supabase
-              .from('class_course_students')
-              .select('student_id')
-              .in('class_course_id', courseIds)
-              .eq('school_id', schoolId);
-
-            const studentIds = Array.from(new Set((studentsEnrolled || []).map(s => s.student_id)));
-
-            // 2. Fetch Grades for these students and courses
-            let gradesQuery = supabase.from('exam_grades').select('*, exams:exam_id(title)').eq('school_id', schoolId);
-            if (studentIds.length > 0) gradesQuery = gradesQuery.in('student_id', studentIds);
-            if (courseIds.length > 0) gradesQuery = gradesQuery.in('class_course_id', courseIds);
-
-            const { data: gradesData } = await gradesQuery;
-            if (gradesData) {
-              setExamResultsData(gradesData.map(g => ({
-                assignment: (g.exams as any)?.title || 'Unknown Assessment',
-                className: g.name || 'Unknown Class',
-                courseName: g.course_name || 'Unknown Course',
-                grade: g.grade ? String(g.grade) : 'Pending',
-                percentage: g.percentage ? String(g.percentage) : null,
-                feedback: g.note || 'No feedback provided'
-              })));
-            }
-
-            // 3. Fetch Exams for these courses
-            const { data: examsData } = await supabase
-              .from('exams')
-              .select('*')
-              .in('class_course_id', courseIds)
-              .eq('school_id', schoolId)
-              .order('created_at', { ascending: false });
-
-            if (examsData) {
-              setDynamicExams(examsData.map(ex => ({
-                id: ex.id,
-                subject: ex.title,
-                date: new Date(ex.exam_date || ex.created_at).toLocaleDateString(undefined, { month: 'long', day: '2-digit' }),
-                time: ex.exam_time || '10:00 AM',
-                venue: ex.location || 'TBA',
-                originalDate: ex.exam_date || ex.created_at
-              })));
-            }
-
-            // 4. Fetch Homework for these courses
-            const { data: homeworkData } = await supabase
-              .from('homework_assignments')
-              .select('*')
-              .in('class_course_id', courseIds)
-              .eq('school_id', schoolId)
-              .order('created_at', { ascending: false });
-
-            if (homeworkData) {
-              const assignmentIds = homeworkData.map(h => h.id);
-              // Fetch all submissions for these assignments with student names
-              const { data: rawSubmissions } = await supabase
-                .from('homework_submissions')
-                .select('*, student:student_id(name)')
-                .in('assignment_id', assignmentIds)
-                .eq('school_id', schoolId);
-
-              setDynamicAssignments(homeworkData.map(hw => {
-                const submissions = rawSubmissions?.filter(s => s.assignment_id === hw.id) || [];
-                const rawUrl = hw.attachment_url || hw.file_url || '';
-                const fileName = rawUrl ? decodeURIComponent(rawUrl.split('/').pop()?.split('?')[0] || '') : '';
-
-                return {
-                  id: hw.id,
-                  title: hw.title,
-                  description: hw.description || '',
-                  dueDate: new Date(hw.due_date || hw.created_at).toLocaleDateString(undefined, { month: 'long', day: '2-digit' }),
-                  status: submissions.length > 0 ? 'Submitted' : 'None',
-                  course: hw.course_name || 'General',
-                  location: hw.location || 'TBA',
-                  fileUrl: rawUrl,
-                  fileName,
-                  originalDate: hw.due_date || hw.created_at,
-                  submissions: submissions.map(s => ({
-                    studentName: (s.student as any)?.name || 'Unknown Student',
-                    url: s.submission_url,
-                    id: s.id
-                  }))
-                };
-              }));
-            }
-
-            // 5. Fetch Achievements for these students
-            if (studentIds.length > 0) {
-              const { data: achievementsData } = await supabase
-                .from('student_achievements')
-                .select('*')
-                .in('student_id', studentIds)
-                .eq('school_id', schoolId)
-                .order('achievement_date', { ascending: false });
-
-              if (achievementsData) {
-                setDynamicAchievements(achievementsData.map(ach => ({
-                  id: ach.id,
-                  title: ach.title,
-                  desc: ach.description || ach.title,
-                  icon: ach.icon || 'fa-award',
-                  color: ach.color ? (ach.color.startsWith('text-') ? ach.color : `text-${ach.color}-500`) : 'text-emerald-500',
-                  date: ach.achievement_date ? new Date(ach.achievement_date).toLocaleDateString() : 'Recent'
-                })));
-              }
-            }
-          }
-        } else if (user.role === UserRole.STUDENT) {
-          // STUDENT SCOPING (Existing logic)
-          // Fetch grades with assessment titles
-          const { data: gradesData, error: gradesError } = await supabase
-            .from('exam_grades')
-            .select('*, exams:exam_id(title)')
-            .eq('student_id', user.studentId)
-            .eq('school_id', schoolId);
-
-          if (!gradesError && gradesData) {
-            const mappedGrades = gradesData.map(g => ({
-              assignment: (g.exams as any)?.title || 'Unknown Assessment',
-              className: g.name || 'Unknown Class',
-              courseName: g.course_name || 'Unknown Course',
-              grade: g.grade ? String(g.grade) : 'Pending',
-              percentage: g.percentage ? String(g.percentage) : null,
-              feedback: g.note || 'No feedback provided'
-            }));
-            setExamResultsData(mappedGrades);
-          } else {
-            console.error("Error fetching grades:", gradesError);
-            setExamResultsData([]);
-          }
-
-          // Fetch student's enrolled courses to get exams and homework
-          const { data: enrolledData, error: enrolledError } = await supabase
-            .from('class_course_students')
-            .select('class_course_id, class_id')
-            .eq('student_id', user.studentId)
-            .eq('school_id', schoolId);
-
-          if (!enrolledError && enrolledData) {
-            const courseIds = enrolledData.map(d => d.class_course_id);
-
-            if (courseIds.length > 0) {
-              // Fetch Exams
-              const { data: examsData, error: examsError } = await supabase
-                .from('exams')
-                .select('*')
-                .in('class_course_id', courseIds)
-                .eq('school_id', schoolId)
-                .order('created_at', { ascending: false });
-
-              if (!examsError && examsData) {
-                const mappedExams = examsData.map(ex => {
-                  const dateSource = ex.exam_date || ex.created_at;
-                  const date = new Date(dateSource);
-                  const month = date.toLocaleString('default', { month: 'long' });
-                  const dayStr = date.getDate().toString().padStart(2, '0');
-                  return {
-                    id: ex.id,
-                    subject: ex.title,
-                    date: `${month} ${dayStr}`,
-                    time: ex.exam_time || '10:00 AM',
-                    venue: ex.location || 'TBA',
-                    originalDate: dateSource
-                  };
-                });
-                setDynamicExams(mappedExams);
-              }
-
-              // Fetch Homework/Assignments
-              const { data: homeworkData, error: homeworkError } = await supabase
-                .from('homework_assignments')
-                .select('*')
-                .in('class_course_id', courseIds)
-                .eq('school_id', schoolId)
-                .order('created_at', { ascending: false });
-
-              if (!homeworkError && homeworkData) {
-                // Now fetch submissions for this student to show correct status
-                const { data: submissionsData } = await supabase
-                  .from('homework_submissions')
-                  .select('assignment_id, status, submission_url')
-                  .eq('student_id', user.studentId)
+      console.log('[NoticeBoard] Fetching data for schoolId:', schoolId);
+      
+      await Promise.allSettled([
+        (async () => {
+          const notices = await fetchNoticeBoardData(schoolId, user.studentId, assignedClassIds, assignedCourseIds, user.id);
+          if (notices) setDynamicAnnouncements(notices);
+        })(),
+        (async () => {
+          if (supabase && isSupabaseConfigured) {
+            if (user.role === UserRole.TEACHER) {
+              const courseIds = assignedCourseIds;
+              if (courseIds.length > 0) {
+                // Fetch Students
+                const { data: studentsEnrolled } = await supabase
+                  .schema('public')
+                  .from('class_course_students')
+                  .select('student_id')
+                  .in('class_course_id', courseIds)
                   .eq('school_id', schoolId);
 
-                const mappedAssignments = homeworkData.map(hw => {
-                  const dateSource = hw.due_date || hw.created_at;
-                  const date = new Date(dateSource);
-                  const month = date.toLocaleString('default', { month: 'long' });
-                  const dayStr = date.getDate().toString().padStart(2, '0');
+                const studentIds = Array.from(new Set((studentsEnrolled || []).map(s => s.student_id)));
 
-                  const submission = submissionsData?.find(s => s.assignment_id === hw.id);
+                // Fetch Grades
+                let gradesQuery = supabase.schema('public').from('exam_grades').select('*, exams:exam_id(title)').eq('school_id', schoolId);
+                if (studentIds.length > 0) gradesQuery = gradesQuery.in('student_id', studentIds);
+                if (courseIds.length > 0) gradesQuery = gradesQuery.in('class_course_id', courseIds);
 
-                  const rawUrl = hw.attachment_url || hw.file_url || '';
-                  const fileName = rawUrl ? decodeURIComponent(rawUrl.split('/').pop()?.split('?')[0] || '') : '';
-                  return {
-                    id: hw.id,
-                    title: hw.title,
-                    description: hw.description || '',
-                    dueDate: `${month} ${dayStr}`,
-                    status: submission ? (submission.status || 'Active') : 'Pending',
-                    course: hw.course_name ? `${hw.class_name || ''} - ${hw.course_name}` : 'General',
-                    location: hw.location || 'TBA',
-                    fileUrl: rawUrl,
-                    fileName,
-                    submissionUrl: submission?.submission_url,
-                    originalDate: dateSource
-                  };
-                });
-                setDynamicAssignments(mappedAssignments);
+                const { data: gradesData } = await gradesQuery;
+                if (gradesData) {
+                  setExamResultsData(gradesData.map(g => ({
+                    assignment: (g.exams as any)?.title || 'Unknown Assessment',
+                    className: g.name || 'Unknown Class',
+                    courseName: g.course_name || 'Unknown Course',
+                    grade: g.grade ? String(g.grade) : 'Pending',
+                    percentage: g.percentage ? String(g.percentage) : null,
+                    feedback: g.note || 'No feedback provided'
+                  })));
+                }
+
+                // Fetch Exams
+                const { data: examsData } = await supabase
+                  .schema('public')
+                  .from('exams')
+                  .select('*')
+                  .in('class_course_id', courseIds)
+                  .eq('school_id', schoolId)
+                  .order('created_at', { ascending: false });
+
+                if (examsData) {
+                  setDynamicExams(examsData.map(ex => ({
+                    id: ex.id,
+                    subject: ex.title,
+                    date: new Date(ex.exam_date || ex.created_at).toLocaleDateString(undefined, { month: 'long', day: '2-digit' }),
+                    time: ex.exam_time || '10:00 AM',
+                    venue: ex.location || 'TBA',
+                    originalDate: ex.exam_date || ex.created_at
+                  })));
+                }
+
+                // Fetch Homework
+                const { data: homeworkData } = await supabase
+                  .schema('public')
+                  .from('homework_assignments')
+                  .select('*')
+                  .in('class_course_id', courseIds)
+                  .eq('school_id', schoolId)
+                  .order('created_at', { ascending: false });
+
+                if (homeworkData) {
+                  const assignmentIds = homeworkData.map(h => h.id);
+                  const { data: rawSubmissions } = await supabase
+                    .schema('public')
+                    .from('homework_submissions')
+                    .select('*, student:student_id(name)')
+                    .in('assignment_id', assignmentIds)
+                    .eq('school_id', schoolId);
+
+                  setDynamicAssignments(homeworkData.map(hw => {
+                    const submissions = rawSubmissions?.filter(s => s.assignment_id === hw.id) || [];
+                    const rawUrl = hw.attachment_url || hw.file_url || '';
+                    const fileName = rawUrl ? decodeURIComponent(rawUrl.split('/').pop()?.split('?')[0] || '') : '';
+
+                    return {
+                      id: hw.id,
+                      title: hw.title,
+                      description: hw.description || '',
+                      dueDate: new Date(hw.due_date || hw.created_at).toLocaleDateString(undefined, { month: 'long', day: '2-digit' }),
+                      status: submissions.length > 0 ? 'Submitted' : 'None',
+                      course: hw.course_name || 'General',
+                      location: hw.location || 'TBA',
+                      fileUrl: rawUrl,
+                      fileName,
+                      originalDate: hw.due_date || hw.created_at,
+                      submissions: submissions.map(s => ({
+                        studentName: (s.student as any)?.name || 'Unknown Student',
+                        url: s.submission_url,
+                        id: s.id
+                      }))
+                    };
+                  }));
+                }
+
+                // Achievements
+                if (studentIds.length > 0) {
+                  const { data: achievementsData } = await supabase
+                    .schema('public')
+                    .from('student_achievements')
+                    .select('*')
+                    .in('student_id', studentIds)
+                    .eq('school_id', schoolId)
+                    .order('achievement_date', { ascending: false });
+
+                  if (achievementsData) {
+                    setDynamicAchievements(achievementsData.map(ach => ({
+                      id: ach.id,
+                      title: ach.title,
+                      desc: ach.description || ach.title,
+                      icon: ach.icon || 'fa-award',
+                      color: ach.color ? (ach.color.startsWith('text-') ? ach.color : `text-${ach.color}-500`) : 'text-emerald-500',
+                      date: ach.achievement_date ? new Date(ach.achievement_date).toLocaleDateString() : 'Recent'
+                    })));
+                  }
+                }
+              }
+            } else if (user.role === UserRole.STUDENT) {
+              // Student Scoping
+              const { data: gradesData } = await supabase
+                .schema('public')
+                .from('exam_grades')
+                .select('*, exams:exam_id(title)')
+                .eq('student_id', user.studentId)
+                .eq('school_id', schoolId);
+
+              if (gradesData) {
+                setExamResultsData(gradesData.map(g => ({
+                  assignment: (g.exams as any)?.title || 'Unknown Assessment',
+                  className: g.name || 'Unknown Class',
+                  courseName: g.course_name || 'Unknown Course',
+                  grade: g.grade ? String(g.grade) : 'Pending',
+                  percentage: g.percentage ? String(g.percentage) : null,
+                  feedback: g.note || 'No feedback provided'
+                })));
               }
 
-              // Fetch Report Cards
-              const client = supabase;
-              if (!client) return;
-              const { data: reportCardsData, error: reportCardsError } = await client
-                .from('report_cards')
-                .select('*')
+              const { data: enrolledData } = await supabase
+                .schema('public')
+                .from('class_course_students')
+                .select('class_course_id, class_id')
                 .eq('student_id', user.studentId)
-                .eq('school_id', schoolId)
-                .order('report_date', { ascending: false });
+                .eq('school_id', schoolId);
 
-              if (!reportCardsError && reportCardsData) {
-                const mappedReportCards = reportCardsData.map(rc => {
-                  let fileUrl = '';
-                  if (rc.file_path && supabase) {
-                    const { data } = supabase.storage.from('report_cards').getPublicUrl(rc.file_path);
-                    fileUrl = data.publicUrl;
-                  } else if (rc.file_url) {
-                    fileUrl = rc.file_url;
+              if (enrolledData) {
+                const courseIds = enrolledData.map(d => d.class_course_id);
+                if (courseIds.length > 0) {
+                  const { data: examsData } = await supabase
+                    .schema('public')
+                    .from('exams')
+                    .select('*')
+                    .in('class_course_id', courseIds)
+                    .eq('school_id', schoolId)
+                    .order('created_at', { ascending: false });
+
+                  if (examsData) {
+                    setDynamicExams(examsData.map(ex => ({
+                      id: ex.id,
+                      subject: ex.title,
+                      date: new Date(ex.exam_date || ex.created_at).toLocaleDateString(undefined, { month: 'long', day: '2-digit' }),
+                      time: ex.exam_time || '10:00 AM',
+                      venue: ex.location || 'TBA',
+                      originalDate: ex.exam_date || ex.created_at
+                    })));
                   }
 
-                  return {
-                    id: rc.id,
-                    title: rc.file_name || rc.title || 'Official Report Card',
-                    reportDate: rc.report_date ? new Date(rc.report_date).toLocaleDateString() : 'N/A',
-                    reportType: rc.report_type,
-                    filePath: rc.file_path,
-                    fileName: rc.file_name,
-                    fileUrl
-                  };
-                });
-                setDynamicReportCards(mappedReportCards);
-              } else {
-                console.error("Error fetching report cards:", reportCardsError);
-                setDynamicReportCards([]);
-              }
+                  const { data: homeworkData } = await supabase
+                    .schema('public')
+                    .from('homework_assignments')
+                    .select('*')
+                    .in('class_course_id', courseIds)
+                    .eq('school_id', schoolId)
+                    .order('created_at', { ascending: false });
 
-              // Fetch Student Achievements
-              const { data: achievementsData } = await supabase
-                .from('student_achievements')
-                .select('*')
-                .eq('student_id', user.studentId)
-                .eq('school_id', schoolId)
-                .order('achievement_date', { ascending: false });
+                  if (homeworkData) {
+                    const { data: submissionsData } = await supabase
+                      .schema('public')
+                      .from('homework_submissions')
+                      .select('assignment_id, status, submission_url')
+                      .eq('student_id', user.studentId)
+                      .eq('school_id', schoolId);
 
-              if (achievementsData) {
-                setDynamicAchievements(achievementsData.map(ach => ({
-                  id: ach.id,
-                  title: ach.title,
-                  desc: ach.description || ach.title,
-                  icon: ach.icon || 'fa-award',
-                  color: ach.color ? (ach.color.startsWith('text-') ? ach.color : `text-${ach.color}-500`) : 'text-emerald-500',
-                  date: ach.achievement_date ? new Date(ach.achievement_date).toLocaleDateString() : 'Recent'
-                })));
+                    setDynamicAssignments(homeworkData.map(hw => {
+                      const submission = submissionsData?.find(s => s.assignment_id === hw.id);
+                      const rawUrl = hw.attachment_url || hw.file_url || '';
+                      const fileName = rawUrl ? decodeURIComponent(rawUrl.split('/').pop()?.split('?')[0] || '') : '';
+                      return {
+                        id: hw.id,
+                        title: hw.title,
+                        description: hw.description || '',
+                        dueDate: new Date(hw.due_date || hw.created_at).toLocaleDateString(undefined, { month: 'long', day: '2-digit' }),
+                        status: submission ? (submission.status || 'Active') : 'Pending',
+                        course: hw.course_name || 'General',
+                        location: hw.location || 'TBA',
+                        fileUrl: rawUrl,
+                        fileName,
+                        submissionUrl: submission?.submission_url,
+                        originalDate: hw.due_date || hw.created_at
+                      };
+                    }));
+                  }
+                }
               }
             }
           }
-        }
+        })(),
+        (async () => {
+          if (supabase && isSupabaseConfigured) {
+             // Events
+             const { data: schoolEventsData } = await supabase
+              .schema('public')
+              .from('events')
+              .select('*')
+              .eq('school_id', schoolId)
+              .order('event_date', { ascending: false });
 
-        // --- SHARED DATA FETCHING (Institutional Overview) ---
-        // Fetch School Events
-        const { data: schoolEventsData } = await supabase
-          .from('events')
-          .select('*')
-          .eq('school_id', schoolId)
-          .order('event_date', { ascending: false });
+            if (schoolEventsData) {
+              setDynamicSchoolEvents(schoolEventsData.map(ev => ({
+                id: ev.id,
+                name: ev.title,
+                type: ev.type,
+                date: ev.event_date ? new Date(ev.event_date).toLocaleDateString() : 'TBA',
+                image: ev.image_url || 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800',
+                location: ev.location
+              })));
+            }
 
-        if (schoolEventsData) {
-          setDynamicSchoolEvents(schoolEventsData.map(ev => ({
-            id: ev.id,
-            name: ev.title,
-            type: ev.type,
-            date: ev.event_date ? new Date(ev.event_date).toLocaleDateString() : 'TBA',
-            image: ev.image_url || 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800',
-            location: ev.location
-          })));
-        }
+            // Student Activities
+            const { data: activitiesData } = await supabase
+              .schema('public')
+              .from('student_activities')
+              .select('*')
+              .eq('school_id', schoolId)
+              .order('created_at', { ascending: false });
 
-        // Fetch Student Activities
-        const { data: activitiesData } = await supabase
-          .from('student_activities')
-          .select('*')
-          .eq('school_id', schoolId)
-          .order('created_at', { ascending: false });
-
-        if (activitiesData) {
-          setDynamicStudentActivities(activitiesData.map(act => ({
-            id: act.id,
-            name: act.name,
-            description: act.description,
-            icon: act.activity_type === 'Sports' ? 'fa-volleyball' :
-              act.activity_type === 'Arts' ? 'fa-palette' :
-                act.activity_type === 'Science' ? 'fa-flask' : 'fa-users',
-            activity_type: act.activity_type,
-            attachment_url: act.attachment_url
-          })));
-        }
+            if (activitiesData) {
+              setDynamicStudentActivities(activitiesData.map(act => ({
+                id: act.id,
+                name: act.name,
+                description: act.description,
+                icon: act.activity_type === 'Sports' ? 'fa-volleyball' : 'fa-users',
+                activity_type: act.activity_type,
+                attachment_url: act.attachment_url
+              })));
+            }
+          }
+        })()
+      ]);
 
         // Fetch Live Intel (For Institutional Logs)
         const { data: liveIntelData } = await supabase
+          .schema('public')
           .from('live_intel')
           .select('*')
           .eq('school_id', schoolId)
@@ -689,7 +629,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             date: intel.created_at ? new Date(intel.created_at).toLocaleTimeString() : 'Recent'
           })));
         }
-      }
       setLastSyncTime(new Date().toLocaleTimeString());
     } catch (err) {
       console.error("Sync error", err);
@@ -1348,6 +1287,54 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     setActiveQuiz(null);
     setCurrentView('dashboard');
     setIsSidebarOpen(false);
+  };
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase) return;
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setPasswordLoading(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    try {
+      // 1. Verify old password by attempting re-login
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: oldPassword,
+      });
+
+      if (signInError) {
+        setPasswordError("Incorrect current password.");
+        return;
+      }
+
+      // 2. Update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) throw updateError;
+
+      setPasswordSuccess("Password updated successfully!");
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setIsChangingPassword(false), 2000);
+    } catch (err: any) {
+      console.error('Password Update Error:', err);
+      setPasswordError(err.message || "Failed to update password.");
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   const fetchCourseResources = async (schoolId: string, classId: string, courseId: string): Promise<Note[]> => {
@@ -3628,6 +3615,101 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Security / Password Section */}
+              <div className="mt-8 pt-8 border-t border-white/5 relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest flex items-center gap-2">
+                    <i className="fa-solid fa-shield-halved"></i> Security Settings
+                  </h4>
+                  {!isChangingPassword && (
+                    <button
+                      onClick={() => setIsChangingPassword(true)}
+                      className="px-4 py-2 bg-[#4ea59d]/10 hover:bg-[#4ea59d]/20 border border-[#4ea59d]/30 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      Change Password
+                    </button>
+                  )}
+                </div>
+
+                {isChangingPassword ? (
+                  <form onSubmit={handlePasswordUpdate} className="bg-white/5 p-6 rounded-[32px] border border-white/10 space-y-5 animate-in slide-in-from-top duration-300">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Current Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={oldPassword}
+                          onChange={(e) => setOldPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-sm text-slate-900 focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-700"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-sm text-slate-900 focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-700"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Retype New Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-4 text-sm text-slate-900 focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-700"
+                        />
+                      </div>
+                    </div>
+
+                    {passwordError && (
+                      <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest bg-rose-400/10 p-3 rounded-xl border border-rose-400/20">
+                        <i className="fa-solid fa-circle-exclamation mr-2"></i> {passwordError}
+                      </p>
+                    )}
+                    {passwordSuccess && (
+                      <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-400/10 p-3 rounded-xl border border-emerald-400/20">
+                        <i className="fa-solid fa-circle-check mr-2"></i> {passwordSuccess}
+                      </p>
+                    )}
+
+                    <div className="flex gap-4 pt-2">
+                      <button
+                        type="submit"
+                        disabled={passwordLoading}
+                        className="px-8 py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50 shadow-lg shadow-[#4ea59d]/20"
+                      >
+                        {passwordLoading ? (
+                          <span className="flex items-center gap-2">
+                            <i className="fa-solid fa-spinner animate-spin"></i> Updating...
+                          </span>
+                        ) : (
+                          'Confirm Update'
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsChangingPassword(false); setPasswordError(null); setPasswordSuccess(null); }}
+                        className="px-8 py-3 bg-white/5 hover:bg-white/10 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border border-white/10"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <p className="text-[10px] text-slate-500 font-bold italic tracking-wide">
+                    Your account is secure. Keep your password private to protect your educational records.
+                  </p>
+                )}
               </div>
             </div>
           </div>

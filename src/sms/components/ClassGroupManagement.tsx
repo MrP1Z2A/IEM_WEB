@@ -111,12 +111,12 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
     setIsLoading(true);
     try {
       const [classRes, courseRes, teacherRes, studentRes, atRes, asRes] = await Promise.all([
-        supabase.from('classes').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }),
-        supabase.from('class_courses').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }),
-        supabase.from('teachers').select('id, name, email, avatar').eq('school_id', schoolId).order('name'),
-        supabase.from('students').select('id, name, email, avatar').eq('school_id', schoolId).order('name'),
-        supabase.from('class_course_teachers').select('*').eq('school_id', schoolId),
-        supabase.from('class_course_students').select('*').eq('school_id', schoolId),
+        supabase.schema('public').from('classes').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }),
+        supabase.schema('public').from('class_courses').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }),
+        supabase.schema('public').from('teachers').select('id, name, email, avatar').eq('school_id', schoolId).order('name'),
+        supabase.schema('public').from('students').select('id, name, email, avatar').eq('school_id', schoolId).order('name'),
+        supabase.schema('public').from('class_course_teachers').select('*').eq('school_id', schoolId),
+        supabase.schema('public').from('class_course_students').select('*').eq('school_id', schoolId),
       ]);
 
       setClasses(classRes.data || []);
@@ -214,13 +214,13 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
       if (classFormImage) imageUrl = await uploadProfileImage(classFormImage, 'class');
 
       if (editingClass) {
-        const { error } = await supabase.from('classes').update({ name: classFormName.trim(), color: classFormColor, image_url: imageUrl }).eq('id', editingClass.id);
+        const { error } = await supabase.schema('public').from('classes').update({ name: classFormName.trim(), color: classFormColor, image_url: imageUrl }).eq('id', editingClass.id);
         if (error) throw error;
         setClasses(prev => prev.map(c => c.id === editingClass.id ? { ...c, name: classFormName.trim(), color: classFormColor, image_url: imageUrl } : c));
         if (selectedClass?.id === editingClass.id) setSelectedClass(c => c ? { ...c, name: classFormName.trim(), color: classFormColor, image_url: imageUrl } : c);
         showNotification('Class updated successfully.');
       } else {
-        const { data, error } = await supabase.from('classes').insert([{ name: classFormName.trim(), color: classFormColor, image_url: imageUrl, school_id: schoolId }]).select().single();
+        const { data, error } = await supabase.schema('public').from('classes').insert([{ name: classFormName.trim(), color: classFormColor, image_url: imageUrl, school_id: schoolId }]).select().single();
         if (error) throw error;
         setClasses(prev => [data, ...prev]);
         showNotification('Class created successfully.');
@@ -240,11 +240,11 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
           // Delete related courses, assignments, then class
           const courseIds = courses.filter(c => c.class_id === cls.id).map(c => c.id);
           if (courseIds.length > 0) {
-            await supabase.from('class_course_teachers').delete().in('class_course_id', courseIds);
-            await supabase.from('class_course_students').delete().in('class_course_id', courseIds);
-            await supabase.from('class_courses').delete().in('id', courseIds);
+            await supabase.schema('public').from('class_course_teachers').delete().in('class_course_id', courseIds);
+            await supabase.schema('public').from('class_course_students').delete().in('class_course_id', courseIds);
+            await supabase.schema('public').from('class_courses').delete().in('id', courseIds);
           }
-          await supabase.from('classes').delete().eq('id', cls.id);
+          await supabase.schema('public').from('classes').delete().eq('id', cls.id);
           setClasses(prev => prev.filter(c => c.id !== cls.id));
           setCourses(prev => prev.filter(c => c.class_id !== cls.id));
           if (selectedClass?.id === cls.id) { setSelectedClass(null); setSelectedCourse(null); }
@@ -279,13 +279,13 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
       if (courseFormImage) imageUrl = await uploadProfileImage(courseFormImage, 'course');
 
       if (editingCourse) {
-        const { error } = await supabase.from('class_courses').update({ name: courseFormName.trim(), image_url: imageUrl }).eq('id', editingCourse.id);
+        const { error } = await supabase.schema('public').from('class_courses').update({ name: courseFormName.trim(), image_url: imageUrl }).eq('id', editingCourse.id);
         if (error) throw error;
         setCourses(prev => prev.map(c => c.id === editingCourse.id ? { ...c, name: courseFormName.trim(), image_url: imageUrl } : c));
         if (selectedCourse?.id === editingCourse.id) setSelectedCourse(c => c ? { ...c, name: courseFormName.trim(), image_url: imageUrl } : c);
         showNotification('Course updated.');
       } else {
-        const { data, error } = await supabase.from('class_courses').insert([{ name: courseFormName.trim(), image_url: imageUrl, class_id: selectedClass.id, school_id: schoolId }]).select().single();
+        const { data, error } = await supabase.schema('public').from('class_courses').insert([{ name: courseFormName.trim(), image_url: imageUrl, class_id: selectedClass.id, school_id: schoolId }]).select().single();
         if (error) throw error;
         setCourses(prev => [data, ...prev]);
         showNotification('Course created.');
@@ -302,9 +302,9 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
       onConfirm: async () => {
         if (!supabase) return;
         try {
-          await supabase.from('class_course_teachers').delete().eq('class_course_id', course.id);
-          await supabase.from('class_course_students').delete().eq('class_course_id', course.id);
-          await supabase.from('class_courses').delete().eq('id', course.id);
+          await supabase.schema('public').from('class_course_teachers').delete().eq('class_course_id', course.id);
+          await supabase.schema('public').from('class_course_students').delete().eq('class_course_id', course.id);
+          await supabase.schema('public').from('class_courses').delete().eq('id', course.id);
           setCourses(prev => prev.filter(c => c.id !== course.id));
           if (selectedCourse?.id === course.id) setSelectedCourse(null);
           showNotification('Course deleted.');
@@ -334,10 +334,10 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
         [assignMode === 'teacher' ? 'teacher_id' : 'student_id']: id,
       }));
       const table = assignMode === 'teacher' ? 'class_course_teachers' : 'class_course_students';
-      const { error } = await supabase.from(table).insert(rows);
+      const { error } = await supabase.schema('public').from(table).insert(rows);
       if (error && !/duplicate/i.test(error.message)) throw error;
       // Refresh assignments
-      const { data: updated } = await supabase.from(table).select('*').eq('school_id', schoolId);
+      const { data: updated } = await supabase.schema('public').from(table).select('*').eq('school_id', schoolId);
       if (assignMode === 'teacher') setAssignedTeachers(updated || []);
       else setAssignedStudents(updated || []);
       showNotification(`${selectedAssignIds.size} ${assignMode}(s) assigned.`);
@@ -349,7 +349,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
 
   const removeTeacher = async (teacherId: string) => {
     if (!selectedCourse || !supabase) return;
-    const { error } = await supabase.from('class_course_teachers').delete().eq('class_course_id', selectedCourse.id).eq('teacher_id', teacherId);
+    const { error } = await supabase.schema('public').from('class_course_teachers').delete().eq('class_course_id', selectedCourse.id).eq('teacher_id', teacherId);
     if (error) { showNotification(error.message, 'error'); return; }
     setAssignedTeachers(prev => prev.filter(a => !(a.class_course_id === selectedCourse.id && String(a.teacher_id) === teacherId)));
     showNotification('Teacher removed.');
@@ -361,7 +361,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
       label: `Remove "${student?.name ?? 'this student'}" from ${selectedCourse?.name}?`,
       onConfirm: async () => {
         if (!selectedCourse || !supabase) return;
-        const { error } = await supabase.from('class_course_students').delete().eq('class_course_id', selectedCourse.id).eq('student_id', studentId);
+        const { error } = await supabase.schema('public').from('class_course_students').delete().eq('class_course_id', selectedCourse.id).eq('student_id', studentId);
         if (error) { showNotification(error.message, 'error'); setDeleteConfirm(null); return; }
         setAssignedStudents(prev => prev.filter(a => !(a.class_course_id === selectedCourse.id && String(a.student_id) === studentId)));
         showNotification('Student removed.');

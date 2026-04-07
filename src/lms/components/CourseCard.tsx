@@ -11,7 +11,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onClick }) => {
   return (
     <div 
       onClick={onClick}
-      className="bg-[#0f2624] rounded-[24px] overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group border border-[#1f4e4a]"
+      className="bg-[#0f2624] rounded-xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group border border-[#1f4e4a]"
     >
       <div className="relative h-48 overflow-hidden">
         <img 

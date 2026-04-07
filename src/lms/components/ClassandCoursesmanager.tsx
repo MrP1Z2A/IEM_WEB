@@ -137,13 +137,13 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
       
       // Load Students if not provided
       if (initialStudents.length === 0) {
-        const { data: sData } = await supabase.from('students').select('*').eq('school_id', schoolId);
+        const { data: sData } = await supabase.schema('public').from('students').select('*').eq('school_id', schoolId);
         if (sData) setInternalStudents(sData as Student[]);
       }
 
       // Load Subjects (Catalog Courses) if not provided
       if (initialSubjects.length === 0) {
-        const { data: cData } = await supabase.from('class_courses').select('id, name').eq('school_id', schoolId).limit(50);
+        const { data: cData } = await supabase.schema('public').from('class_courses').select('id, name').eq('school_id', schoolId).limit(50);
         if (cData) setInternalSubjects(cData as LightweightSubject[]);
       }
     } catch (e) {
@@ -176,6 +176,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
     if (!supabase || !propSchoolId) return;
     
     let query = supabase
+      .schema('public')
       .from('classes')
       .select('*, class_course_students(student_id)')
       .eq('school_id', propSchoolId);
@@ -313,6 +314,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
 
     const { schoolId } = await getCurrentTenantContext();
     const { data, error } = await supabase
+      .schema('public')
       .from('class_courses')
       .select('*')
       .eq('class_id', classId)
@@ -364,6 +366,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
     }
 
     const { data, error } = await supabase
+      .schema('public')
       .from('class_course_students')
       .select('student_id, student_name, created_at')
       .eq(filterColumn, selectedAttendanceContextId)
@@ -567,6 +570,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
 
     const { schoolId } = await getCurrentTenantContext();
     const primaryResult = await supabase
+      .schema('public')
       .from('attendance_records')
       .select('student_id, status, context_type')
       .in('context_type', contextTypeCandidates)
@@ -584,6 +588,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
       }
       const { schoolId } = await getCurrentTenantContext();
       const fallbackResult = await supabase
+        .schema('public')
         .from('attendance_records')
         .select('student_id, status')
         .eq('context_id', selectedAttendanceContextId)
@@ -765,7 +770,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
         {userRole === 'teacher' && (
           <button
             onClick={() => { setEditingClassId(null); setClassName(''); setIsClassFormOpen(true); }}
-            className="group relative px-10 py-5 rounded-[24px] bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+            className="group relative px-10 py-5 rounded-2xl bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
           >
             <i className="fa-solid fa-plus-circle text-slate-600 group-hover:text-slate-900 transition-colors"></i> 
             Form Hub
@@ -775,7 +780,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
 
       {/* CREATE CLASS SECTION */}
       {isClassFormOpen && (
-        <div className="bg-white/10 backdrop-blur-2xl shadow-premium p-10 rounded-[40px] border border-white/20 animate-slideIn">
+        <div className="bg-white/10 backdrop-blur-2xl shadow-premium p-10 rounded-[32px] border border-white/20 animate-slideIn">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="space-y-6">
               <div className="space-y-3">
@@ -785,13 +790,13 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                   placeholder="e.g. Grade 10-A, Computer Science 2024"
                   value={className}
                   onChange={(e) => setClassName(e.target.value)}
-                  className="w-full bg-[#0a1a19] border border-white/10 p-5 rounded-[24px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all"
+                  className="w-full bg-[#0a1a19] border border-white/10 p-5 rounded-2xl outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all"
                 />
               </div>
 
               <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase tracking-widest text-[#4ea59d]">Visual Identity (Optional)</label>
-                <div className="bg-[#0a1a19] rounded-[24px] border border-white/10 p-5 flex items-center gap-4">
+                <div className="bg-[#0a1a19] rounded-2xl border border-white/10 p-5 flex items-center gap-4">
                   <div 
                      className="w-14 h-14 rounded-2xl flex items-center justify-center cursor-pointer border border-white/10"
                      style={{ backgroundColor: classOuterColor }}
@@ -829,10 +834,10 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
               </div>
             </div>
 
-            <div className="p-8 bg-[#0a1a19]/50 rounded-[32px] border border-white/5 flex flex-col justify-between">
+            <div className="p-8 bg-[#0a1a19]/50 rounded-2xl border border-white/5 flex flex-col justify-between">
               <div>
                 <h4 className="text-sm font-black text-slate-900 uppercase mb-4">Creation Preview</h4>
-                <div className="p-6 rounded-3xl border border-white/10" style={{ backgroundColor: '#0a1a19' }}>
+                <div className="p-6 rounded-2xl border border-white/10" style={{ backgroundColor: '#0a1a19' }}>
                    <div 
                       className="w-full aspect-video rounded-2xl mb-4 border border-white/5 flex items-center justify-center overflow-hidden" 
                       style={{ backgroundColor: classOuterColor }}
@@ -851,13 +856,13 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
               <div className="flex gap-4 mt-8">
                  <button
                     onClick={resetClassForm}
-                    className="flex-1 py-4 rounded-[20px] bg-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-900 transition-all"
+                    className="flex-1 py-4 rounded-xl bg-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-900 transition-all"
                   >
                     Discard
                   </button>
                   <button
                     onClick={() => void createOrUpdateClass()}
-                    className="flex-[2] py-4 rounded-[20px] bg-[#4ea59d] text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-[#4ea59d]/20 active:scale-95 transition-all"
+                    className="flex-[2] py-4 rounded-xl bg-[#4ea59d] text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-[#4ea59d]/20 active:scale-95 transition-all"
                   >
                     {editingClassId ? 'Save Changes' : 'Confirm Registration'}
                   </button>
@@ -878,7 +883,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                 value={classSearchQuery}
                 onChange={(e) => setClassSearchQuery(e.target.value)}
                 placeholder="Lookup classes..."
-                className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-[20px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all text-sm"
+                className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-xl outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all text-sm"
               />
            </div>
         </div>
@@ -895,7 +900,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                     onOpenClassPage(classItem);
                   }
                 }}
-                className={`group relative rounded-[32px] border transition-all cursor-pointer overflow-hidden ${isActive ? 'border-[#4ea59d] bg-[#4ea59d]/10' : 'border-white/10 bg-white/5 hover:border-[#4ea59d]/50 shadow-none hover:shadow-2xl hover:shadow-[#000]/20'}`}
+                className={`group relative rounded-2xl border transition-all cursor-pointer overflow-hidden ${isActive ? 'border-[#4ea59d] bg-[#4ea59d]/10' : 'border-white/10 bg-white/5 hover:border-[#4ea59d]/50 shadow-none hover:shadow-2xl hover:shadow-[#000]/20'}`}
               >
                 {/* ACTIONS OVERLAY */}
                 {userRole === 'teacher' && (
@@ -944,7 +949,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
 
       {/* COURSES (SUBJECTS) SECTION */}
       {selectedClass && (
-        <div className="space-y-8 p-10 bg-white/5 backdrop-blur-3xl rounded-[48px] border border-white/10 animate-fadeIn">
+        <div className="space-y-8 p-10 bg-white/5 backdrop-blur-3xl rounded-3xl border border-white/10 animate-fadeIn">
           <header className="flex justify-between items-center">
              <div>
                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Academic Curricula</h3>
@@ -974,7 +979,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
              ) : classCourses.map(course => (
               <div
                 key={course.id}
-                className="group p-10 rounded-[56px] bg-[#0a1a19] border border-white/5 hover:border-[#4ea59d]/40 transition-all relative overflow-hidden shadow-3xl scale-[1.02] hover:scale-[1.06]"
+                className="group p-10 rounded-2xl bg-[#0a1a19] border border-white/5 hover:border-[#4ea59d]/40 transition-all relative overflow-hidden shadow-3xl scale-[1.02] hover:scale-[1.06]"
               >
                 {userRole === 'teacher' && (
                   <div className="absolute top-8 right-8 z-10 flex gap-4 opacity-0 group-hover:opacity-100 transition-all">
@@ -994,7 +999,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                   }}
                   className="cursor-pointer space-y-10"
                 >
-                  <div className="w-full aspect-video rounded-[40px] bg-white/5 border border-white/5 overflow-hidden flex items-center justify-center relative">
+                  <div className="w-full aspect-video rounded-xl bg-white/5 border border-white/5 overflow-hidden flex items-center justify-center relative">
                     {course.image_url ? (
                       <img src={course.image_url} alt={course.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
                     ) : (
@@ -1022,7 +1027,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
       {/* MODALS (Simplified Aesthetics for Speed) */}
       {isCreateCourseModalOpen && (
         <div className="fixed inset-0 z-[1000] glass-panel bg-black/60 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#0a1a19] rounded-[40px] border border-white/10 p-10 space-y-8 animate-fadeIn">
+          <div className="w-full max-w-lg bg-[#0a1a19] rounded-2xl border border-white/10 p-10 space-y-8 animate-fadeIn">
              <header className="flex justify-between items-center">
                 <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Add Course</h3>
                 <button onClick={() => setIsCreateCourseModalOpen(false)} className="text-slate-500 hover:text-slate-900 transition-colors"><i className="fas fa-times"></i></button>
@@ -1035,13 +1040,13 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
                     value={newCourseName}
                     onChange={(e) => { setNewCourseName(e.target.value); if (newCourseError) setNewCourseError(null); }}
                     placeholder="Enter course name"
-                    className="w-full bg-white/5 border border-white/10 p-5 rounded-[24px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all"
+                    className="w-full bg-white/5 border border-white/10 p-5 rounded-2xl outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all"
                   />
                   {newCourseError && <p className="text-[10px] font-bold text-rose-500 px-2">{newCourseError}</p>}
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-[#4ea59d]">Course Illustration</label>
-                  <div className="bg-white/5 rounded-[24px] border border-white/10 p-5">
+                  <div className="bg-white/5 rounded-2xl border border-white/10 p-5">
                     <button
                       type="button"
                       onClick={() => newCourseImageInputRef.current?.click()}
@@ -1063,7 +1068,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
              <button
                 onClick={() => void createClassCourse()}
                 disabled={isClassCourseCreating}
-                className="w-full py-5 rounded-[24px] bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 transition-all active:scale-95 disabled:opacity-50"
+                className="w-full py-5 rounded-2xl bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 transition-all active:scale-95 disabled:opacity-50"
               >
                 {isClassCourseCreating ? 'Registering...' : 'Add to Catalog'}
               </button>

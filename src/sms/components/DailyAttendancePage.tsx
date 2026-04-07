@@ -236,7 +236,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
         {activeStudents.length === 0 ? (
           <p className="p-6 text-sm text-slate-500">No students available for this context.</p>
         ) : (
-          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700 max-h-[600px] overflow-y-auto custom-scrollbar">
             {activeStudents.map(student => {
               const currentStatus = attendanceMap[String(student.id)] || '-';
               return (

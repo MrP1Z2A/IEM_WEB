@@ -1707,7 +1707,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               {/* Student Attendance List */}
               {isAttendanceViewOpen && (
               <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[64px] p-3 sm:p-6 shadow-premium border border-slate-100 dark:border-slate-800 overflow-hidden">
-                <div className="divide-y divide-slate-50 dark:divide-slate-800">
+                <div className="divide-y divide-slate-50 dark:divide-slate-800 max-h-[600px] overflow-y-auto custom-scrollbar">
                   {activeStudents.map(s => {
                     const currentStatus = (attendanceStoreKey ? subjectAttendanceStore[attendanceStoreKey]?.[attendanceDate] : undefined)?.[s.id];
                     return (

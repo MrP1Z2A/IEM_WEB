@@ -386,7 +386,7 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
         </div>
 
         {/* Student List */}
-        <div className="divide-y divide-slate-50 dark:divide-slate-800/60">
+        <div className="divide-y divide-slate-50 dark:divide-slate-800/60 max-h-[600px] overflow-y-auto custom-scrollbar">
           {!selectedClassId ? (
             <div className="flex flex-col items-center justify-center py-20 opacity-30">
               <i className="fas fa-layer-group text-5xl mb-4 text-slate-400"></i>

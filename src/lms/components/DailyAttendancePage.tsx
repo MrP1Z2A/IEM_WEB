@@ -318,7 +318,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
          </header>
 
          {!isRosterCollapsed && (
-          <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y divide-white/5">
+          <div className="max-h-[600px] overflow-y-auto custom-scrollbar divide-y divide-white/5">
                {activeStudents.map(student => {
                   const currentStatus = attendanceMap[String(student.id)] || '-';
                   return (

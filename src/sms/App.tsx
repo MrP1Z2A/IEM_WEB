@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 import {
@@ -1418,30 +1418,34 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   };
 
   // Main data synchronization effect with explicit state clearing for isolation
+  // Main data synchronization effect with explicit state clearing only on school switch
   useEffect(() => {
-    // 1. IMMEDIATELY RESET EVERYTHING BEFORE ANY AWAIT
-    // This synchronously removes stale data from the previous school context
-    setStudents([]);
-    setAllStudents([]);
-    setAttendanceStudents([]);
-    setTeachers([]);
-    setParents([]);
-    setStudentServiceStaff([]);
-    setClasses([]);
-    setTotalEarningMMK(0);
-    setSubjects([]);
-    setLibraryItems([]);
-    setExams([]);
-    setHomeworks([]);
-    setPrograms([]);
-    setSelectedDate('');
-
     const performCloudSync = async () => {
       const activeSchoolId = await requireSchoolId();
       if (!activeSchoolId) return;
 
+      // Only reset the whole app state if we've actually switched schools to prevent "Institutional Pulse" from zeroing out during refresh
+      const lastSchoolId = window.localStorage.getItem('iem_last_sync_school_id');
+      if (lastSchoolId !== activeSchoolId) {
+        setStudents([]);
+        setAllStudents([]);
+        setAttendanceStudents([]);
+        setTeachers([]);
+        setParents([]);
+        setStudentServiceStaff([]);
+        setClasses([]);
+        setTotalEarningMMK(0);
+        setSubjects([]);
+        setLibraryItems([]);
+        setExams([]);
+        setHomeworks([]);
+        setPrograms([]);
+        setSelectedDate('');
+        window.localStorage.setItem('iem_last_sync_school_id', activeSchoolId);
+      }
+
       try {
-        await Promise.all([
+        await Promise.allSettled([
           (async () => {
             if (activeSchoolId) {
               if (selectedDate) {
@@ -1454,7 +1458,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   .eq('school_id', activeSchoolId)
                   .order('created_at', { ascending: false });
 
-                if (!error && data) {
+                if (error) console.error('[Students] Sync failed:', error.message);
+                if (data) {
                   const mapped = data.map(mapStudentFromDB);
                   setStudents(mapped);
                   setAttendanceStudents(mapped);
@@ -1474,7 +1479,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           fetchLiveIntel()
         ]);
       } catch (err) {
-        console.error('Core data sync failed:', err);
+        console.error('Core data sync fatal error:', err);
       }
     };
 
@@ -3341,7 +3346,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   if (onboardingStatus === 'loading') {
     return (
       <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950 flex items-center justify-center">
-        <p className="text-sm font-bold text-slate-400">Loading…</p>
+        <p className="text-sm font-bold text-slate-400">Loadingâ€¦</p>
       </div>
     );
   }
