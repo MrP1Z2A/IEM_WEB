@@ -11,38 +11,41 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onClick }) => {
   return (
     <div 
       onClick={onClick}
-      className="bg-[#0f2624] rounded-xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group border border-[#1f4e4a]"
+      className="group bg-white rounded-[32px] overflow-hidden shadow- premium border border-slate-100 hover:border-[#4ea59d]/40 transition-all hover:-translate-y-2 cursor-pointer"
     >
-      <div className="relative h-48 overflow-hidden">
+      <div className="relative aspect-video overflow-hidden bg-slate-50">
         <img 
           src={course.thumbnail} 
           alt={course.title}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-90"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a19]/90 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/10 via-transparent to-transparent"></div>
         <div className="absolute top-4 left-4">
-          <span className="px-3 py-1 bg-[#4ea59d] backdrop-blur rounded-lg text-[10px] font-bold text-slate-900 shadow-lg uppercase tracking-wider">
+          <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-wider rounded-lg border border-white/20">
             {course.category}
           </span>
         </div>
       </div>
-      <div className="p-6">
-        <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-[#4ea59d] transition-colors line-clamp-1">
-          {course.title}
-        </h3>
-        <p className="text-[#4ea59d]/60 text-sm line-clamp-2 mb-6 leading-relaxed">
+      <div className="p-8 space-y-4">
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1.5">Course</p>
+          <h3 className="text-2xl font-black text-slate-900 group-hover:text-[#4ea59d] transition-colors line-clamp-1 uppercase tracking-tighter">
+            {course.title}
+          </h3>
+        </div>
+        <p className="text-slate-400 text-xs font-medium line-clamp-2 leading-relaxed">
           {course.description}
         </p>
-        <div className="flex items-center justify-between border-t border-[#1f4e4a] pt-4">
+        <div className="flex items-center justify-between border-t border-slate-50 pt-6 mt-4">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#4ea59d] animate-pulse"></div>
-            <span className="text-xs font-bold text-[#4ea59d]/60 uppercase tracking-widest">
-              {course.notes.length} Modules
+            <div className="w-1.5 h-1.5 rounded-full bg-[#4ea59d] animate-pulse"></div>
+            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest group-hover:text-slate-900 transition-colors">
+              {course.notes.length} Academic Modules
             </span>
           </div>
-          <button className="text-[#4ea59d] hover:translate-x-1 transition-transform">
-            <i className="fa-solid fa-arrow-right"></i>
-          </button>
+          <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-[#4ea59d] group-hover:bg-[#4ea59d] group-hover:text-white transition-all shadow-sm">
+            <i className="fa-solid fa-arrow-right text-[10px]"></i>
+          </div>
         </div>
       </div>
     </div>

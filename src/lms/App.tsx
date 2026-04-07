@@ -613,6 +613,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       ]);
 
         // Fetch Live Intel (For Institutional Logs)
+        if (!supabase) return;
         const { data: liveIntelData } = await supabase
           .schema('public')
           .from('live_intel')
@@ -2774,25 +2775,29 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         });
                       }
                     }}
-                    className="group relative aspect-video rounded-[64px] overflow-hidden cursor-pointer shadow-4xl border border-white/10 hover:border-[#4ea59d]/60 transition-all scale-[1.02] hover:scale-[1.07]"
+                    className="group bg-white rounded-[32px] overflow-hidden cursor-pointer shadow- premium border border-slate-100 hover:border-[#4ea59d]/40 transition-all hover:-translate-y-2"
                   >
-                    <img
-                      src={crs.image_url || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800'}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent"></div>
-                    <div className="absolute bottom-12 left-12 right-12">
-                      <div className="flex items-center gap-4 mb-6">
-                        <span className="px-6 py-2.5 rounded-2xl bg-[#4ea59d]/30 text-[#4ea59d] text-[10px] font-black uppercase tracking-[0.4em] border border-[#4ea59d]/30 shadow-lg">
+                    <div className="relative aspect-video overflow-hidden bg-slate-50">
+                      <img
+                        src={crs.image_url || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800'}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-transparent"></div>
+                      <div className="absolute top-6 left-6">
+                        <span className="px-4 py-2 rounded-xl bg-white/20 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.3em] border border-white/20 shadow-xl">
                           {crs.code || 'Academic'}
                         </span>
-                        <span className="w-12 h-px bg-white/20"></span>
                       </div>
-                      <h4 className="text-5xl font-black text-slate-900 uppercase tracking-tighter leading-none group-hover:text-[#4ea59d] transition-colors">{crs.name}</h4>
-                      <div className="mt-8 flex items-center justify-between pt-8 border-t border-white/10">
-                        <span className="text-[14px] font-black text-slate-400 uppercase tracking-[0.5em] group-hover:text-slate-900 transition-colors">Access Portal</span>
-                        <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center text-[#4ea59d] group-hover:bg-[#4ea59d] group-hover:text-slate-900 transition-all shadow-2xl scale-110">
-                          <i className="fas fa-arrow-right text-[14px]"></i>
+                    </div>
+                    <div className="p-8 space-y-4">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1.5">Course</p>
+                        <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-tight group-hover:text-[#4ea59d] transition-all">{crs.name}</h4>
+                      </div>
+                      <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                        <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest group-hover:text-slate-900 transition-colors">Access Portal</span>
+                        <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-[#4ea59d] group-hover:bg-[#4ea59d] group-hover:text-white transition-all shadow-sm">
+                          <i className="fas fa-arrow-right text-[12px]"></i>
                         </div>
                       </div>
                     </div>

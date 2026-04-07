@@ -79,7 +79,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
     const gid = activeChat.group.id;
     const channel = supabase
       .channel(`group-msgs:${gid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `group_id=eq.${activeChat.group.id}` }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `group_id=eq.${gid}` }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const msg = payload.new as Message;
           setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
@@ -217,12 +217,15 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
           .select('*')
           .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${chat.contact.id}),and(sender_id.eq.${chat.contact.id},receiver_id.eq.${currentUser.id})`)
           .order('created_at', { ascending: true });
-      } else {
+      } else if (chat.kind === 'group') {
         query = supabase
           .from('messages')
           .select('*')
           .eq('group_id', chat.group.id)
           .order('created_at', { ascending: true });
+      } else {
+        setMessages([]);
+        return;
       }
       const { data, error } = await query;
       if (error) throw error;
@@ -254,9 +257,11 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
       sender_id: currentUser.id,
       content: newMessage.trim(),
       school_id: schoolId,
-      ...(isGroup
+      ...(isGroup && activeChat.kind === 'group'
         ? { group_id: activeChat.group.id, receiver_id: null }
-        : { receiver_id: activeChat.contact.id, group_id: null }),
+        : activeChat.kind === 'dm'
+        ? { receiver_id: activeChat.contact.id, group_id: null }
+        : { receiver_id: null, group_id: null }),
     };
 
     const optimistic: Message = { id: `opt-${Date.now()}`, ...messageData, created_at: new Date().toISOString() };
@@ -347,7 +352,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
     setAddingMemberId(contact.id);
     try {
       const { error } = await supabase.from('message_group_members').insert([{
-        group_id: activeChat.group.id,
+        group_id: (activeChat as any).group.id,
         user_id: contact.id,
         user_role: contact.role,
         user_name: contact.name,
@@ -364,7 +369,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
   const handleRemoveMember = async (memberId: string) => {
     if (!supabase || activeChat?.kind !== 'group') return;
     try {
-      await supabase.from('message_group_members').delete().eq('group_id', activeChat.group.id).eq('user_id', memberId);
+      await supabase.from('message_group_members').delete().eq('group_id', (activeChat as any).group.id).eq('user_id', memberId);
       await fetchGroups();
     } catch (err) { console.error('removeMember:', err); }
   };
@@ -407,7 +412,13 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
     return 'text-[#4ea59d]';
   };
 
-  const activeChatTitle = activeChat?.kind === 'dm' ? activeChat.contact.name : activeChat?.group?.name ?? '';
+  const activeChatTitle = activeChat?.kind === 'dm' 
+    ? activeChat.contact.name 
+    : activeChat?.kind === 'group' 
+    ? activeChat.group.name 
+    : activeChat?.kind === 'system' 
+    ? 'System Alerts' 
+    : '';
   const activeChatAvatar = activeChat?.kind === 'dm'
     ? (activeChat.contact.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(activeChat.contact.name)}&background=4ea59d&color=fff`)
     : null;
@@ -415,7 +426,8 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
   // Members NOT yet in group — for Add Member modal
   const nonMembers = useMemo(() => {
     if (activeChat?.kind !== 'group') return [];
-    const memberIds = new Set((activeChat.group.members || []).map(m => m.user_id));
+    const members = activeChat.group.members || [];
+    const memberIds = new Set(members.map(m => m.user_id));
     return contacts.filter(c => !memberIds.has(c.id));
   }, [contacts, activeChat]);
 
@@ -626,12 +638,14 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                     <p className={`text-[10px] font-black uppercase tracking-widest ${getRoleColor(activeChat.contact.role)}`}>
                       {activeChat.contact.role.replace('_', ' ')}
                     </p>
-                  ) : (
+                  ) : activeChat.kind === 'group' ? (
                     <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">
                       {(activeChat.group.members || []).length} members
                       {' · '}
-                      {(activeChat.group.members || []).map(m => m.user_name.split(' ')[0]).join(', ')}
+                      {(activeChat.group.members || []).map((m: any) => m.user_name.split(' ')[0]).join(', ')}
                     </p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">System Channel</p>
                   )}
                 </div>
               </div>
@@ -833,12 +847,12 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
               {/* Current members */}
               <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2">Current Members</p>
               <div className="flex flex-wrap gap-2 mb-4">
-                {(activeChat.group.members || []).map(m => (
+                {activeChat.kind === 'group' && (activeChat.group.members || []).map((m: any) => (
                   <div key={m.user_id} className="flex items-center gap-1.5 bg-white/5 rounded-xl px-2.5 py-1.5">
                     <img src={m.user_avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.user_name)}&background=4ea59d&color=fff`}
                       className="w-5 h-5 rounded-md object-cover" alt="" />
                     <span className="text-[10px] font-bold text-slate-900">{m.user_name.split(' ')[0]}</span>
-                    {m.user_id !== currentUser.id && activeChat.group.created_by === currentUser.id && (
+                    {m.user_id !== currentUser.id && activeChat.kind === 'group' && activeChat.group.created_by === currentUser.id && (
                       <button onClick={() => void handleRemoveMember(m.user_id)} className="text-slate-500 hover:text-rose-400 transition-colors ml-0.5">
                         <i className="fa-solid fa-xmark text-[8px]"></i>
                       </button>
