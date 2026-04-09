@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import * as XLSX from 'xlsx';
 import {
@@ -534,6 +534,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     attendanceRate: typeof student?.attendanceRate === 'number' ? student.attendanceRate : 0,
     courseAttendance: Array.isArray(student?.courseAttendance) ? student.courseAttendance : [],
     securityStatus: student?.securityStatus || { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+    studentschool_id: student?.studentschool_id || null,
+    teacherschool_id: student?.teacherschool_id || null,
+    staffschool_id: student?.staffschool_id || null,
   });
 
   const fetchStudentsByDate = async (date: string) => {
@@ -1875,9 +1878,19 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       // Sync with Supabase if it's a student
       if (type === 'student') {
         const schoolId = await requireSchoolId();
-        const existingStudent = students.find(student => student.id === data.id);
+        const existingStudent = students.find(s => s.id === data.id);
+        
+        // Strip other roles' school IDs and non-DB fields
+        const { 
+          teacherschool_id, 
+          staffschool_id, 
+          courseAttendance, 
+          securityStatus, 
+          ...sanitizedStudentData 
+        } = finalData;
+
         const studentPayload = withSchoolId({
-          ...finalData,
+          ...sanitizedStudentData,
           role: finalData.role ?? existingStudent?.role ?? 'student',
           status: finalData.status ?? existingStudent?.status ?? Status.PENDING,
           attendanceRate: finalData.attendanceRate ?? existingStudent?.attendanceRate ?? 0,
@@ -1894,8 +1907,19 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
       if (type === 'teacher') {
         const schoolId = await requireSchoolId();
-        const existingTeacher = teachers.find(teacher => teacher.id === data.id);
+        const existingTeacher = teachers.find(t => t.id === data.id);
+        
+        // Strip other roles' school IDs and non-DB fields
+        const { 
+          studentschool_id, 
+          staffschool_id, 
+          courseAttendance, 
+          securityStatus, 
+          ...sanitizedTeacherData 
+        } = finalData;
+
         const teacherPayload = withSchoolId({
+          ...sanitizedTeacherData,
           id: finalData.id,
           name: finalData.name,
           email: finalData.email,
@@ -1906,6 +1930,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           avatar: finalData.avatar ?? existingTeacher?.avatar ?? null,
           phone: finalData.phone ?? existingTeacher?.phone ?? '',
           address: finalData.address ?? existingTeacher?.address ?? '',
+          teacherschool_id: finalData.teacherschool_id ?? null,
         }, schoolId);
 
         const { error } = await supabase.from('teachers').upsert(teacherPayload);
@@ -1919,8 +1944,19 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
       if (type === 'student_service') {
         const schoolId = await requireSchoolId();
-        const existingStaff = studentServiceStaff.find(staff => staff.id === data.id);
+        const existingStaff = studentServiceStaff.find(s => s.id === data.id);
+        
+        // Strip other roles' school IDs and non-DB fields
+        const { 
+          studentschool_id, 
+          teacherschool_id, 
+          courseAttendance, 
+          securityStatus, 
+          ...sanitizedStaffData 
+        } = finalData;
+
         const staffPayload = withSchoolId({
+          ...sanitizedStaffData,
           id: data.id,
           name: data.name,
           email: data.email,
@@ -1931,6 +1967,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           avatar: data.avatar ?? existingStaff?.avatar ?? null,
           phone: data.phone ?? existingStaff?.phone ?? '',
           address: data.address ?? existingStaff?.address ?? '',
+          staffschool_id: finalData.staffschool_id ?? null,
         }, schoolId);
 
         const { error } = await supabase.from('student_services').upsert(staffPayload);
@@ -2559,6 +2596,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         secondary_parent_email: normalizedSecondaryParentEmail || null,
         phone: studentPhone,
         address: enrollData.address || null,
+        studentschool_id: enrollData.school_id || null,
       }, schoolId);
 
       let createdStudentRecord: any = null;
@@ -2716,6 +2754,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         auth_user_id: authUserId,
         temp_password: generatedPassword,
         temp_password_created_at: new Date().toISOString(),
+        teacherschool_id: teacherEnrollData.school_id || null,
       }, schoolId);
 
       const { data, error: insertError } = await supabase
@@ -2797,6 +2836,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         auth_user_id: authUserId,
         temp_password: generatedPassword,
         temp_password_created_at: new Date().toISOString(),
+        staffschool_id: studentServiceEnrollData.school_id || null,
       }, schoolId);
 
       const { data, error: dbError } = await supabase

@@ -28,6 +28,9 @@ export interface User {
   address?: string;
   assignedCourseIds?: string[];
   assignedClassIds?: string[];
+  studentschool_id?: string;
+  teacherschool_id?: string;
+  staffschool_id?: string;
 }
 
 export interface SubjectResult {
@@ -137,6 +140,9 @@ export interface Student {
   phone?: string;
   address?: string;
   date_of_birth?: string;
+  studentschool_id?: string;
+  teacherschool_id?: string;
+  staffschool_id?: string;
 }
 
 // ...existing code...
@@ -186,6 +192,9 @@ export interface Contact {
   lastMessage?: Message;
   unreadCount?: number;
   lastMessageAt?: string; // ISO timestamp for sorting by most recent interaction
+  studentschool_id?: string;
+  teacherschool_id?: string;
+  staffschool_id?: string;
 }
 
 // ...existing code...

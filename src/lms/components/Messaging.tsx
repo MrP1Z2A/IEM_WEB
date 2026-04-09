@@ -103,9 +103,9 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
     setIsLoadingContacts(true);
     try {
       const [{ data: teachers }, { data: students }, { data: services }] = await Promise.all([
-        supabase.from('teachers').select('id, name, email, avatar').eq('school_id', schoolId),
-        supabase.from('students').select('id, name, email, avatar').eq('school_id', schoolId).neq('id', currentUser.id),
-        supabase.from('student_services').select('id, name, email, avatar').eq('school_id', schoolId),
+        supabase.from('teachers').select('id, name, email, avatar, teacherschool_id, staffschool_id').eq('school_id', schoolId),
+        supabase.from('students').select('id, name, email, avatar, studentschool_id').eq('school_id', schoolId).neq('id', currentUser.id),
+        supabase.from('student_services').select('id, name, email, avatar, staffschool_id').eq('school_id', schoolId),
       ]);
 
       const allContacts: Contact[] = [
@@ -564,7 +564,9 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                                   </div>
                                   <div className="flex items-center justify-between gap-1 mt-0.5">
                                     <p className={`text-[10px] truncate ${isActive ? 'text-slate-700' : contact.lastMessage ? 'text-slate-400' : getRoleColor(contact.role)}`}>
-                                      {contact.lastMessage ? contact.lastMessage.content : contact.role.replace('_', ' ')}
+                                      {contact.lastMessage 
+                                        ? contact.lastMessage.content 
+                                        : (contact.studentschool_id || contact.teacherschool_id || contact.staffschool_id || contact.role.replace('_', ' '))}
                                     </p>
                                     {contact.unreadCount && contact.unreadCount > 0 && !isActive
                                       ? <span className="shrink-0 flex h-4 w-4 items-center justify-center rounded-full bg-[#fa6d64] text-[9px] font-black text-slate-900 animate-pulse">{contact.unreadCount > 9 ? '9+' : contact.unreadCount}</span>
@@ -636,7 +638,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                   <h4 className="text-sm font-black text-slate-900">{activeChatTitle}</h4>
                   {activeChat.kind === 'dm' ? (
                     <p className={`text-[10px] font-black uppercase tracking-widest ${getRoleColor(activeChat.contact.role)}`}>
-                      {activeChat.contact.role.replace('_', ' ')}
+                      {activeChat.contact.studentschool_id || activeChat.contact.teacherschool_id || activeChat.contact.staffschool_id || activeChat.contact.role.replace('_', ' ')}
                     </p>
                   ) : activeChat.kind === 'group' ? (
                     <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">

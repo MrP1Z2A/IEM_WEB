@@ -11,6 +11,7 @@ interface TeacherEnrollmentModalProps {
     phone: string;
     address: string;
     avatarFile?: File | null;
+    school_id?: string;
   };
   setEnrollData: (data: any) => void;
   onSubmit: () => void;
@@ -126,15 +127,15 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
                 />
             </div>
 
-            <div>
-              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Residential Address</label>
-                <input
-                  type="text"
-                  placeholder="City, Country"
-                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
-                  value={enrollData.address}
-                  onChange={(e) => setEnrollData({ ...enrollData, address: e.target.value })}
-                />
+            <div className="sm:col-span-2">
+              <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">School Staff/Teacher ID (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. STAFF-2024-001"
+                className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-[10px]"
+                value={enrollData.school_id || ''}
+                onChange={(e) => setEnrollData({ ...enrollData, school_id: e.target.value })}
+              />
             </div>
           </div>
 

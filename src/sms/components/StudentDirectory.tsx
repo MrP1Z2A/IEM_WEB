@@ -107,6 +107,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     const matchesQuery = !q || (
       student.name.toLowerCase().includes(q) ||
       String(student.id).toLowerCase().includes(q) ||
+      String(student.studentschool_id || '').toLowerCase().includes(q) ||
       student.email.toLowerCase().includes(q)
     );
 
@@ -458,7 +459,8 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     doc.setFont('helvetica', 'normal');
 
     filteredStudents.forEach((student) => {
-      const rowText = `${namePrefix}${student.name} | ${student.id} | ${student.email || '-'} | ${getStudentClassNames(String(student.id))}`;
+      const displayId = student.studentschool_id || `IEM-${student.id}`;
+      const rowText = `${namePrefix}${student.name} | ${displayId} | ${student.email || '-'} | ${getStudentClassNames(String(student.id))}`;
       const wrapped = doc.splitTextToSize(rowText, 515);
 
       if (y + (wrapped.length * lineHeight) > pageHeight - 36) {
@@ -712,7 +714,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
               <div className="space-y-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                 <div className="flex items-center gap-2">
                   <i className="fas fa-id-card w-3 text-slate-300"></i>
-                  <span className="truncate">{s.id}</span>
+                  <span className="truncate">{s.studentschool_id || `IEM-${s.id}`}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <i className="fas fa-school w-3 text-slate-300"></i>
@@ -784,7 +786,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
               <div className="min-w-0">
                 <p className="text-lg font-black tracking-tight truncate">{namePrefix}{selectedStudent.name}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{selectedStudent.email}</p>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">ID: {selectedStudent.id}</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">ID: {selectedStudent.studentschool_id || `IEM-${selectedStudent.id}`}</p>
                 <button
                   onClick={handleChangeProfilePhoto}
                   disabled={isPhotoUploading}

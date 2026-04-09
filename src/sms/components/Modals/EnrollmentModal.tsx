@@ -171,6 +171,7 @@ interface EnrollmentModalProps {
     studentCountryCode: string;
     phone: string;
     address: string;
+    studentschool_id?: string;
   };
   setEnrollData: (data: any) => void;
   studentProfileImage: File | null;
@@ -304,6 +305,17 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                   onChange={(e) => setEnrollData({ ...enrollData, email: e.target.value })}
                 />
                 {!isStudentEmailValid && <p className="mt-2 text-[11px] font-bold text-rose-500">Enter a valid email format (example@domain.com).</p>}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">School Student ID (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. SCH-2024-001"
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
+                  value={enrollData.studentschool_id || ''}
+                  onChange={(e) => setEnrollData({ ...enrollData, studentschool_id: e.target.value })}
+                />
               </div>
 
               <div>

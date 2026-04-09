@@ -655,7 +655,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       // Load Teacher Profile
       let teacherQuery = supabase
         .from('teachers')
-        .select('*')
+        .select('*, teacherschool_id, staffschool_id')
         .or(`email.eq.${user.email},name.eq.${user.email}`);
 
       if (schoolId) teacherQuery = teacherQuery.eq('school_id', schoolId);
@@ -718,7 +718,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         schoolId: teacher.school_id || prev.schoolId,
         avatar: getStudentAvatarUrl(teacher.avatar) || prev.avatar,
         phone: teacher.phone || undefined,
-        address: teacher.address || undefined
+        address: teacher.address || undefined,
+        teacherschool_id: teacher.teacherschool_id || undefined,
+        staffschool_id: teacher.staffschool_id || undefined
       }));
       return;
     }
@@ -726,7 +728,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     // Load Student Profile (Existing logic)
     let studentQuery = supabase
       .from('students')
-      .select('id, name, avatar, email, attendanceRate, school_id, date_of_birth, parent_name, parent_number, parent_email, phone, address')
+      .select('id, name, avatar, email, attendanceRate, school_id, date_of_birth, parent_name, parent_number, parent_email, phone, address, studentschool_id')
       .or(`email.eq.${user.email},name.eq.${user.email}`);
 
     if (schoolId) {
@@ -783,7 +785,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       parentPhone: student.parent_number || undefined,
       parentEmail: student.parent_email || undefined,
       phone: student.phone || undefined,
-      address: student.address || undefined
+      address: student.address || undefined,
+      studentschool_id: student.studentschool_id || undefined
     }));
   }, [isLoggedIn, user.email, schoolId]);
 
@@ -3511,6 +3514,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         onSwitch={onSwitch}
         schoolName={schoolName}
         avatarUrl={getStudentAvatarUrl(user.avatar)}
+        studentschool_id={user.studentschool_id}
+        teacherschool_id={user.teacherschool_id}
+        staffschool_id={user.staffschool_id}
       />
       <main className={`flex-1 transition-all duration-300 p-6 md:p-8 overflow-x-hidden bg-[#f3f0e8] ${isSidebarOpen ? 'hidden md:block' : 'block'} ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-72'}`}>
         {currentView === 'dashboard' && renderDashboard()}
@@ -3584,7 +3590,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
                         <i className="fa-solid fa-id-card text-[#4ea59d]"></i> Student ID
                       </p>
-                      <p className="text-sm font-mono font-bold text-slate-700">{user.studentId || 'N/A'}</p>
+                      <p className="text-sm font-mono font-bold text-slate-700">{user.studentschool_id || user.studentId || 'N/A'}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">

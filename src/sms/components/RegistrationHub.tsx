@@ -99,7 +99,7 @@ const RegistrationHub: React.FC<RegistrationHubProps> = ({
                   </div>
                   <div>
                     <p className="text-sm font-black truncate max-w-[120px]">{s.name}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">{s.id}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">{s.studentschool_id || `IEM-${s.id}`}</p>
                   </div>
                 </div>
                 <button 

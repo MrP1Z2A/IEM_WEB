@@ -63,6 +63,9 @@ export interface Student {
   secondary_parent_name?: string;
   secondary_parent_number?: string;
   secondary_parent_email?: string;
+  studentschool_id?: string;
+  teacherschool_id?: string;
+  staffschool_id?: string;
 }
 
 export type PageId = 

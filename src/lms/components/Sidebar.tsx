@@ -1,4 +1,4 @@
-
+import React, { useState } from 'react';
 import { View, UserRole } from '../types';
 import logoIem from '../../sms/src/LOGO_IEM.png';
 
@@ -18,6 +18,9 @@ interface SidebarProps {
   onSwitch?: () => void;
   schoolName?: string;
   avatarUrl?: string | null;
+  studentschool_id?: string;
+  teacherschool_id?: string;
+  staffschool_id?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -34,8 +37,25 @@ const Sidebar: React.FC<SidebarProps> = ({
   onCollapse,
   onSwitch,
   schoolName,
-  avatarUrl
+  avatarUrl,
+  studentschool_id,
+  teacherschool_id,
+  staffschool_id
 }) => {
+  const [logoClicks, setLogoClicks] = useState(0);
+
+  const handleLogoClick = () => {
+    const newClicks = logoClicks + 1;
+    if (newClicks >= 3) {
+      window.open('https://youtu.be/-S3eJswGN0k?si=h5-qPO3IggShUyLn', '_blank');
+      setLogoClicks(0);
+    } else {
+      setLogoClicks(newClicks);
+      // Reset after 2 seconds of inactivity
+      setTimeout(() => setLogoClicks(0), 2000);
+    }
+  };
+
   const handleNavClick = (view: View) => {
     onViewChange(view);
     if (onToggle) onToggle();
@@ -69,7 +89,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       )}
       <aside className={`fixed left-0 top-0 h-screen bg-[#0f2624] border-r border-[#1f4e4a] text-white flex flex-col z-[60] overflow-y-auto custom-scrollbar transition-all duration-300 ${isOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'} ${isCollapsed ? 'md:w-20' : 'md:w-72'}`}>
         <div className={`p-8 flex items-center shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-          <div className="flex items-center gap-4">
+          <div 
+            onClick={handleLogoClick}
+            className="flex items-center gap-4 cursor-pointer active:scale-95 transition-transform"
+          >
             <div className="w-10 h-10 bg-white rounded-2xl flex items-center justify-center p-1 shadow-xl shadow-[#4ea59d]/20 shrink-0 overflow-hidden">
               <img src={logoIem} alt="IEM Logo" className="w-full h-full object-contain" />
             </div>
@@ -139,7 +162,14 @@ const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <div className="flex-1 overflow-hidden">
                 <p className="text-[9px] font-black text-[#4ea59d] uppercase tracking-[0.2em] truncate">{userName || 'Student'}</p>
-                <p className="text-[8px] text-slate-500 truncate">{userRole} Account</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[8px] text-slate-500 truncate">{userRole} Account</p>
+                  {(studentschool_id || teacherschool_id || staffschool_id) && (
+                    <p className="text-[8px] font-bold text-[#4ea59d]/60 truncate">
+                      • {studentschool_id || teacherschool_id || staffschool_id}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
           </div>
