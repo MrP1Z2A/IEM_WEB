@@ -790,24 +790,47 @@ select public.apply_open_rls('student_payments', 'student_payments');
 select public.ensure_realtime_table('student_payments');
 
 -- -----------------------------------------------------------------------------
--- Admin password verification RPC used by app
+-- Admin Security Settings: Multi-tenant & Synchronized with Schools
 -- -----------------------------------------------------------------------------
 
-create table if not exists public.app_admin_settings (
-  id boolean primary key default true,
-  delete_password text not null default 'admin123',
+create table if not exists public.admin_security_settings (
+  school_id uuid primary key references public.schools(id) on delete cascade,
+  delete_password_hash text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-insert into public.app_admin_settings (id, delete_password)
-values (true, 'admin123')
-on conflict (id) do nothing;
+-- Backfill from existing schools
+insert into public.admin_security_settings (school_id, delete_password_hash)
+select id, password_hash
+from public.schools
+where password_hash is not null
+on conflict (school_id) do update
+set delete_password_hash = excluded.delete_password_hash;
 
-drop trigger if exists trg_app_admin_settings_updated_at on public.app_admin_settings;
-create trigger trg_app_admin_settings_updated_at
-before update on public.app_admin_settings
+drop trigger if exists trg_admin_security_settings_updated_at on public.admin_security_settings;
+create trigger trg_admin_security_settings_updated_at
+before update on public.admin_security_settings
 for each row execute function public.set_row_updated_at();
+
+-- Trigger to sync school password to security settings
+create or replace function public.sync_school_password_to_security()
+returns trigger as $$
+begin
+  insert into public.admin_security_settings (school_id, delete_password_hash)
+  values (new.id, new.password_hash)
+  on conflict (school_id) do update
+  set delete_password_hash = excluded.delete_password_hash,
+      updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_sync_school_password on public.schools;
+create trigger trg_sync_school_password
+after insert or update of password_hash on public.schools
+for each row
+execute function public.sync_school_password_to_security();
 
 create or replace function public.verify_admin_delete_password(input_password text)
 returns boolean
@@ -816,19 +839,25 @@ security definer
 set search_path = public
 as $$
 declare
-  stored_password text;
+  stored_hash text;
 begin
-  select delete_password
-  into stored_password
-  from public.app_admin_settings
-  where id = true
+  -- Get the hash for the current tenant school
+  select delete_password_hash
+  into stored_hash
+  from public.admin_security_settings
+  where school_id = public.current_school_id()
   limit 1;
 
-  if stored_password is null then
-    return false;
+  if stored_hash is null then
+    -- Fallback to school password if no specific security setting exists
+    select password_hash
+    into stored_hash
+    from public.schools
+    where id = public.current_school_id()
+    limit 1;
   end if;
 
-  return stored_password = input_password;
+  return stored_hash = input_password;
 end;
 $$;
 

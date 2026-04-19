@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { hashPassword } from '../services/cryptoUtils';
 
 interface CreateSchoolPageProps {
   onCreated: (schoolId: string) => void;
@@ -11,12 +12,6 @@ const slugify = (text: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-const hashPassword = async (value: string) => {
-  const buffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(buffer))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-};
 
 type AccessMode = 'lookup' | 'set-password' | 'enter-password';
 
