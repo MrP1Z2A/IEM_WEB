@@ -1,14 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { School, MapPin, Phone, Globe, MessageSquare, Share2, Send, Mail } from 'lucide-react';
+import { School, MapPin, Phone, Globe, MessageSquare, Share2, Send, Mail, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { supabase } from '../../sms/supabaseClient';
 
 interface InstitutionHubProps {
   schoolId?: string;
+  parentEmail?: string;
 }
 
-const InstitutionHub: React.FC<InstitutionHubProps> = ({ schoolId }) => {
+const DEPARTMENTS = ['Academic Affairs', 'Finance/Billing', 'Sports & Activities', 'Admissions', 'Technical Support'];
+const URGENCY_LEVELS = ['Normal Inquiry', 'Action Required', 'Urgent Attention'];
+
+const InstitutionHub: React.FC<InstitutionHubProps> = ({ schoolId, parentEmail }) => {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Inquiry form state
+  const [department, setDepartment] = useState(DEPARTMENTS[0]);
+  const [urgency, setUrgency] = useState(URGENCY_LEVELS[0]);
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchInfo = async () => {
@@ -31,6 +44,48 @@ const InstitutionHub: React.FC<InstitutionHubProps> = ({ schoolId }) => {
     };
     void fetchInfo();
   }, [schoolId]);
+
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subject.trim() || !message.trim()) {
+      setSendError('Please fill in both the subject and message fields.');
+      return;
+    }
+    if (!schoolId) {
+      setSendError('School information is missing. Please log out and log back in.');
+      return;
+    }
+
+    setIsSending(true);
+    setSendError(null);
+    setSendSuccess(false);
+
+    try {
+      const { error } = await supabase
+        .from('parent_inquiries')
+        .insert({
+          school_id: schoolId,
+          parent_email: parentEmail || 'unknown',
+          department,
+          urgency,
+          subject: subject.trim(),
+          message: message.trim(),
+        });
+
+      if (error) throw error;
+
+      setSendSuccess(true);
+      setSubject('');
+      setMessage('');
+      setDepartment(DEPARTMENTS[0]);
+      setUrgency(URGENCY_LEVELS[0]);
+    } catch (err: any) {
+      console.error('Inquiry send error:', err);
+      setSendError(err.message || 'Failed to send inquiry. Please try again.');
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -128,40 +183,81 @@ const InstitutionHub: React.FC<InstitutionHubProps> = ({ schoolId }) => {
             <p className="text-slate-500 mt-2 font-medium">Have questions? Send a direct message to the administration.</p>
           </div>
 
-          <form className="space-y-6">
+          {/* Success Banner */}
+          {sendSuccess && (
+            <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl animate-fadeIn">
+              <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-black text-emerald-800">Inquiry Dispatched!</p>
+                <p className="text-xs text-emerald-700 mt-0.5">Your message has been sent to the school administration. They will follow up with you shortly.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error Banner */}
+          {sendError && (
+            <div className="flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 rounded-2xl animate-fadeIn">
+              <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-bold text-rose-700">{sendError}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleInquirySubmit} className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Department</label>
-                <select className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:bg-white transition-all appearance-none cursor-pointer">
-                  <option>Academic Affairs</option>
-                  <option>Finance/Billing</option>
-                  <option>Sports & Activities</option>
-                  <option>Admissions</option>
-                  <option>Technical Support</option>
+                <select
+                  value={department}
+                  onChange={e => setDepartment(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:bg-white transition-all appearance-none cursor-pointer"
+                >
+                  {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Urgency</label>
-                <select className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:bg-white transition-all appearance-none cursor-pointer">
-                  <option>Normal Inquiry</option>
-                  <option>Action Required</option>
-                  <option>Urgent Attention</option>
+                <select
+                  value={urgency}
+                  onChange={e => setUrgency(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:bg-white transition-all appearance-none cursor-pointer"
+                >
+                  {URGENCY_LEVELS.map(u => <option key={u}>{u}</option>)}
                 </select>
               </div>
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Subject Header</label>
-              <input type="text" placeholder="Brief summary of your request" className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:bg-white transition-all" />
+              <input
+                type="text"
+                value={subject}
+                onChange={e => { setSubject(e.target.value); setSendSuccess(false); setSendError(null); }}
+                placeholder="Brief summary of your request"
+                className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:bg-white transition-all"
+              />
             </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Your Message</label>
-              <textarea rows={6} placeholder="Detailed notes or questions for the staff..." className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:bg-white transition-all resize-none"></textarea>
+              <textarea
+                rows={6}
+                value={message}
+                onChange={e => { setMessage(e.target.value); setSendSuccess(false); setSendError(null); }}
+                placeholder="Detailed notes or questions for the staff..."
+                className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 focus:bg-white transition-all resize-none"
+              />
             </div>
 
-            <button type="button" className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 group active:scale-[0.98]">
-              <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /> Dispatch Message
+            <button
+              type="submit"
+              disabled={isSending}
+              className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 group active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isSending ? (
+                <><Loader className="w-5 h-5 animate-spin" /> Dispatching...</>
+              ) : (
+                <><Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /> Dispatch Message</>
+              )}
             </button>
           </form>
         </div>

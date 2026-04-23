@@ -226,7 +226,7 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
     switch (currentView) {
       case 'dashboard':     return <Dashboard key={keyStr} parentEmail={parentData?.email} studentNames={names} studentIds={ids} schoolId={parentData?.schoolId} onNoticeClick={(n: any) => { setSelectedNotice(n); setCurrentView('notice-detail'); }} />;
       case 'student':       return <StudentHub key={keyStr} studentNames={names} studentIds={ids} schoolId={parentData?.schoolId} />;
-      case 'institution':   return <InstitutionHub schoolId={parentData?.schoolId} />;
+      case 'institution':   return <InstitutionHub schoolId={parentData?.schoolId} parentEmail={parentData?.email} />;
       case 'news':          return <Communications schoolId={parentData?.schoolId} />;
       case 'finance':       return <Finance key={keyStr} studentIds={ids} schoolId={parentData?.schoolId} />;
       case 'notice-detail': return <NoticeDetail notice={selectedNotice} onBack={() => setCurrentView('dashboard')} />;
