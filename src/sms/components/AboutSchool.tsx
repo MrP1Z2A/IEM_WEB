@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { hashPassword } from '../services/cryptoUtils';
+import { updateSchoolDeletePassword } from '../services/adminSecurity';
 import { getUnicornSchoolLogoDataUri, isUnicornSchoolLogo } from '../../shared/branding/unicornSchoolLogo';
 
 interface AboutSchoolProps {
@@ -205,8 +205,11 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
 
   const handleSecuritySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!schoolId) return;
-    if (!deletePassword.trim()) {
+    const normalizedSchoolId = String(schoolId || '').trim();
+    if (!normalizedSchoolId) return;
+
+    const nextDeletePassword = deletePassword.trim();
+    if (!nextDeletePassword) {
       setSecurityError('Please enter a password.');
       return;
     }
@@ -216,16 +219,7 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
     setSecurityStatus(null);
 
     try {
-      const hashedPass = await hashPassword(deletePassword);
-      const { error: upsertError } = await supabase
-        .from('admin_security_settings')
-        .upsert({
-          school_id: schoolId,
-          delete_password_hash: hashedPass,
-          updated_at: new Date().toISOString()
-        });
-
-      if (upsertError) throw upsertError;
+      await updateSchoolDeletePassword(normalizedSchoolId, nextDeletePassword);
       setSecurityStatus('Universal delete password updated successfully!');
       setDeletePassword('');
     } catch (err: any) {

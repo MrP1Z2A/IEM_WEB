@@ -1,6 +1,34 @@
 import { supabase } from '../supabaseClient';
 import { hashPassword } from './cryptoUtils';
 
+export const updateSchoolDeletePassword = async (schoolId: string, password: string) => {
+  const normalizedSchoolId = String(schoolId || '').trim();
+  const normalizedPassword = String(password || '').trim();
+
+  if (!normalizedSchoolId) {
+    throw new Error('School context is missing.');
+  }
+
+  if (!normalizedPassword) {
+    throw new Error('Please enter a password.');
+  }
+
+  const hashedPass = await hashPassword(normalizedPassword);
+  const { error } = await supabase
+    .from('admin_security_settings')
+    .upsert(
+      {
+        school_id: normalizedSchoolId,
+        delete_password_hash: hashedPass,
+      },
+      { onConflict: 'school_id' }
+    );
+
+  if (error) {
+    throw error;
+  }
+};
+
 const getStoredAdminPasswordHash = async (schoolId: string) => {
   const { data: securitySettings, error: securityError } = await supabase
     .from('admin_security_settings')
