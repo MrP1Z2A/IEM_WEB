@@ -110,6 +110,7 @@ export type PageId =
   | 'payment-assign'
   | 'payment-history'
   | 'student-finance-status'
+  | 'cash-records'
   | 'student-service'
   | 'student-service-batch'
   | 'events'

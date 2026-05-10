@@ -1,18 +1,29 @@
 import { supabase } from '../supabaseClient';
 import { Profile, UserRole } from '../types';
 
+const normalizeAuthRole = (role: UserRole) => (role === 'student_service' ? 'staff' : role);
+
 export const authService = {
   /**
    * Register a new user
    */
-  async signUp(email: string, password: string, fullName: string, role: UserRole = 'student') {
+  async signUp(
+    email: string,
+    password: string,
+    fullName: string,
+    role: UserRole = 'student',
+    schoolId?: string
+  ) {
+    const authRole = normalizeAuthRole(role);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: fullName,
-          role: role,
+          role: authRole,
+          app_role: role,
+          school_id: schoolId,
         },
       },
     });
@@ -25,12 +36,14 @@ export const authService = {
    * Special signup for staff members with school context
    */
   async signUpStaff(email: string, password: string, role: UserRole, schoolId?: string) {
+    const authRole = normalizeAuthRole(role);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          role: role,
+          role: authRole,
+          app_role: role,
           school_id: schoolId,
         },
       },

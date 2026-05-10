@@ -354,6 +354,7 @@ interface AppProps {
 const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdChange, isStudentService }) => {
   const [allowedPages, setAllowedPages] = useState<string[] | undefined>(undefined);
   const [onboardingStatus, setOnboardingStatus] = useState<'loading' | 'needs-school' | 'needs-auth' | 'ready'>('loading');
+  const [authStateVersion, setAuthStateVersion] = useState(0);
   const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
@@ -686,6 +687,17 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   }, [onSchoolIdChange, schoolId]);
 
   useEffect(() => {
+    const { data } = authService.onAuthStateChange(() => {
+      setAuthStateVersion(prev => prev + 1);
+      setOnboardingStatus('loading');
+    });
+
+    return () => {
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (developerTapResetTimeoutRef.current !== null) {
         window.clearTimeout(developerTapResetTimeoutRef.current);
@@ -792,7 +804,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       }
     };
     void checkOnboarding();
-  }, [isStudentService, schoolId]);
+  }, [authStateVersion, isStudentService, schoolId]);
 
   useEffect(() => {
     if (isDarkMode) document.documentElement.classList.add('dark');
@@ -807,7 +819,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     let isActive = true;
 
     const loadSchoolBranding = async () => {
-      if (!schoolId) {
+      if (!schoolId || onboardingStatus !== 'ready') {
         if (isActive) {
           setSchoolLogoUrl(undefined);
         }
@@ -841,7 +853,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     return () => {
       isActive = false;
     };
-  }, [schoolId]);
+  }, [onboardingStatus, schoolId]);
 
   const mapStudentFromDB = (student: any): Student => ({
     ...(student as Student),
@@ -1740,6 +1752,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   // Main data synchronization effect with explicit state clearing for isolation
   // Main data synchronization effect with explicit state clearing only on school switch
   useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
     const performCloudSync = async () => {
       const activeSchoolId = await requireSchoolId();
       if (!activeSchoolId) return;
@@ -1804,19 +1820,27 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     };
 
     void performCloudSync();
-  }, [schoolId, selectedDate, requireSchoolId]);
+  }, [onboardingStatus, schoolId, selectedDate, requireSchoolId]);
 
   useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
     if (currentPage === 'dashboard') {
       void fetchTotalEarnings();
     }
-  }, [currentPage]);
+  }, [currentPage, onboardingStatus]);
 
   useEffect(() => {
-    if ((currentPage === 'student-attendance' || currentPage === 'class-attendance') && attendanceDate) {
-      fetchAttendanceStudentsByDate(attendanceDate);
+    if (onboardingStatus !== 'ready') {
+      return;
     }
-  }, [attendanceDate, currentPage]);
+
+    if ((currentPage === 'student-attendance' || currentPage === 'class-attendance') && attendanceDate) {
+      void fetchAttendanceStudentsByDate(attendanceDate);
+    }
+  }, [attendanceDate, currentPage, onboardingStatus]);
 
   useEffect(() => {
     if (currentPage !== 'student-attendance' && currentPage !== 'class-attendance') {
@@ -2967,7 +2991,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
       let authUserId: string | null = null;
       try {
-        const authData = await authService.signUp(normalizedStudentEmail, generatedPassword, enrollData.name, 'student');
+        const authData = await authService.signUp(normalizedStudentEmail, generatedPassword, enrollData.name, 'student', schoolId);
         authUserId = authData?.user?.id || null;
       } catch (authError: any) {
         console.error('Auth sign-up failed, continuing with student profile only:', authError);
@@ -3794,6 +3818,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   }, [notify]);
 
   const syncAllStudentsToCloud = useCallback(async (showErrorToast = false) => {
+    if (onboardingStatus !== 'ready') return;
     if (isCloudSyncRunningRef.current) return;
 
     isCloudSyncRunningRef.current = true;
@@ -3825,7 +3850,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       setIsCloudSyncRunning(false);
       isCloudSyncRunningRef.current = false;
     }
-  }, [notify, syncStudentAttendanceRates]);
+  }, [notify, onboardingStatus, syncStudentAttendanceRates]);
 
   const updateSubjectAttendance = useCallback(async (
     contextType: AttendanceContextType,
@@ -3964,10 +3989,18 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   }, [getAttendanceStoreKey, notify, requireSchoolId, setAttendanceForDate, syncStudentAttendanceRates]);
 
   useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
     void syncAllStudentsToCloud(false);
-  }, [syncAllStudentsToCloud]);
+  }, [onboardingStatus, syncAllStudentsToCloud]);
 
   useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
     const intervalId = window.setInterval(() => {
       setCloudSyncCountdown(prev => {
         if (prev <= 1) {
@@ -3981,7 +4014,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [syncAllStudentsToCloud]);
+  }, [onboardingStatus, syncAllStudentsToCloud]);
 
   const cloudSyncTimeText = useMemo(() => {
     const minutes = Math.floor(cloudSyncCountdown / 60);
@@ -4812,6 +4845,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <PaymentFinanceHub schoolId={schoolId} view="student-finance-status" />
           )}
 
+          {currentPage === 'cash-records' && (
+            <PaymentFinanceHub schoolId={schoolId} view="cash-records" />
+          )}
+
           {/* PROGRAMS PAGE - WITH CRUD */}
           {currentPage === 'programs' && (
             <div className="space-y-12 animate-in fade-in duration-700 pb-20">
@@ -5191,7 +5228,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
 
           {/* FALLBACK HUB */}
-          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'about-school', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel', 'class-announcements', 'messages', 'class-group-management', 'sms-attendance', 'student-achievements'].includes(currentPage) && (
+          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'about-school', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'cash-records', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel', 'class-announcements', 'messages', 'class-group-management', 'sms-attendance', 'student-achievements'].includes(currentPage) && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>

@@ -60,6 +60,14 @@ type CourseFolderFile = {
   updated_at?: string;
 };
 
+type ViewerContext = {
+  authUserId: string;
+  role: string;
+  displayName: string;
+  email: string | null;
+  teacherId: string | null;
+};
+
 const ALLOWED_FILE_TYPES = new Set([
   'application/pdf',
   'application/msword',
@@ -72,11 +80,19 @@ const COURSE_RESOURCES_BUCKET = 'resources';
 const FOLDER_MARKER_FILE = '__folder__.pdf';
 const isFolderMarker = (name: string) => name === '.keep' || name === FOLDER_MARKER_FILE;
 const FOLDER_FILE_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.json,.xml,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp3,.wav,.mp4,.mov,.zip,.rar,.7z,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,application/json,image/*,audio/*,video/*,application/zip,application/x-rar-compressed,application/x-7z-compressed';
+const normalizeViewerRole = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'student_service' ? 'staff' : normalized;
+};
+const isSchemaCompatibilityError = (message?: string | null) => /created_at|column|schema cache|does not exist|relation/i.test(message || '');
 
 export default function HomeworkManager({ schoolId }: { schoolId: string | undefined }) {
   const [error, setError] = useState<string | null>(null);
   const [classes, setClasses] = useState<AppClass[]>([]);
   const [courses, setCourses] = useState<AppCourse[]>([]);
+  const [activeSchoolId, setActiveSchoolId] = useState(schoolId || '');
+  const [viewerContext, setViewerContext] = useState<ViewerContext | null>(null);
+  const [isResolvingContext, setIsResolvingContext] = useState(true);
 
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState('');
@@ -305,8 +321,117 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
     });
   };
 
+  const resolveViewerContext = async () => {
+    setIsResolvingContext(true);
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) {
+        throw userError;
+      }
+
+      if (!user) {
+        setViewerContext(null);
+        setActiveSchoolId(schoolId || '');
+        return;
+      }
+
+      let resolvedSchoolId = schoolId || '';
+      let resolvedRole = normalizeViewerRole(
+        user.user_metadata?.app_role
+        || user.user_metadata?.role
+        || user.app_metadata?.role
+      );
+      let resolvedDisplayName = String(
+        user.user_metadata?.full_name
+        || user.user_metadata?.name
+        || user.email
+        || 'User'
+      );
+      let resolvedEmail = user.email ? String(user.email) : null;
+      let teacherId: string | null = null;
+
+      const profileResult = await supabase
+        .from('profiles')
+        .select('school_id, role, full_name, email')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profileResult.error && profileResult.data) {
+        if (profileResult.data.school_id) {
+          resolvedSchoolId = String(profileResult.data.school_id);
+        }
+        resolvedRole = normalizeViewerRole(profileResult.data.role || resolvedRole);
+        resolvedDisplayName = String(profileResult.data.full_name || resolvedDisplayName);
+        resolvedEmail = profileResult.data.email ? String(profileResult.data.email) : resolvedEmail;
+      }
+
+      if (resolvedSchoolId) {
+        let teacherRow: any = null;
+        let teacherError: any = null;
+
+        {
+          const result = await supabase
+            .from('teachers')
+            .select('id, name, email')
+            .eq('school_id', resolvedSchoolId)
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
+
+          teacherRow = result.data;
+          teacherError = result.error;
+        }
+
+        if (!teacherRow && resolvedEmail) {
+          const fallbackResult = await supabase
+            .from('teachers')
+            .select('id, name, email')
+            .eq('school_id', resolvedSchoolId)
+            .eq('email', resolvedEmail)
+            .maybeSingle();
+
+          teacherRow = fallbackResult.data;
+          teacherError = teacherError || fallbackResult.error;
+        }
+
+        if (teacherError && teacherError.code !== 'PGRST116' && !isSchemaCompatibilityError(teacherError.message || '')) {
+          throw teacherError;
+        }
+
+        if (teacherRow) {
+          teacherId = String(teacherRow.id || '');
+          resolvedDisplayName = String(teacherRow.name || resolvedDisplayName);
+          resolvedEmail = teacherRow.email ? String(teacherRow.email) : resolvedEmail;
+          if (!resolvedRole || resolvedRole === 'student') {
+            resolvedRole = 'teacher';
+          }
+        }
+      }
+
+      setActiveSchoolId(resolvedSchoolId);
+      setViewerContext({
+        authUserId: user.id,
+        role: resolvedRole || 'authenticated',
+        displayName: resolvedDisplayName,
+        email: resolvedEmail,
+        teacherId,
+      });
+    } catch (contextError: any) {
+      console.error('Failed to resolve homework viewer context:', contextError);
+      setViewerContext(null);
+      setActiveSchoolId(schoolId || '');
+      setError(contextError?.message || 'Failed to resolve your login context.');
+    } finally {
+      setIsResolvingContext(false);
+    }
+  };
+
   const fetchAcademicData = async () => {
-    if (!schoolId) {
+    if (!activeSchoolId) {
       setClasses([]);
       setCourses([]);
       setIsLoadingAcademic(false);
@@ -323,17 +448,17 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
         const result = await supabase
           .from('classes')
           .select('*')
-          .eq('school_id', schoolId)
+          .eq('school_id', activeSchoolId)
           .order('created_at', { ascending: false });
         classRows = result.data || [];
         classError = result.error;
       }
 
-      if (classError && /created_at|column|schema cache|does not exist/i.test(classError.message || '')) {
+      if (classError && isSchemaCompatibilityError(classError.message || '')) {
         const fallbackClassResult = await supabase
           .from('classes')
           .select('*')
-          .eq('school_id', schoolId);
+          .eq('school_id', activeSchoolId);
         classRows = fallbackClassResult.data || [];
         classError = fallbackClassResult.error;
       }
@@ -349,17 +474,17 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
         const result = await supabase
           .from('class_courses')
           .select('*')
-          .eq('school_id', schoolId)
+          .eq('school_id', activeSchoolId)
           .order('created_at', { ascending: false });
         courseRows = result.data || [];
         courseError = result.error;
       }
 
-      if (courseError && /created_at|column|schema cache|does not exist/i.test(courseError.message || '')) {
+      if (courseError && isSchemaCompatibilityError(courseError.message || '')) {
         const fallbackCourseResult = await supabase
           .from('class_courses')
           .select('*')
-          .eq('school_id', schoolId);
+          .eq('school_id', activeSchoolId);
         courseRows = fallbackCourseResult.data || [];
         courseError = fallbackCourseResult.error;
       }
@@ -368,8 +493,53 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
         throw courseError;
       }
 
+      let visibleClassRows = classRows;
+      let visibleCourseRows = courseRows;
+
+      if (viewerContext?.role === 'teacher') {
+        if (!viewerContext.teacherId) {
+          visibleClassRows = [];
+          visibleCourseRows = [];
+          setError('Teacher login is not linked to a row in public.teachers. Match `teachers.auth_user_id` or teacher email to this account.');
+        } else {
+          const assignedCourseIds = new Set<string>();
+          const assignedClassIds = new Set<string>();
+
+          courseRows.forEach((row: any) => {
+            if (String(row.teacher_id || '') === viewerContext.teacherId) {
+              assignedCourseIds.add(String(row.id));
+              assignedClassIds.add(String(row.class_id || ''));
+            }
+          });
+
+          const teacherAssignmentsResult = await supabase
+            .from('class_course_teachers')
+            .select('class_id, class_course_id')
+            .eq('school_id', activeSchoolId)
+            .eq('teacher_id', viewerContext.teacherId);
+
+          if (!teacherAssignmentsResult.error && Array.isArray(teacherAssignmentsResult.data)) {
+            teacherAssignmentsResult.data.forEach((row: any) => {
+              if (row?.class_course_id) assignedCourseIds.add(String(row.class_course_id));
+              if (row?.class_id) assignedClassIds.add(String(row.class_id));
+            });
+          } else if (teacherAssignmentsResult.error && !isSchemaCompatibilityError(teacherAssignmentsResult.error.message || '')) {
+            throw teacherAssignmentsResult.error;
+          }
+
+          visibleCourseRows = courseRows.filter((row: any) => assignedCourseIds.has(String(row.id)));
+          visibleClassRows = classRows.filter((row: any) => {
+            const currentClassId = String(row.id);
+            return (
+              assignedClassIds.has(currentClassId)
+              || visibleCourseRows.some((course: any) => String(course.class_id) === currentClassId)
+            );
+          });
+        }
+      }
+
       setClasses(
-        classRows.map((row: any) => ({
+        visibleClassRows.map((row: any) => ({
           id: String(row.id),
           school_id: row.school_id ? String(row.school_id) : null,
           name: String(row.name || ''),
@@ -384,7 +554,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
       );
 
       setCourses(
-        courseRows.map((row: any) => ({
+        visibleCourseRows.map((row: any) => ({
           id: String(row.id),
           class_id: String(row.class_id),
           name: String(row.name || ''),
@@ -403,7 +573,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
   };
 
   const fetchHomework = async (classId: string, courseId: string) => {
-    if (!classId || !courseId || !schoolId) {
+    if (!classId || !courseId || !activeSchoolId) {
       setHomeworkItems([]);
       setOpenHomework({});
       return;
@@ -423,7 +593,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
           .select('*')
           .eq('class_id', classId)
           .eq('class_course_id', courseId)
-          .eq('school_id', schoolId)
+          .eq('school_id', activeSchoolId)
           .order('created_at', { ascending: false });
 
         rows = result.data || [];
@@ -484,14 +654,14 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
   };
 
   const fetchSubmissions = async (homeworkId: string) => {
-    if (!schoolId) return;
+    if (!activeSchoolId) return;
     setIsLoadingSubmissions(prev => ({ ...prev, [homeworkId]: true }));
     try {
       const { data, error: subError } = await supabase
         .from('homework_submissions')
         .select('*, student:student_id(name)')
         .eq('assignment_id', homeworkId)
-        .eq('school_id', schoolId);
+        .eq('school_id', activeSchoolId);
 
       if (subError) throw subError;
       setSubmissions(prev => ({ ...prev, [homeworkId]: data || [] }));
@@ -599,12 +769,12 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
       }
 
       const activeClass = classes.find(c => c.id === selectedClassId);
-      const schoolId = activeClass?.school_id || undefined;
+      const resourceSchoolId = activeClass?.school_id || activeSchoolId || undefined;
 
       const { data: publicUrlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(keepPath);
 
       const { error: dbError } = await supabase.from('resources_buckets').insert([{
-        school_id: schoolId,
+        school_id: resourceSchoolId,
         class_id: selectedClassId,
         class_course_id: selectedCourseId,
         name: normalizedName,
@@ -702,12 +872,12 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
         }
 
         const activeClass = classes.find(c => c.id === selectedClassId);
-        const schoolId = activeClass?.school_id || undefined;
+        const resourceSchoolId = activeClass?.school_id || activeSchoolId || undefined;
 
         const { data: publicUrlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(path);
 
         const { error: dbError } = await supabase.from('resources_buckets').insert([{
-          school_id: schoolId,
+          school_id: resourceSchoolId,
           class_id: selectedClassId,
           class_course_id: selectedCourseId,
           name: file.name,
@@ -813,7 +983,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
             .from('homework_assignments')
             .update(payload)
             .eq('id', editingHomeworkId)
-            .eq('school_id', schoolId);
+          .eq('school_id', activeSchoolId);
           updateError = result.error;
         }
 
@@ -823,7 +993,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
             .from('homework_assignments')
             .update(payloadWithoutAttachment)
             .eq('id', editingHomeworkId)
-            .eq('school_id', schoolId);
+            .eq('school_id', activeSchoolId);
           updateError = fallbackUpdate.error;
         }
 
@@ -851,7 +1021,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
         {
           const result = await supabase
             .from('homework_assignments')
-            .insert([{ ...payload, school_id: schoolId }]);
+            .insert([{ ...payload, school_id: activeSchoolId }]);
           insertError = result.error;
         }
 
@@ -946,12 +1116,39 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
   };
 
   useEffect(() => {
+    void resolveViewerContext();
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      void resolveViewerContext();
+    });
+
+    return () => {
+      data.subscription.unsubscribe();
+    };
+  }, [schoolId]);
+
+  useEffect(() => {
+    if (isResolvingContext) return;
     void fetchAcademicData();
-  }, []);
+  }, [activeSchoolId, isResolvingContext, viewerContext?.role, viewerContext?.teacherId]);
+
+  useEffect(() => {
+    if (selectedClassId && !classes.some((item) => item.id === selectedClassId)) {
+      setSelectedClassId('');
+      setSelectedCourseId('');
+      resetComposer();
+    }
+  }, [classes, selectedClassId]);
+
+  useEffect(() => {
+    if (selectedCourseId && !classCourses.some((item) => item.id === selectedCourseId)) {
+      setSelectedCourseId('');
+      resetComposer();
+    }
+  }, [classCourses, selectedCourseId]);
 
   useEffect(() => {
     void fetchHomework(selectedClassId, selectedCourseId);
-  }, [selectedClassId, selectedCourseId]);
+  }, [activeSchoolId, selectedClassId, selectedCourseId]);
 
   useEffect(() => {
     void loadCourseFolders();
@@ -971,20 +1168,40 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
           </div>
         )}
 
+        {viewerContext && (
+          <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-950/40 p-4 sm:p-5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              {viewerContext.role === 'teacher' ? 'Teacher Session' : 'Signed In'}
+            </p>
+            <p className="mt-1 text-lg font-black tracking-tight text-slate-900 dark:text-slate-100">
+              {viewerContext.displayName}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              {viewerContext.role === 'teacher'
+                ? 'Homework is filtered to the classes and courses assigned to this teacher.'
+                : 'Showing homework across the current school context.'}
+            </p>
+          </div>
+        )}
+
         {!selectedClassId && (
           <>
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm sm:text-base font-black uppercase tracking-widest text-slate-500">Classes</h3>
+              <h3 className="text-sm sm:text-base font-black uppercase tracking-widest text-slate-500">
+                {viewerContext?.role === 'teacher' ? 'Assigned Classes' : 'Classes'}
+              </h3>
               <span className="text-xs font-black uppercase tracking-widest text-slate-400">{classes.length} Class Blocks</span>
             </div>
 
-            {isLoadingAcademic ? (
+            {isResolvingContext || isLoadingAcademic ? (
               <div className="rounded-3xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/30 p-6 text-sm font-bold text-slate-500">
-                Loading classes...
+                {viewerContext?.role === 'teacher' ? 'Loading teacher assignments...' : 'Loading classes...'}
               </div>
             ) : classes.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/30 p-8 text-sm font-bold text-slate-500">
-                No classes found. Create classes first.
+                {viewerContext?.role === 'teacher'
+                  ? 'No classes or courses are assigned to this teacher yet.'
+                  : 'No classes found. Create classes first.'}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">

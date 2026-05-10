@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import { supabase } from '../supabaseClient';
 import { getCurrentTenantContext, withSchoolId, withSchoolIdRows } from '../services/tenantService';
 
-type FinanceView = 'payment' | 'payment-assign' | 'payment-history' | 'student-finance-status';
+type FinanceView = 'payment' | 'payment-assign' | 'payment-history' | 'student-finance-status' | 'cash-records';
 
 type AppStudent = {
   id: string;
@@ -36,6 +36,26 @@ type AppCourse = {
   class_id: string;
 };
 
+type CashOutRecord = {
+  id: string;
+  amount_mmk: number;
+  record_date: string;
+  category: string;
+  note: string | null;
+  created_at: string;
+};
+
+type CashLedgerEntry = {
+  id: string;
+  entry_type: 'in' | 'out';
+  amount_mmk: number;
+  record_date: string;
+  title: string;
+  subtitle: string;
+  note: string | null;
+  created_at: string;
+};
+
 type PaymentFinanceHubProps = {
   view: FinanceView;
   schoolId: string | undefined;
@@ -47,6 +67,15 @@ const toIsoDate = (value: string | null | undefined) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '';
   return parsed.toISOString().slice(0, 10);
+};
+
+const isCashRecordsSchemaMissing = (message?: string | null) => {
+  const text = String(message || '').toLowerCase();
+  return text.includes('cash_records') && (
+    /relation|does not exist|column/.test(text)
+    || text.includes('could not find the table')
+    || text.includes('schema cache')
+  );
 };
 
 const formatMMK = (value: number) => {
@@ -113,16 +142,19 @@ const amountToWords = (value: number) => {
 const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId }) => {
   const [students, setStudents] = useState<AppStudent[]>([]);
   const [payments, setPayments] = useState<StudentPayment[]>([]);
+  const [cashOutRecords, setCashOutRecords] = useState<CashOutRecord[]>([]);
   const [studentCourseLinks, setStudentCourseLinks] = useState<StudentCourseLink[]>([]);
   const [courseRows, setCourseRows] = useState<AppCourse[]>([]);
   const [classesMap, setClassesMap] = useState<Map<string, string>>(new Map());
   const [coursesMap, setCoursesMap] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCashRecordsSchemaReady, setIsCashRecordsSchemaReady] = useState(true);
   const [collectingStudentId, setCollectingStudentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [cashSearchQuery, setCashSearchQuery] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [assignAmountMmk, setAssignAmountMmk] = useState('');
   const [assignDueDate, setAssignDueDate] = useState(getTodayIso());
@@ -136,6 +168,12 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
     amount_mmk: '',
     payment_date: getTodayIso(),
     status: 'paid' as PaymentStatus,
+    note: '',
+  });
+  const [cashOutFormData, setCashOutFormData] = useState({
+    amount_mmk: '',
+    record_date: getTodayIso(),
+    category: '',
     note: '',
   });
 
@@ -324,6 +362,34 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
         class_course_id: String(row.class_course_id || ''),
       })).filter((row: StudentCourseLink) => row.student_id);
 
+      const cashRecordsResult = await supabase
+        .from('cash_records')
+        .select('id, amount_mmk, record_date, category, note, created_at')
+        .eq('school_id', schoolId)
+        .order('record_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (cashRecordsResult.error) {
+        if (isCashRecordsSchemaMissing(cashRecordsResult.error.message)) {
+          setIsCashRecordsSchemaReady(false);
+          setCashOutRecords([]);
+        } else {
+          throw cashRecordsResult.error;
+        }
+      } else {
+        const cashRows = (cashRecordsResult.data || []).map((row: any) => ({
+          id: String(row.id),
+          amount_mmk: Number(row.amount_mmk || 0),
+          record_date: String(row.record_date || row.created_at || getTodayIso()),
+          category: String(row.category || 'General'),
+          note: row.note ? String(row.note) : null,
+          created_at: String(row.created_at || new Date().toISOString()),
+        }));
+
+        setIsCashRecordsSchemaReady(true);
+        setCashOutRecords(cashRows);
+      }
+
       setStudents(studentRows);
       setPayments(paymentRows);
       setClassesMap(nextClassesMap);
@@ -334,6 +400,7 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
       setError(loadError?.message || 'Failed to load payment records.');
       setStudents([]);
       setPayments([]);
+      setCashOutRecords([]);
       setClassesMap(new Map());
       setCoursesMap(new Map());
       setCourseRows([]);
@@ -364,6 +431,71 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
     () => filteredPayments.filter(payment => payment.status === 'paid'),
     [filteredPayments]
   );
+
+  const totalCashIn = useMemo(
+    () => payments
+      .filter(payment => payment.status === 'paid')
+      .reduce((sum, payment) => sum + payment.amount_mmk, 0),
+    [payments]
+  );
+
+  const totalCashOut = useMemo(
+    () => cashOutRecords.reduce((sum, record) => sum + record.amount_mmk, 0),
+    [cashOutRecords]
+  );
+
+  const cashBalance = totalCashIn - totalCashOut;
+
+  const cashLedgerEntries = useMemo(() => {
+    const incomingEntries: CashLedgerEntry[] = payments
+      .filter(payment => payment.status === 'paid')
+      .map(payment => {
+        const student = studentMap.get(payment.student_id);
+        const academic = studentAcademicMap.get(payment.student_id);
+
+        return {
+          id: `payment-${payment.id}`,
+          entry_type: 'in',
+          amount_mmk: payment.amount_mmk,
+          record_date: toIsoDate(payment.payment_date) || getTodayIso(),
+          title: student?.name || payment.student_id,
+          subtitle: academic
+            ? `${academic.className} / ${academic.courseName}`
+            : 'Student payment collection',
+          note: payment.note,
+          created_at: payment.created_at,
+        };
+      });
+
+    const outgoingEntries: CashLedgerEntry[] = cashOutRecords.map(record => ({
+      id: `cash-out-${record.id}`,
+      entry_type: 'out',
+      amount_mmk: record.amount_mmk,
+      record_date: toIsoDate(record.record_date) || getTodayIso(),
+      title: record.category,
+      subtitle: 'Manual money out record',
+      note: record.note,
+      created_at: record.created_at,
+    }));
+
+    const query = cashSearchQuery.trim().toLowerCase();
+
+    return [...incomingEntries, ...outgoingEntries]
+      .filter(entry => {
+        if (!query) return true;
+        return [
+          entry.title,
+          entry.subtitle,
+          entry.note || '',
+          entry.record_date,
+        ].some(value => String(value).toLowerCase().includes(query));
+      })
+      .sort((a, b) => {
+        const dateCompare = b.record_date.localeCompare(a.record_date);
+        if (dateCompare !== 0) return dateCompare;
+        return b.created_at.localeCompare(a.created_at);
+      });
+  }, [payments, cashOutRecords, studentMap, studentAcademicMap, cashSearchQuery]);
 
   const studentFinanceRows = useMemo(() => {
     const map = new Map<string, {
@@ -489,16 +621,16 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
     setIsSaving(true);
     try {
       const { schoolId } = await getCurrentTenantContext();
-      const rows = selectedStudentIds.map(studentId => ({
+      const rows = withSchoolIdRows(selectedStudentIds.map(studentId => ({
         student_id: studentId,
         amount_mmk: Math.round(amount),
         payment_date: getTodayIso(),
         due_date: assignDueDate,
         status: 'pending' as PaymentStatus,
         note: assignNote.trim() || null,
-      }));
+      })), schoolId);
 
-      const insertResult = await supabase.from('student_payments').insert(rows.map(r => ({ ...r, school_id: schoolId })));
+      const insertResult = await supabase.from('student_payments').insert(rows);
       if (insertResult.error) throw insertResult.error;
 
       setStatus(`Assigned pending dues to ${selectedStudentIds.length} student(s).`);
@@ -557,6 +689,62 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
       await loadData();
     } catch (saveError: any) {
       setError(saveError?.message || 'Failed to save payment.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const submitCashOutRecord = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setStatus(null);
+
+    if (!isCashRecordsSchemaReady) {
+      setError('Cash Records setup is missing. Run the cash records SQL setup before saving money out.');
+      return;
+    }
+
+    const amount = Number(cashOutFormData.amount_mmk);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Please enter a valid money out amount in MMK.');
+      return;
+    }
+
+    if (!cashOutFormData.category.trim()) {
+      setError('Please add a category or reason for this money out record.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const tenantContext = await getCurrentTenantContext();
+      const payload = withSchoolId({
+        amount_mmk: Math.round(amount),
+        record_date: cashOutFormData.record_date || getTodayIso(),
+        category: cashOutFormData.category.trim(),
+        note: cashOutFormData.note.trim() || null,
+        created_by: tenantContext.userId,
+      }, tenantContext.schoolId);
+
+      const insertResult = await supabase.from('cash_records').insert([payload]);
+      if (insertResult.error) {
+        if (isCashRecordsSchemaMissing(insertResult.error.message)) {
+          setIsCashRecordsSchemaReady(false);
+          throw new Error('Cash Records setup is missing. Run the cash records SQL setup before saving money out.');
+        }
+        throw insertResult.error;
+      }
+
+      setStatus('Money out record saved.');
+      setCashOutFormData({
+        amount_mmk: '',
+        record_date: getTodayIso(),
+        category: '',
+        note: '',
+      });
+      await loadData();
+    } catch (saveError: any) {
+      setError(saveError?.message || 'Failed to save money out record.');
     } finally {
       setIsSaving(false);
     }
@@ -818,6 +1006,10 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
       title: 'Student Finance Status',
       subtitle: 'Pending and overdue visibility by student.',
     },
+    'cash-records': {
+      title: 'Cash Records',
+      subtitle: 'See money in from student payments and log manual money out.',
+    },
   } as const;
 
   return (
@@ -842,6 +1034,18 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
             value={studentSearchQuery}
             onChange={(event) => setStudentSearchQuery(event.target.value)}
             placeholder="Search by student name or email"
+            className="mt-2 w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold"
+          />
+        </div>
+      )}
+
+      {view === 'cash-records' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[28px] p-4 sm:p-5 shadow-premium">
+          <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Search Cash Records</label>
+          <input
+            value={cashSearchQuery}
+            onChange={(event) => setCashSearchQuery(event.target.value)}
+            placeholder="Search by student, category, date, or note"
             className="mt-2 w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold"
           />
         </div>
@@ -1191,6 +1395,145 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {view === 'cash-records' && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-[28px] border border-emerald-200 bg-emerald-50 p-5">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-emerald-700">Money In</p>
+                  <p className="mt-3 text-2xl font-black text-emerald-700">{formatMMK(totalCashIn)}</p>
+                  <p className="mt-2 text-xs font-semibold text-emerald-700/80">{payments.filter(payment => payment.status === 'paid').length} paid student record(s)</p>
+                </div>
+                <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-5">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-rose-700">Money Out</p>
+                  <p className="mt-3 text-2xl font-black text-rose-700">{formatMMK(totalCashOut)}</p>
+                  <p className="mt-2 text-xs font-semibold text-rose-700/80">{cashOutRecords.length} manual expense record(s)</p>
+                </div>
+                <div className="rounded-[28px] border border-slate-200 bg-slate-900 p-5 text-white">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-300">Current Cash Balance</p>
+                  <p className="mt-3 text-2xl font-black">{formatMMK(cashBalance)}</p>
+                  <p className="mt-2 text-xs font-semibold text-slate-300">Money in minus money out</p>
+                </div>
+              </div>
+
+              {!isCashRecordsSchemaReady && (
+                <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-semibold text-amber-800">
+                  Cash Records setup is not ready yet. Money in from student payments is still shown, but you need to run the cash records SQL setup before staff can save money out entries.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 xl:grid-cols-[360px,minmax(0,1fr)] gap-5">
+                <form onSubmit={submitCashOutRecord} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[36px] p-5 sm:p-6 shadow-premium space-y-5">
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-black uppercase tracking-widest text-rose-500">Money Out Only</p>
+                    <h3 className="text-2xl font-black tracking-tight">Add Cash Out Record</h3>
+                    <p className="text-sm text-slate-500">
+                      Money in is created automatically from saved student payments. This form is only for money going out.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Amount Out (MMK)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={cashOutFormData.amount_mmk}
+                      onChange={(event) => setCashOutFormData(prev => ({ ...prev, amount_mmk: event.target.value }))}
+                      placeholder="e.g. 50000"
+                      disabled={!isCashRecordsSchemaReady}
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold disabled:opacity-60"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Date</label>
+                    <input
+                      type="date"
+                      value={cashOutFormData.record_date}
+                      onChange={(event) => setCashOutFormData(prev => ({ ...prev, record_date: event.target.value }))}
+                      disabled={!isCashRecordsSchemaReady}
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold disabled:opacity-60"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Category / Reason</label>
+                    <input
+                      value={cashOutFormData.category}
+                      onChange={(event) => setCashOutFormData(prev => ({ ...prev, category: event.target.value }))}
+                      placeholder="Transport, supplies, salary advance..."
+                      disabled={!isCashRecordsSchemaReady}
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold disabled:opacity-60"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-400">Note (Optional)</label>
+                    <textarea
+                      value={cashOutFormData.note}
+                      onChange={(event) => setCashOutFormData(prev => ({ ...prev, note: event.target.value }))}
+                      placeholder="Why the money went out"
+                      rows={4}
+                      disabled={!isCashRecordsSchemaReady}
+                      className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold resize-none disabled:opacity-60"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSaving || !isCashRecordsSchemaReady}
+                    className="w-full px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-black uppercase tracking-widest disabled:opacity-60"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Money Out'}
+                  </button>
+                </form>
+
+                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[36px] p-5 sm:p-6 shadow-premium space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-2xl font-black tracking-tight">Cash Flow Timeline</h3>
+                      <p className="text-sm text-slate-500">Incoming cash is automatic from paid student payments. Outgoing cash comes from manual records.</p>
+                    </div>
+                    <span className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-black uppercase tracking-widest">
+                      {cashLedgerEntries.length} Visible Record(s)
+                    </span>
+                  </div>
+
+                  {cashLedgerEntries.length === 0 ? (
+                    <p className="text-sm font-semibold text-slate-500">No cash records found.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {cashLedgerEntries.map(entry => (
+                        <div key={entry.id} className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                          <div className="space-y-2 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                                entry.entry_type === 'in'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-rose-50 text-rose-700'
+                              }`}>
+                                {entry.entry_type === 'in' ? 'Money In' : 'Money Out'}
+                              </span>
+                              <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                {entry.record_date}
+                              </span>
+                            </div>
+                            <p className="text-sm font-black text-slate-900 dark:text-white truncate">{entry.title}</p>
+                            <p className="text-xs font-semibold text-slate-500">{entry.subtitle}</p>
+                            {entry.note && <p className="text-xs text-slate-500">{entry.note}</p>}
+                          </div>
+                          <div className={`text-lg font-black ${entry.entry_type === 'in' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            {entry.entry_type === 'in' ? '+' : '-'}{formatMMK(entry.amount_mmk)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </>

@@ -176,6 +176,7 @@ const SecurityPermission: React.FC<SecurityPermissionProps> = ({ role = 'super_a
     { id: 'payment-assign', label: 'Assign Payment', icon: 'fa-file-invoice-dollar' },
     { id: 'payment-history', label: 'Payment History', icon: 'fa-receipt' },
     { id: 'student-finance-status', label: 'Student Finance Status', icon: 'fa-chart-pie' },
+    { id: 'cash-records', label: 'Cash Records', icon: 'fa-cash-register' },
     { id: 'exam', label: 'Exam Management', icon: 'fa-clipboard-check' },
     { id: 'about-school', label: 'About School', icon: 'fa-circle-info' },
     { id: 'security', label: 'Security Permission', icon: 'fa-user-shield' },
