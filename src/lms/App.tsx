@@ -808,8 +808,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         avatar: getStudentAvatarUrl(teacher.avatar) || prev.avatar,
         phone: teacher.phone || undefined,
         address: teacher.address || undefined,
-        teacherschool_id: teacher.teacherschool_id || undefined,
-        staffschool_id: teacher.staffschool_id || undefined
+        dob: teacher.date_of_birth || undefined,
+        eduLevel: teacher.educational_background || teacher.job_position || undefined,
+        teacherschool_id: teacher.teacherschool_id || undefined
       }));
       return;
     }
@@ -3659,10 +3660,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       accept="image/*"
                     />
                   </div>
-                  <div className="px-4 py-2 bg-[#4ea59d]/20 rounded-xl border border-[#4ea59d]/30 text-center">
-                    <p className="text-[10px] font-black text-[#4ea59d] uppercase">Attendance</p>
-                    <p className="text-xl font-black text-slate-900">{studentAttendanceRate}</p>
-                  </div>
+                  {user.role !== UserRole.TEACHER && (
+                    <div className="px-4 py-2 bg-[#4ea59d]/20 rounded-xl border border-[#4ea59d]/30 text-center">
+                      <p className="text-[10px] font-black text-[#4ea59d] uppercase">Attendance</p>
+                      <p className="text-xl font-black text-slate-900">{studentAttendanceRate}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 space-y-6 text-center sm:text-left">
                   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -3689,9 +3692,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
-                        <i className="fa-solid fa-id-card text-[#4ea59d]"></i> Student ID
+                        <i className="fa-solid fa-id-card text-[#4ea59d]"></i> {user.role === UserRole.TEACHER ? 'Teacher ID' : 'Student ID'}
                       </p>
-                      <p className="text-sm font-mono font-bold text-slate-700">{user.studentschool_id || user.studentId || 'N/A'}</p>
+                      <p className="text-sm font-mono font-bold text-slate-700">
+                        {user.role === UserRole.TEACHER ? (user.teacherId || user.teacherschool_id || 'N/A') : (user.studentschool_id || user.studentId || 'N/A')}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
@@ -3701,7 +3706,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
-                        <i className="fa-solid fa-phone text-[#4ea59d]"></i> Student Phone
+                        <i className="fa-solid fa-phone text-[#4ea59d]"></i> {user.role === UserRole.TEACHER ? 'Contact Number' : 'Student Phone'}
                       </p>
                       <p className="text-sm font-bold text-slate-700">{user.phone || 'N/A'}</p>
                     </div>
@@ -3713,25 +3718,27 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     </div>
                   </div>
 
-                  <div className="pt-6 border-t border-white/5">
-                    <h4 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <i className="fa-solid fa-users-gear"></i> Guardian Information
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-3xl border border-white/5">
-                      <div className="space-y-1">
-                        <p className="text-[9px] font-black text-slate-400 uppercase">Primary Guardian</p>
-                        <p className="text-sm font-bold text-slate-900">{user.parentName || 'N/A'}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[9px] font-black text-slate-400 uppercase">Contact Number</p>
-                        <p className="text-sm font-bold text-slate-900">{user.parentPhone || 'N/A'}</p>
-                      </div>
-                      <div className="md:col-span-2 space-y-1">
-                        <p className="text-[9px] font-black text-slate-400 uppercase">Guardian Email</p>
-                        <p className="text-sm font-bold text-slate-900">{user.parentEmail || 'N/A'}</p>
+                  {user.role !== UserRole.TEACHER && (
+                    <div className="pt-6 border-t border-white/5">
+                      <h4 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i className="fa-solid fa-users-gear"></i> Guardian Information
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white/5 p-6 rounded-3xl border border-white/5">
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-black text-slate-400 uppercase">Primary Guardian</p>
+                          <p className="text-sm font-bold text-slate-900">{user.parentName || 'N/A'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-black text-slate-400 uppercase">Contact Number</p>
+                          <p className="text-sm font-bold text-slate-900">{user.parentPhone || 'N/A'}</p>
+                        </div>
+                        <div className="md:col-span-2 space-y-1">
+                          <p className="text-[9px] font-black text-slate-400 uppercase">Guardian Email</p>
+                          <p className="text-sm font-bold text-slate-900">{user.parentEmail || 'N/A'}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 

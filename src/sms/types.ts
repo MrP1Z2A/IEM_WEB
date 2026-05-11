@@ -122,4 +122,5 @@ export type PageId =
   | 'about-school'
   | 'messages'
   | 'class-group-management'
-  | 'sms-attendance';
+  | 'sms-attendance'
+  | 'teacher-attendance';

@@ -122,6 +122,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <SidebarMenuItem icon="fa-chalkboard-teacher" label="Teachers" activePage={currentPage} hasDropdown>
           <SidebarSubItem id="teachers" label="Teacher Directory" activePage={currentPage} />
           <SidebarSubItem id="teacher-register" label="Registration Hub" activePage={currentPage} />
+          <SidebarSubItem id="teacher-attendance" label="Staff Attendance" activePage={currentPage} />
         </SidebarMenuItem>
         <SidebarMenuItem icon="fa-user-tie" label="Student Service" activePage={currentPage} hasDropdown>
           <SidebarSubItem id="student-service" label="SS Directory" activePage={currentPage} />

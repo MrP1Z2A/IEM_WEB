@@ -36,6 +36,7 @@ import SecurityPermission from './components/Modals/SecurityPermission';
 import MessagesOversight from './components/MessagesOversight';
 import ClassGroupManagement from './components/ClassGroupManagement';
 import AttendanceTaker from './components/AttendanceTaker';
+import TeacherAttendance from './components/TeacherAttendance';
 
 import EnrollmentModal from './components/Modals/EnrollmentModal';
 import TeacherEnrollmentModal from './components/Modals/TeacherEnrollmentModal';
@@ -4784,6 +4785,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <AttendanceTaker schoolId={schoolId} />
           )}
 
+          {currentPage === 'teacher-attendance' && schoolId && (
+            <TeacherAttendance schoolId={schoolId} />
+          )}
+
           {/* SUBJECT PAGE - WITH CRUD */}
           {currentPage === 'subject' && (
             <div className="space-y-12 animate-in fade-in duration-700 pb-20">
@@ -5228,7 +5233,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
 
           {/* FALLBACK HUB */}
-          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'about-school', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'cash-records', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel', 'class-announcements', 'messages', 'class-group-management', 'sms-attendance', 'student-achievements'].includes(currentPage) && (
+          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'about-school', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'cash-records', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel', 'class-announcements', 'messages', 'class-group-management', 'sms-attendance', 'teacher-attendance', 'student-achievements'].includes(currentPage) && (
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>

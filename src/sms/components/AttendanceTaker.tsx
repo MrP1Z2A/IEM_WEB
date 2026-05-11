@@ -48,10 +48,13 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
-  // ── Load Classes ───────────────────────────────────
+  const selectedClass = classes.find(c => String(c.id) === selectedClassId);
+  const selectedCourse = courses.find(c => String(c.id) === selectedCourseId);
+
+  // ── Initial Fetch (Classes) ────────────────────────
   useEffect(() => {
-    if (!supabase) return;
-    void supabase.from('classes').select('id, name, color, image_url').eq('school_id', schoolId).order('name')
+    if (!supabase || !schoolId) return;
+    void supabase.from('classes').select('id, name').eq('school_id', schoolId).order('name')
       .then(({ data }) => setClasses(data || []));
   }, [schoolId]);
 
@@ -198,21 +201,18 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
   const isToday = (d: Date) => fmtDate(d) === fmtDate(new Date());
   const isSelected = (d: Date) => fmtDate(d) === fmtDate(selectedDate);
 
-  const selectedClass = classes.find(c => c.id === selectedClassId);
-  const selectedCourse = courses.find(c => c.id === selectedCourseId);
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
-      {/* Toast */}
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      {/* Toast Notification */}
       {notification && (
-        <div className={`fixed top-6 right-6 z-[999] px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-white font-black text-sm animate-in slide-in-from-top-2 duration-300 ${notification.type === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+        <div className={`fixed top-8 right-8 z-[999] px-6 py-4 rounded-[24px] shadow-2xl flex items-center gap-4 text-white font-black text-sm animate-in slide-in-from-top-4 duration-300 ${notification.type === 'error' ? 'bg-rose-500' : 'bg-brand-500'}`}>
           <i className={`fas ${notification.type === 'error' ? 'fa-circle-xmark' : 'fa-circle-check'}`}></i>
           {notification.msg}
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div>
           <h2 className="text-3xl font-black tracking-tighter text-slate-800 dark:text-white flex items-center gap-3">
             <i className="fas fa-calendar-check text-brand-500"></i> Attendance
@@ -257,41 +257,38 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
           </div>
         </div>
 
-        {/* Date Picker */}
+        {/* Date Selector */}
         <div className="relative">
-          <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">Date</label>
+          <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">Attendance Date</label>
           <button onClick={() => setIsCalendarOpen(p => !p)}
             className="w-full flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3 px-4 text-sm font-semibold text-slate-700 dark:text-white focus:outline-none hover:border-brand-500 transition-all shadow-sm">
             <span className="flex items-center gap-3">
               <i className="fas fa-calendar text-brand-500"></i>
-              {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+              {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}
             </span>
             <i className={`fas fa-chevron-down text-slate-400 text-xs transition-transform duration-200 ${isCalendarOpen ? 'rotate-180' : ''}`}></i>
           </button>
 
           {/* Calendar Dropdown */}
           {isCalendarOpen && (
-            <div className="absolute top-full mt-2 left-0 right-0 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[20px] shadow-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
-              {/* Month nav */}
+            <div className="absolute top-full mt-2 left-0 right-0 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[24px] shadow-2xl p-5 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-4">
                 <button onClick={() => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth()-1, 1))}
-                  className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-brand-500 hover:text-white transition-all">
+                  className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-brand-500 hover:text-white transition-all">
                   <i className="fas fa-chevron-left text-xs"></i>
                 </button>
                 <h4 className="text-sm font-black text-slate-700 dark:text-white">
                   {MONTHS[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
                 </h4>
                 <button onClick={() => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth()+1, 1))}
-                  className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-brand-500 hover:text-white transition-all">
+                  className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-brand-500 hover:text-white transition-all">
                   <i className="fas fa-chevron-right text-xs"></i>
                 </button>
               </div>
-              {/* Day labels */}
               <div className="grid grid-cols-7 mb-2">
                 {DAYS.map(d => <div key={d} className="text-center text-[9px] font-black uppercase tracking-widest text-slate-400">{d}</div>)}
               </div>
-              {/* Day cells */}
-              <div className="grid grid-cols-7 gap-0.5">
+              <div className="grid grid-cols-7 gap-1">
                 {calendarDays.map((day, i) => (
                   <div key={i}>
                     {day ? (
@@ -306,33 +303,13 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
                   </div>
                 ))}
               </div>
-              {/* Today shortcut */}
               <button onClick={() => { setSelectedDate(new Date()); setCalendarMonth(new Date()); setIsCalendarOpen(false); }}
-                className="w-full mt-3 py-2 text-[10px] font-black uppercase tracking-widest text-brand-500 hover:bg-brand-500/5 rounded-xl transition-all">
-                Today
+                className="w-full mt-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-brand-500 hover:bg-brand-500/5 rounded-xl transition-all">
+                Go to Today
               </button>
             </div>
           )}
         </div>
-      </div>
-
-      {/* ── Quick Date Nav ── */}
-      <div className="flex items-center gap-2">
-        <button onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate()-1); return n; })}
-          className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-500 transition-all shadow-sm">
-          <i className="fas fa-chevron-left text-xs"></i>
-        </button>
-        <div className="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-2 px-4 shadow-sm">
-          <i className="fas fa-calendar-day text-brand-500 text-sm"></i>
-          <span className="text-sm font-black text-slate-700 dark:text-white">
-            {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}, {selectedDate.getFullYear()}
-          </span>
-          {isToday(selectedDate) && <span className="px-2 py-0.5 bg-brand-500/10 text-brand-600 text-[9px] font-black uppercase tracking-widest rounded-full">Today</span>}
-        </div>
-        <button onClick={() => setSelectedDate(d => { const n = new Date(d); n.setDate(n.getDate()+1); return n; })}
-          className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:border-brand-500 hover:text-brand-500 transition-all shadow-sm">
-          <i className="fas fa-chevron-right text-xs"></i>
-        </button>
       </div>
 
       {/* ── Stats Bar (shows when students loaded) ── */}
@@ -344,7 +321,7 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
             { key: 'late',    label: 'Late',    value: stats.late,    color: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-400',          icon: 'fa-clock' },
             { key: 'unmarked',label: 'Unmarked',value: stats.unmarked, color: 'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700',                                    icon: 'fa-circle-question' },
           ].map(s => (
-            <div key={s.key} className={`flex items-center gap-3 p-3 rounded-2xl border ${s.color}`}>
+            <div key={s.key} className={`flex items-center gap-3 p-4 rounded-[24px] border ${s.color} transition-all`}>
               <i className={`fas ${s.icon} text-lg`}></i>
               <div>
                 <p className="text-2xl font-black">{s.value}</p>
@@ -355,11 +332,10 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
         </div>
       )}
 
-      {/* ── Main Roll Call Panel ── */}
-      <div className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
-        {/* Panel Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-5 border-b border-slate-100 dark:border-slate-800">
-          <div>
+      {/* ── Roll Call Section ── */}
+      <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-premium overflow-hidden">
+        <div className="flex items-center justify-between p-6 sm:p-8 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex-1">
             <h3 className="text-base font-black text-slate-800 dark:text-white flex items-center gap-2">
               <i className="fas fa-clipboard-list text-brand-500"></i>
               Roll Call
@@ -371,15 +347,11 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
             <div className="flex flex-wrap gap-2">
               <button onClick={() => markAll('P')}
                 className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm shadow-emerald-500/20">
-                <i className="fas fa-circle-check text-xs"></i> Mark All Present
-              </button>
-              <button onClick={() => markAll('A')}
-                className="flex items-center gap-1.5 px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm shadow-rose-500/20">
-                <i className="fas fa-circle-xmark text-xs"></i> Mark All Absent
+                <i className="fas fa-check-double"></i> Mark All Present
               </button>
               <button onClick={unmarkAll}
-                className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                <i className="fas fa-rotate-left text-xs"></i> Unmark All
+                className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                Reset All
               </button>
             </div>
           )}
@@ -465,9 +437,8 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
               {stats.present}P · {stats.absent}A · {stats.late}L · {stats.unmarked} unmarked
             </p>
             <button onClick={() => void saveAttendance()} disabled={isSaving}
-              className="flex items-center gap-2 px-5 py-2.5 bg-brand-500 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/25 disabled:opacity-50">
-              <i className={`fas ${isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`}></i>
-              {isSaving ? 'Saving…' : 'Save Attendance'}
+              className="px-6 py-2.5 bg-brand-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-600 transition-all disabled:opacity-50">
+              Confirm & Save
             </button>
           </div>
         )}

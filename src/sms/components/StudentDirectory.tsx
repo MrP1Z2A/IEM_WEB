@@ -2,6 +2,7 @@ import React from 'react';
 import { jsPDF } from 'jspdf';
 import { Student } from '../types';
 import { supabase } from '../supabaseClient';
+import * as XLSX from 'xlsx';
 
 /**
  * StudentDirectory Component
@@ -452,17 +453,91 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     doc.save(`${fileBase}-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
+  const downloadDirectoryExcel = () => {
+    if (filteredStudents.length === 0) {
+      alert('No data available to export. Please adjust your filters.');
+      return;
+    }
+
+    const data = filteredStudents.map((student) => {
+      const displayId = student.studentschool_id || student.teacherschool_id || student.staffschool_id || `IEM-${student.id}`;
+      const classes = getStudentClassNames(String(student.id));
+      
+      const row: any = {
+        'Name': `${namePrefix}${student.name}`,
+        'ID': displayId,
+        'Role': student.role,
+        'Gender': student.gender || '—',
+        'Status': student.status,
+        'Email': student.email || '—',
+        'Phone': student.phone || '—',
+        'Address': student.address || '—',
+        'Date of Birth': student.date_of_birth || '—',
+        'Age': student.age || '—',
+        'NRC': student.nrc || '—',
+        'Marital Status': student.marital_status || '—',
+        'Race': student.race || '—',
+        'Religion': student.religion || '—',
+        'Educational Background': student.educational_background || '—',
+        'Classes': classes
+      };
+
+      // Add student-specific fields
+      if (student.role === 'student') {
+        row['Parent Name'] = student.parent_name || '—';
+        row['Parent Phone'] = student.parent_number || '—';
+        row['Parent Email'] = student.parent_email || '—';
+        row['Secondary Parent Name'] = student.secondary_parent_name || '—';
+        row['Secondary Parent Phone'] = student.secondary_parent_number || '—';
+        row['Secondary Parent Email'] = student.secondary_parent_email || '—';
+      }
+
+      // Add teacher/staff-specific fields
+      if (student.role === 'teacher' || student.role === 'staff' || student.role === 'student_service') {
+        row['Salary'] = student.salary || '—';
+        row['Job Position'] = student.job_position || '—';
+      }
+
+      return row;
+    });
+
+    try {
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Directory');
+
+      // Auto-size columns logic
+      if (data.length > 0) {
+        const maxWidths = Object.keys(data[0]).map(key => {
+          const maxLen = Math.max(
+            key.length,
+            ...data.map(row => String(row[key] || '').length)
+          );
+          return { wch: maxLen + 2 };
+        });
+        worksheet['!cols'] = maxWidths;
+      }
+
+      const fileBase = String(title || 'directory').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const fileName = `${fileBase}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    } catch (error) {
+      console.error('Excel export failed:', error);
+      alert('Failed to generate Excel file. Please try again.');
+    }
+  };
+
   return (
     <div className="space-y-12 animate-in fade-in duration-700 pb-20">
       {/* Header Section with Title and Filters */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-10">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 lg:gap-10">
         <div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter">{title}</h2>
           <p className="text-sm text-slate-400 font-bold uppercase tracking-[0.3em] mt-3">Identity Management Protocol</p>
         </div>
         
         {/* Filter Pills */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div className="flex flex-wrap gap-3 items-center">
           <div className="bg-white dark:bg-slate-900 p-2 rounded-[24px] sm:rounded-[32px] shadow-premium border border-slate-100 dark:border-slate-800 flex items-center gap-2">
             <i className="fas fa-search text-slate-400 px-2"></i>
             <input
@@ -473,7 +548,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
               autoComplete="off"
               name="directory-search"
               spellCheck={false}
-              className="bg-transparent text-sm font-semibold px-2 py-2 outline-none min-w-[220px]"
+              className="bg-transparent text-sm font-semibold px-2 py-2 outline-none w-full sm:min-w-[200px]"
             />
             {searchQuery && (
               <button
@@ -536,7 +611,13 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
           >
             Download PDF
           </button>
-
+          <button
+            onClick={downloadDirectoryExcel}
+            className="px-4 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest bg-emerald-600 text-white flex items-center gap-2"
+          >
+            <i className="fas fa-file-excel"></i>
+            Export Excel
+          </button>
         </div>
       </div>
 
