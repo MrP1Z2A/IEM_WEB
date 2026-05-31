@@ -289,10 +289,8 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
     fetchCoursesFromDb();
   }, [supabase, schoolId, courses]);
 
-  const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
-  const [showTokenModal, setShowTokenModal] = useState(false);
 
   // Connection-driven Mic/Cam/Screen States
   const [isMicEnabled, setIsMicEnabled] = useState(true);
@@ -347,7 +345,6 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
     setActiveRoom(course);
     setIsLoadingToken(true);
     setError(null);
-    setToken(null);
 
     const roomId = `room-${course.id}`;
     const userId = user.id || `user-${Math.random().toString(36).substr(2, 9)}`;
@@ -355,7 +352,6 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
 
     try {
       const generatedToken = await fetchLiveKitToken(userId, userName, roomId, isTeacher);
-      setToken(generatedToken);
 
       const livekitUrl = import.meta.env.VITE_LIVEKIT_WS_URL || 'ws://localhost:7880';
       const r = new Room({
@@ -409,7 +405,6 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
     setParticipants([]);
     setIsSharingScreen(false);
     setActiveRoom(null);
-    setToken(null);
     setError(null);
   };
 
@@ -692,14 +687,6 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                   <i className="fa-solid fa-desktop"></i>
                 </button>
 
-                <button
-                  onClick={() => setShowTokenModal(true)}
-                  className="w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-lg transition-all"
-                  title="Inspect LiveKit Access Token"
-                >
-                  <i className="fa-solid fa-key"></i>
-                </button>
-
                 <div className="w-[1px] h-8 bg-white/20 mx-2"></div>
 
                 <button
@@ -741,9 +728,9 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-slate-400 font-bold uppercase tracking-wider">Token State</span>
-                  <span className={`font-bold px-3 py-1 rounded-lg ${token ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500 animate-pulse'}`}>
-                    {token ? 'JWT Signed' : 'Signing JWT...'}
+                  <span className="text-slate-400 font-bold uppercase tracking-wider">Connection Status</span>
+                  <span className="font-bold px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-500">
+                    Connected
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-xs">
@@ -777,62 +764,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
         </div>
       )}
 
-      {/* INSPECT TOKEN MODAL */}
-      {showTokenModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="w-full max-w-3xl bg-[#0a1a19] border border-white/20 rounded-[48px] overflow-hidden shadow-4xl p-10 space-y-8 text-white relative">
-            <button
-              onClick={() => setShowTokenModal(false)}
-              className="absolute top-8 right-8 w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-all"
-            >
-              <i className="fa-solid fa-xmark"></i>
-            </button>
 
-            <div className="space-y-2">
-              <h3 className="text-3xl font-black text-white uppercase tracking-tighter">LiveKit Access Token</h3>
-              <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.4em]">Development Mode Decrypted Signature</p>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-sm text-slate-300 leading-relaxed">
-                This token is a secure JSON Web Token (JWT) signed by the local token server plugin using the API secret in development mode (`devkey` / `secret`). The LiveKit Client SDK requires this token to authenticate with the LiveKit server room.
-              </p>
-              
-              <div className="bg-black/50 p-6 rounded-3xl border border-white/10 font-mono text-[11px] overflow-x-auto text-emerald-400 max-h-60 custom-scrollbar select-all">
-                {token || "No token currently signed. Please rejoin the room to generate a signature."}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-xs bg-white/5 p-6 rounded-3xl border border-white/10 text-slate-300">
-                <div>
-                  <p className="text-[9px] text-[#4ea59d] uppercase font-black mb-1">Signed API Key</p>
-                  <p className="font-mono font-bold">devkey</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-[#4ea59d] uppercase font-black mb-1">User Identifier</p>
-                  <p className="font-mono font-bold">{user.id}</p>
-                </div>
-                <div className="mt-3">
-                  <p className="text-[9px] text-[#4ea59d] uppercase font-black mb-1">Identity Claims</p>
-                  <p className="font-mono font-bold">userName: {user.name}</p>
-                </div>
-                <div className="mt-3">
-                  <p className="text-[9px] text-[#4ea59d] uppercase font-black mb-1">Permission Level</p>
-                  <p className="font-bold text-white uppercase">{isTeacher ? 'Publish Stream (Teacher)' : 'Viewer Stream (Student)'}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 flex justify-end">
-              <button
-                onClick={() => setShowTokenModal(false)}
-                className="px-8 py-4 bg-[#4ea59d] text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#4ea59d]/20"
-              >
-                Close Inspector
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
