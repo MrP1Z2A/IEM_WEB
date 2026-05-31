@@ -374,14 +374,24 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
 
       await r.connect(livekitUrl, generatedToken);
       setActiveRoomObj(r);
-
-      // Auto-publish local tracks
-      await r.localParticipant.setCameraEnabled(true);
-      await r.localParticipant.setMicrophoneEnabled(true);
-      setIsCamEnabled(true);
-      setIsMicEnabled(true);
-
+      
+      // Update participants immediately so they can see the room even if camera takes time
       updateParticipantsList(r);
+
+      // Auto-publish local tracks without blocking or throwing fatal errors
+      r.localParticipant.setCameraEnabled(true).then(() => {
+        setIsCamEnabled(true);
+      }).catch(e => {
+        console.warn("Could not enable camera automatically:", e);
+        setIsCamEnabled(false);
+      });
+      
+      r.localParticipant.setMicrophoneEnabled(true).then(() => {
+        setIsMicEnabled(true);
+      }).catch(e => {
+        console.warn("Could not enable microphone automatically:", e);
+        setIsMicEnabled(false);
+      });
     } catch (err: any) {
       console.error("Error joining video conference room:", err);
       setError(err.message || "Failed to establish a connection or retrieve token.");
