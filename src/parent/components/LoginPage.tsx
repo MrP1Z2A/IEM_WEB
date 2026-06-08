@@ -97,12 +97,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin, onBackToHubs }) => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Registered Parent Email</label>
+              <label htmlFor="parentEmailInput" className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Registered Parent Email</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
                 </div>
                 <input
+                  id="parentEmailInput"
                   type="email"
                   required
                   value={email}

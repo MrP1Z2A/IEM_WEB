@@ -791,7 +791,7 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
               className="hidden"
             />
             <button
-              onClick={() => fullScheduleInputRef.current?.click()}
+              type="button" onClick={() => fullScheduleInputRef.current?.click()}
               disabled={isUploadingFullSchedule}
               className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-black uppercase tracking-wider flex items-center gap-2"
             >
@@ -843,7 +843,7 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
               onClick={openCreateEditor}
               disabled={!selectedClassId || !selectedCourseId || role !== 'teacher'}
               className="w-full rounded-2xl px-4 py-3 bg-brand-500 hover:bg-brand-600 text-white text-sm font-black uppercase tracking-widest disabled:opacity-60"
-            >
+             type="button">
               Add Exam
             </button>
           </div>
@@ -947,19 +947,19 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
                 {role === 'teacher' ? (
                   <>
                     <button
-                      onClick={() => openGradingPage(exam)}
+                      type="button" onClick={() => openGradingPage(exam)}
                       className="px-3 py-2 rounded-xl bg-brand-50 text-brand-700 text-xs font-black uppercase tracking-widest"
                     >
                       Grade
                     </button>
                     <button
-                      onClick={() => openEditEditor(exam)}
+                      type="button" onClick={() => openEditEditor(exam)}
                       className="px-3 py-2 rounded-xl bg-brand-50 text-brand-700 text-xs font-black uppercase tracking-widest"
                     >
                       Edit
                     </button>
                     <button
-                      onClick={() => deleteExam(exam)}
+                      type="button" onClick={() => deleteExam(exam)}
                       disabled={deletingExamId === exam.id}
                       className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 text-xs font-black uppercase tracking-widest disabled:opacity-60"
                     >
@@ -967,7 +967,7 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
                     </button>
                   </>
                 ) : (
-                  <button className="px-3 py-2 rounded-xl bg-brand-50 text-brand-700 text-xs font-black uppercase tracking-widest">
+                  <button className="px-3 py-2 rounded-xl bg-brand-50 text-brand-700 text-xs font-black uppercase tracking-widest" type="button">
                     Start Exam
                   </button>
                 )}
@@ -980,11 +980,11 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
 
       {isEditorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-          <button className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={closeEditor} aria-label="Close modal" />
+          <button className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={closeEditor} aria-label="Close modal" type="button" />
           <div className="relative w-full max-w-2xl rounded-[32px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-2xl space-y-5">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-2xl font-black tracking-tight">{editingExamId ? 'Edit Exam' : 'Create Exam'}</h3>
-              <button onClick={closeEditor} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white">
+              <button onClick={closeEditor} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:hover:text-white" type="button">
                 <i className="fas fa-xmark"></i>
               </button>
             </div>
@@ -1106,14 +1106,14 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
             </div>
 
             <div className="flex items-center justify-end gap-3">
-              <button onClick={closeEditor} className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-200">
+              <button onClick={closeEditor} className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-200" type="button">
                 Cancel
               </button>
               <button
                 onClick={saveExam}
                 disabled={isSavingExam}
                 className="px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-black uppercase tracking-widest disabled:opacity-60"
-              >
+               type="button">
                 {isSavingExam ? 'Saving...' : editingExamId ? 'Save Changes' : 'Create Exam'}
               </button>
             </div>
@@ -1133,7 +1133,7 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
             </div>
             <div className="flex gap-3 pt-2">
               <button
-                onClick={() => setConfirmDialog(null)}
+                type="button" onClick={() => setConfirmDialog(null)}
                 className="flex-1 px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
               >
                 Cancel
@@ -1141,7 +1141,7 @@ export default function ExamManagementPage({ schoolId }: { schoolId: string | un
               <button
                 onClick={confirmDialog.onConfirm}
                 className="flex-1 px-4 py-3 rounded-2xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all"
-              >
+               type="button">
                 Delete Exam
               </button>
             </div>

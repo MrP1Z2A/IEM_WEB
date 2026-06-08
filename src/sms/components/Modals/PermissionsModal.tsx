@@ -38,10 +38,10 @@ const PermissionsModal: React.FC<PermissionsModalProps> = ({
         {/* Modal Header */}
         <div className="p-5 sm:p-8 lg:p-10 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center gap-4">
           <h3 className="text-xl sm:text-2xl font-black tracking-tight">Registration Access Protocol</h3>
-          <button 
+          <button aria-label="Action" 
             onClick={onClose} 
             className="w-10 h-10 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400"
-          >
+           type="button">
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -71,8 +71,8 @@ const PermissionsModal: React.FC<PermissionsModalProps> = ({
                 </div>
                 
                 {/* Custom Toggle Switch */}
-                <button 
-                  onClick={() => togglePermission(p.key as keyof StudentPermissions)} 
+                <button aria-label="Action" 
+                  type="button" onClick={() => togglePermission(p.key as keyof StudentPermissions)} 
                   className={`w-14 h-7 rounded-full transition-all flex items-center px-1 ${permTarget.permissions?.[p.key as keyof StudentPermissions] ? 'bg-brand-500 shadow-glow shadow-brand-500/30' : 'bg-slate-300 dark:bg-slate-700'}`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full transition-all ${permTarget.permissions?.[p.key as keyof StudentPermissions] ? 'translate-x-7' : 'translate-x-0'}`}></div>
@@ -87,7 +87,7 @@ const PermissionsModal: React.FC<PermissionsModalProps> = ({
           <button 
             onClick={onClose} 
             className="w-full py-6 bg-brand-500 text-white font-black rounded-3xl text-[12px] uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all"
-          >
+           type="button">
             Finalize Registration
           </button>
         </div>

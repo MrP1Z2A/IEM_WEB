@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useReducer } from 'react';
 import { Room, RoomEvent, VideoPresets, Track, Participant, ParticipantEvent } from 'livekit-client';
 import { fetchLiveKitToken } from '../livekitUtils';
 
@@ -26,6 +26,38 @@ interface VideoConferenceProps {
   supabase?: any;
 }
 
+interface MediaState {
+  videoTrack: any;
+  audioTrack: any;
+  isSpeaking: boolean;
+  isCamEnabled: boolean;
+  isMicEnabled: boolean;
+}
+
+type MediaAction =
+  | { type: 'UPDATE_TRACKS'; videoTrack: any; audioTrack: any; isCamEnabled: boolean; isMicEnabled: boolean }
+  | { type: 'SET_SPEAKING'; isSpeaking: boolean };
+
+const mediaReducer = (state: MediaState, action: MediaAction): MediaState => {
+  switch (action.type) {
+    case 'UPDATE_TRACKS':
+      return {
+        ...state,
+        videoTrack: action.videoTrack,
+        audioTrack: action.audioTrack,
+        isCamEnabled: action.isCamEnabled,
+        isMicEnabled: action.isMicEnabled,
+      };
+    case 'SET_SPEAKING':
+      return {
+        ...state,
+        isSpeaking: action.isSpeaking,
+      };
+    default:
+      return state;
+  }
+};
+
 // -------------------------------------------------------------
 // ParticipantMediaTile: Renders Video/Audio for a Participant
 // -------------------------------------------------------------
@@ -37,17 +69,19 @@ const ParticipantMediaTile: React.FC<{
 }> = ({ participant, isLocal, className = '', showName = true }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [videoTrack, setVideoTrack] = useState<any>(null);
-  const [audioTrack, setAudioTrack] = useState<any>(null);
-  const [isSpeaking, setIsSpeaking] = useState(participant.isSpeaking);
-  const [isCamEnabled, setIsCamEnabled] = useState(participant.isCameraEnabled);
-  const [isMicEnabled, setIsMicEnabled] = useState(participant.isMicrophoneEnabled);
+
+  const [state, dispatch] = useReducer(mediaReducer, {
+    videoTrack: null,
+    audioTrack: null,
+    isSpeaking: participant.isSpeaking,
+    isCamEnabled: participant.isCameraEnabled,
+    isMicEnabled: participant.isMicrophoneEnabled,
+  });
+
+  const { videoTrack, audioTrack, isSpeaking, isCamEnabled, isMicEnabled } = state;
 
   useEffect(() => {
     const updateParticipantTracks = () => {
-      setIsCamEnabled(participant.isCameraEnabled);
-      setIsMicEnabled(participant.isMicrophoneEnabled);
-
       let vTrack: any = null;
       let aTrack: any = null;
       participant.trackPublications.forEach((pub) => {
@@ -56,12 +90,17 @@ const ParticipantMediaTile: React.FC<{
           if (pub.kind === 'audio') aTrack = pub.track;
         }
       });
-      setVideoTrack(vTrack);
-      setAudioTrack(aTrack);
+      dispatch({
+        type: 'UPDATE_TRACKS',
+        videoTrack: vTrack,
+        audioTrack: aTrack,
+        isCamEnabled: participant.isCameraEnabled,
+        isMicEnabled: participant.isMicrophoneEnabled,
+      });
     };
 
     const handleIsSpeaking = (speaking: boolean) => {
-      setIsSpeaking(speaking);
+      dispatch({ type: 'SET_SPEAKING', isSpeaking: speaking });
     };
 
     participant.on(ParticipantEvent.TrackSubscribed, updateParticipantTracks);
@@ -175,18 +214,24 @@ const ParticipantMediaTile: React.FC<{
 // -------------------------------------------------------------
 const MainScreenShare: React.FC<{ participant: Participant }> = ({ participant }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [screenTrack, setScreenTrack] = useState<any>(null);
+  const screenTrackRef = useRef<any>(null);
 
   useEffect(() => {
     const handleTrackSubscribed = (track: any) => {
       if (track.source === Track.Source.ScreenShare) {
-        setScreenTrack(track);
+        screenTrackRef.current = track;
+        if (videoRef.current) {
+          track.attach(videoRef.current);
+        }
       }
     };
 
     const handleTrackUnsubscribed = (track: any) => {
       if (track.source === Track.Source.ScreenShare) {
-        setScreenTrack(null);
+        if (videoRef.current && screenTrackRef.current) {
+          screenTrackRef.current.detach(videoRef.current);
+        }
+        screenTrackRef.current = null;
       }
     };
 
@@ -196,24 +241,21 @@ const MainScreenShare: React.FC<{ participant: Participant }> = ({ participant }
     // Initial check
     participant.trackPublications.forEach((pub) => {
       if (pub.track && pub.source === Track.Source.ScreenShare) {
-        setScreenTrack(pub.track);
+        screenTrackRef.current = pub.track;
+        if (videoRef.current) {
+          pub.track.attach(videoRef.current);
+        }
       }
     });
 
     return () => {
       participant.off(ParticipantEvent.TrackSubscribed, handleTrackSubscribed);
       participant.off(ParticipantEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      if (screenTrackRef.current && videoRef.current) {
+        screenTrackRef.current.detach(videoRef.current);
+      }
     };
   }, [participant]);
-
-  useEffect(() => {
-    if (videoRef.current && screenTrack) {
-      screenTrack.attach(videoRef.current);
-      return () => {
-        screenTrack.detach(videoRef.current);
-      };
-    }
-  }, [screenTrack]);
 
   return (
     <div className="absolute inset-0 z-10 bg-black flex items-center justify-center">
@@ -509,7 +551,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
               <p className="text-xs opacity-80">{error}</p>
             </div>
           </div>
-          <button onClick={handleLeaveRoom} className="px-6 py-2.5 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all">
+          <button onClick={handleLeaveRoom} className="px-6 py-2.5 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all" type="button">
             Dismiss
           </button>
         </div>
@@ -550,7 +592,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                 )}
 
                 <button
-                  onClick={() => handleJoinRoom(course)}
+                  type="button" onClick={() => handleJoinRoom(course)}
                   className={`w-full py-4 text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-[1.03] transition-all shadow-lg flex items-center justify-center gap-2 ${isTeacher ? 'bg-amber-400 hover:bg-amber-500 shadow-amber-400/20' : 'bg-[#4ea59d] hover:bg-[#3d8c85] shadow-[#4ea59d]/20'}`}
                 >
                   <i className={`fa-solid ${isTeacher ? 'fa-play' : 'fa-video'}`}></i>
@@ -615,7 +657,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                 {/* Microphone Control */}
                 <div className="relative group">
                   <div className="flex">
-                    <button
+                    <button aria-label="Action"
                       onClick={toggleMic}
                       className={`w-12 h-12 rounded-l-2xl flex items-center justify-center text-lg transition-all ${
                         isMicEnabled
@@ -623,11 +665,11 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                           : 'bg-red-500 text-white hover:bg-red-600'
                       }`}
                       title={isMicEnabled ? "Mute Microphone" : "Unmute Microphone"}
-                    >
+                     type="button">
                       <i className={`fa-solid ${isMicEnabled ? 'fa-microphone' : 'fa-microphone-slash'}`}></i>
                     </button>
-                    <button
-                      onClick={() => { setShowMicMenu(!showMicMenu); setShowCamMenu(false); }}
+                    <button aria-label="Action"
+                      type="button" onClick={() => { setShowMicMenu(!showMicMenu); setShowCamMenu(false); }}
                       className={`w-6 h-12 rounded-r-2xl border-l border-white/10 flex items-center justify-center text-[10px] text-white hover:bg-white/20 transition-all ${isMicEnabled ? 'bg-white/10' : 'bg-red-500 hover:bg-red-600'}`}
                     >
                       <i className="fa-solid fa-chevron-up"></i>
@@ -639,7 +681,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                         Select Microphone
                       </div>
                       {audioDevices.length > 0 ? audioDevices.map(d => (
-                        <button key={d.deviceId} onClick={() => {
+                        <button key={d.deviceId} type="button" onClick={() => {
                           if (activeRoomObj) activeRoomObj.switchActiveDevice('audioinput', d.deviceId);
                           setShowMicMenu(false);
                         }} className="w-full text-left px-4 py-3 text-xs font-bold text-white hover:bg-[#4ea59d] hover:text-slate-900 truncate transition-colors text-ellipsis overflow-hidden">
@@ -655,7 +697,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                 {/* Camera Control */}
                 <div className="relative group">
                   <div className="flex">
-                    <button
+                    <button aria-label="Action"
                       onClick={toggleCam}
                       className={`w-12 h-12 rounded-l-2xl flex items-center justify-center text-lg transition-all ${
                         isCamEnabled
@@ -663,11 +705,11 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                           : 'bg-red-500 text-white hover:bg-red-600'
                       }`}
                       title={isCamEnabled ? "Disable Camera" : "Enable Camera"}
-                    >
+                     type="button">
                       <i className={`fa-solid ${isCamEnabled ? 'fa-video' : 'fa-video-slash'}`}></i>
                     </button>
-                    <button
-                      onClick={() => { setShowCamMenu(!showCamMenu); setShowMicMenu(false); }}
+                    <button aria-label="Action"
+                      type="button" onClick={() => { setShowCamMenu(!showCamMenu); setShowMicMenu(false); }}
                       className={`w-6 h-12 rounded-r-2xl border-l border-white/10 flex items-center justify-center text-[10px] text-white hover:bg-white/20 transition-all ${isCamEnabled ? 'bg-white/10' : 'bg-red-500 hover:bg-red-600'}`}
                     >
                       <i className="fa-solid fa-chevron-up"></i>
@@ -679,7 +721,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                         Select Camera
                       </div>
                       {videoDevices.length > 0 ? videoDevices.map(d => (
-                        <button key={d.deviceId} onClick={() => {
+                        <button key={d.deviceId} type="button" onClick={() => {
                           if (activeRoomObj) activeRoomObj.switchActiveDevice('videoinput', d.deviceId);
                           setShowCamMenu(false);
                         }} className="w-full text-left px-4 py-3 text-xs font-bold text-white hover:bg-[#4ea59d] hover:text-slate-900 truncate transition-colors text-ellipsis overflow-hidden">
@@ -692,7 +734,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                   )}
                 </div>
 
-                <button
+                <button aria-label="Action"
                   onClick={toggleScreenShare}
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg transition-all ${
                     isSharingScreen
@@ -700,7 +742,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                       : 'bg-white/10 text-white hover:bg-white/20'
                   }`}
                   title={isSharingScreen ? "Stop Screen Share" : "Share Screen"}
-                >
+                 type="button">
                   <i className="fa-solid fa-desktop"></i>
                 </button>
 
@@ -709,7 +751,7 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                 <button
                   onClick={handleLeaveRoom}
                   className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-red-500/20"
-                >
+                 type="button">
                   <i className="fa-solid fa-phone-slash"></i>
                   Leave
                 </button>
@@ -718,15 +760,18 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
 
             {/* Sub-grid of other participants */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-              {participants
-                .filter(p => p !== activeFocus || !!screenSharer)
-                .map((p) => (
-                  <ParticipantMediaTile
-                    key={p.identity}
-                    participant={p}
-                    isLocal={p.isLocal}
-                  />
-                ))}
+              {participants.reduce((acc: React.ReactElement[], p) => {
+                if (p !== activeFocus || !!screenSharer) {
+                  acc.push(
+                    <ParticipantMediaTile
+                      key={p.identity}
+                      participant={p}
+                      isLocal={p.isLocal}
+                    />
+                  );
+                }
+                return acc;
+              }, [])}
             </div>
           </div>
 
@@ -764,15 +809,15 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
               </h3>
               <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-3 text-xs">
-                  <input type="checkbox" defaultChecked disabled className="rounded text-[#4ea59d] focus:ring-[#4ea59d] bg-transparent" />
+                  <input aria-label="Action" type="checkbox" defaultChecked disabled className="rounded text-[#4ea59d] focus:ring-[#4ea59d] bg-transparent" />
                   <span className="text-slate-700 font-semibold">End-to-End Encryption</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs">
-                  <input type="checkbox" defaultChecked={isTeacher} disabled className="rounded text-[#4ea59d] focus:ring-[#4ea59d] bg-transparent" />
+                  <input aria-label="Action" type="checkbox" defaultChecked={isTeacher} disabled className="rounded text-[#4ea59d] focus:ring-[#4ea59d] bg-transparent" />
                   <span className="text-slate-700 font-semibold">Host Screen Share Authorization</span>
                 </div>
                 <div className="flex items-center gap-3 text-xs">
-                  <input type="checkbox" defaultChecked disabled className="rounded text-[#4ea59d] focus:ring-[#4ea59d] bg-transparent" />
+                  <input aria-label="Action" type="checkbox" defaultChecked disabled className="rounded text-[#4ea59d] focus:ring-[#4ea59d] bg-transparent" />
                   <span className="text-slate-700 font-semibold">Lobby Waiting Room Enabled</span>
                 </div>
               </div>

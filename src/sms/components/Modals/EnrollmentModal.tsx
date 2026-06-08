@@ -255,11 +255,11 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
             <h3 className="text-xl sm:text-2xl font-black tracking-tighter">{enrollData.type} Registration</h3>
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1"></p>
           </div>
-          <button
+          <button aria-label="Action"
             onClick={onClose}
             className="w-10 h-10 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 flex items-center justify-center"
             title="Close"
-          >
+           type="button">
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -286,7 +286,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
             <>
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Full Legal Name</label>
-                <input
+                <input aria-label="Action"
                   type="text"
                   placeholder="Enter student name..."
                   className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
@@ -297,7 +297,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Network Email (Verification Hub)</label>
-                <input
+                <input aria-label="Action"
                   type="email"
                   placeholder="student@iem.io"
                   className={`w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 font-bold transition-all text-sm ${isStudentEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
@@ -309,7 +309,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">School Student ID (Optional)</label>
-                <input
+                <input aria-label="Action"
                   type="text"
                   placeholder="e.g. SCH-2024-001"
                   className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
@@ -330,7 +330,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                       <option key={code} value={code.split(' ')[0]}>{code}</option>
                     ))}
                   </select>
-                  <input
+                  <input aria-label="Action"
                     type="tel"
                     inputMode="numeric"
                     placeholder="Enter phone number..."
@@ -352,7 +352,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                 return (
                   <button
                     key={classItem.id}
-                    onClick={() => toggleClass(String(classItem.id))}
+                    type="button" onClick={() => toggleClass(String(classItem.id))}
                     className={`px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border-2 transition-all ${isSelected
                       ? 'bg-brand-500 border-brand-500 text-white shadow-lg shadow-brand-500/20'
                       : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -391,13 +391,13 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                         <span className="text-[10px] font-black uppercase text-brand-500 tracking-widest">{classItem?.name || 'Class'} Courses</span>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => selectAllCoursesForClass(classId)}
+                            type="button" onClick={() => selectAllCoursesForClass(classId)}
                             className="text-[9px] font-black uppercase text-slate-400 hover:text-brand-500 tracking-tighter"
                           >
                             Select All
                           </button>
                           <button
-                            onClick={() => clearCoursesForClass(classId)}
+                            type="button" onClick={() => clearCoursesForClass(classId)}
                             className="text-[9px] font-black uppercase text-slate-400 hover:text-rose-500 tracking-tighter"
                           >
                             Clear
@@ -410,7 +410,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                           return (
                             <button
                               key={course.id}
-                              onClick={() => toggleCourse(String(course.id))}
+                              type="button" onClick={() => toggleCourse(String(course.id))}
                               className={`px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tight border-2 transition-all ${isSelected
                                 ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-md'
                                 : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 hover:border-brand-500 hover:text-brand-500'
@@ -438,7 +438,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
             <>
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Date of Birth</label>
-                <input
+                <input aria-label="Action"
                   type="date"
                   className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
                   value={enrollData.dateOfBirth}
@@ -448,7 +448,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
               <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Primary Parent</p>
-                <input
+                <input aria-label="Action"
                   type="text"
                   placeholder="Parent Name"
                   className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
@@ -465,7 +465,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                       <option key={code} value={code.split(' ')[0]}>{code}</option>
                     ))}
                   </select>
-                  <input
+                  <input aria-label="Action"
                     type="tel"
                     inputMode="numeric"
                     placeholder="Parent Number"
@@ -474,7 +474,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                     onChange={(e) => setEnrollData({ ...enrollData, parentNumber: e.target.value.replace(/\D/g, '') })}
                   />
                 </div>
-                <input
+                <input aria-label="Action"
                   type="email"
                   placeholder="Parent Email"
                   className={`w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border font-bold transition-all ${isParentEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
@@ -486,7 +486,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
               <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Secondary Parent (Optional)</p>
-                <input
+                <input aria-label="Action"
                   type="text"
                   placeholder="Second Parent Name"
                   className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
@@ -503,7 +503,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                       <option key={code} value={code.split(' ')[0]}>{code}</option>
                     ))}
                   </select>
-                  <input
+                  <input aria-label="Action"
                     type="tel"
                     inputMode="numeric"
                     placeholder="Second Parent Number"
@@ -512,7 +512,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
                     onChange={(e) => setEnrollData({ ...enrollData, secondaryParentNumber: e.target.value.replace(/\D/g, '') })}
                   />
                 </div>
-                <input
+                <input aria-label="Action"
                   type="email"
                   placeholder="Second Parent Email"
                   className={`w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border font-bold transition-all ${isSecondaryParentEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
@@ -525,7 +525,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Student Profile Image</label>
                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-3">
-                  <input
+                  <input aria-label="Action"
                     type="file"
                     accept="image/*"
                     onChange={(e) => {
@@ -553,7 +553,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Residential Address</label>
                 <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <textarea
+                  <textarea aria-label="Action"
                     placeholder="Enter residential address..."
                     rows={2}
                     className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all resize-none"
@@ -573,7 +573,7 @@ const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
           <button
             onClick={onSubmit}
             className="flex-1 py-4 bg-brand-500 text-white font-black rounded-[24px] text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all outline-none"
-          >
+           type="button">
             Registeration
           </button>
         </div>

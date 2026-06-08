@@ -162,7 +162,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
           <p className="text-slate-500 font-medium">Recognize and celebrate student excellence</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          type="button" onClick={() => setIsModalOpen(true)}
           className="bg-brand-500 hover:bg-brand-600 text-white font-black px-6 py-3 rounded-2xl shadow-lg shadow-brand-500/20 transition-all active:scale-95 flex items-center gap-2"
         >
           <i className="fas fa-plus"></i>
@@ -174,7 +174,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <i className="fas fa-search text-slate-400"></i>
         </div>
-        <input
+        <input aria-label="Action"
           type="text"
           placeholder="Search by student name or achievement title..."
           className="w-full bg-white border border-slate-200 pl-11 pr-4 py-4 rounded-2xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-medium"
@@ -243,7 +243,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
                       </td>
                       <td className="px-8 py-5 text-right">
                         <button
-                          onClick={() => handleDelete(ach.id)}
+                          type="button" onClick={() => handleDelete(ach.id)}
                           className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
                         >
                           <i className="fas fa-trash-alt"></i>
@@ -274,7 +274,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
           <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="px-8 pt-8 pb-4 flex items-center justify-between border-b border-slate-50">
               <h3 className="text-2xl font-black tracking-tighter text-slate-800">Add Achievement</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all">
+              <button aria-label="Action" type="button" onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-all">
                 <i className="fas fa-times"></i>
               </button>
             </div>
@@ -296,7 +296,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Achievement Title</label>
-                <input
+                <input aria-label="Action"
                   type="text"
                   required
                   placeholder="e.g. Science Fair Winner"
@@ -308,7 +308,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Description</label>
-                <textarea
+                <textarea aria-label="Action"
                   placeholder="Tell us more about this achievement..."
                   className="w-full bg-slate-50 border border-slate-100 px-5 py-4 rounded-2xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-bold text-sm min-h-[100px] resize-none"
                   value={formData.description}
@@ -351,7 +351,7 @@ const StudentAchievements: React.FC<StudentAchievementsProps> = ({ schoolId, stu
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Achievement Date</label>
-                <input
+                <input aria-label="Action"
                   type="date"
                   className="w-full bg-slate-50 border border-slate-100 px-5 py-4 rounded-2xl focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all font-bold text-sm"
                   value={formData.date}

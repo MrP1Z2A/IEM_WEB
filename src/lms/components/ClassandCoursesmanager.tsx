@@ -2,22 +2,27 @@ import React from 'react';
 import { supabase } from '../src/supabaseClient';
 import { getCurrentTenantContext, withSchoolId } from '../services/tenantService';
 import { Student } from '../types';
+import { ClassForm } from './ClassandCoursesmanager/ClassForm';
+import { ClassesGrid } from './ClassandCoursesmanager/ClassesGrid';
+import { CoursesSection } from './ClassandCoursesmanager/CoursesSection';
+import { CreateCourseModal } from './ClassandCoursesmanager/CreateCourseModal';
+import { EditCourseModal } from './ClassandCoursesmanager/EditCourseModal';
 
-type AttendanceContextType = 'class' | 'subject';
-type AttendanceStatus = 'P' | 'A' | 'L';
+export type AttendanceContextType = 'class' | 'subject';
+export type AttendanceStatus = 'P' | 'A' | 'L';
 
-type AttendanceStudent = {
+export type AttendanceStudent = {
   id: string;
   name: string;
   email?: string;
 };
 
-type LightweightSubject = {
+export type LightweightSubject = {
   id: string;
   name: string;
 };
 
-type ClassRow = {
+export type ClassRow = {
   id: string;
   name: string;
   student_ids?: string[];
@@ -28,7 +33,7 @@ type ClassRow = {
   student_count?: number;
 };
 
-type CourseRow = {
+export type CourseRow = {
   id: string;
   name: string;
   class_id: string;
@@ -68,17 +73,19 @@ const getTodayIsoDate = () => {
   return `${year}-${month}-${day}`;
 };
 
+const EMPTY_ARRAY: any[] = [];
+
 const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({ 
-  students: initialStudents = [], 
+  students: initialStudents = EMPTY_ARRAY, 
   allStudents: initialAllStudents, 
-  subjects: initialSubjects = [], 
+  subjects: initialSubjects = EMPTY_ARRAY, 
   notify, 
   onOpenCoursePage,
   onOpenClassPage,
   schoolId: propSchoolId,
   userRole,
-  assignedClassIds: propAssignedClassIds = [],
-  assignedCourseIds: propAssignedCourseIds = []
+  assignedClassIds: propAssignedClassIds = EMPTY_ARRAY,
+  assignedCourseIds: propAssignedCourseIds = EMPTY_ARRAY
 }) => {
   const isTeacher = React.useMemo(() => userRole?.toLowerCase() === 'teacher', [userRole]);
   const [classes, setClasses] = React.useState<ClassRow[]>([]);
@@ -112,16 +119,6 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
   const [editCourseImage, setEditCourseImage] = React.useState<File | null>(null);
   const [editCourseError, setEditCourseError] = React.useState<string | null>(null);
   const editCourseImageInputRef = React.useRef<HTMLInputElement | null>(null);
-
-  const [contextType, setContextType] = React.useState<AttendanceContextType>('class');
-  const [selectedAttendanceContextId, setSelectedAttendanceContextId] = React.useState<string>('');
-  const [attendanceDate, setAttendanceDate] = React.useState(getTodayIsoDate());
-  const [attendanceMap, setAttendanceMap] = React.useState<Record<string, AttendanceStatus>>({});
-  const [isAttendanceLoading, setIsAttendanceLoading] = React.useState(false);
-  const [isAttendanceSaving, setIsAttendanceSaving] = React.useState(false);
-  const [deletingAttendanceStudentId, setDeletingAttendanceStudentId] = React.useState<string | null>(null);
-  const [linkedAttendanceStudents, setLinkedAttendanceStudents] = React.useState<AttendanceStudent[]>([]);
-  const [isLinkedAttendanceStudentsLoading, setIsLinkedAttendanceStudentsLoading] = React.useState(false);
 
   // Self-Fetching Logic for Students and Subjects (Courses)
   const [internalStudents, setInternalStudents] = React.useState<Student[]>(initialStudents);
@@ -365,61 +362,6 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
     void loadClassCourses(selectedClassId);
   }, [selectedClassId, loadClassCourses]);
 
-  React.useEffect(() => {
-    if (contextType === 'class' && selectedClassId) {
-      setSelectedAttendanceContextId(String(selectedClassId));
-    }
-  }, [contextType, selectedClassId]);
-
-  const loadLinkedAttendanceStudents = React.useCallback(async () => {
-    if (!selectedAttendanceContextId) {
-      setLinkedAttendanceStudents([]);
-      return;
-    }
-
-    const filterColumn = contextType === 'class' ? 'class_id' : 'class_course_id';
-    setIsLinkedAttendanceStudentsLoading(true);
-
-    if (!supabase) {
-      setIsLinkedAttendanceStudentsLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .schema('public')
-      .from('class_course_students')
-      .select('student_id, student_name, created_at')
-      .eq(filterColumn, selectedAttendanceContextId)
-      .order('created_at', { ascending: true });
-
-    setIsLinkedAttendanceStudentsLoading(false);
-
-    if (error) {
-      console.error('Failed to load linked attendance students:', error);
-      setLinkedAttendanceStudents([]);
-      return;
-    }
-
-    const seen = new Set<string>();
-    const mapped: AttendanceStudent[] = [];
-
-    (data || []).forEach((row: any) => {
-      const id = String(row?.student_id || '').trim();
-      if (!id || seen.has(id)) return;
-      seen.add(id);
-      mapped.push({
-        id,
-        name: String(row?.student_name || '').trim() || id,
-      });
-    });
-
-    setLinkedAttendanceStudents(mapped);
-  }, [contextType, selectedAttendanceContextId]);
-
-  React.useEffect(() => {
-    void loadLinkedAttendanceStudents();
-  }, [loadLinkedAttendanceStudents]);
-
   const createClassCourse = async () => {
     if (!selectedClassId) {
       setNewCourseError('Select class first.');
@@ -530,255 +472,6 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
     if (selectedClassId) await loadClassCourses(selectedClassId);
   };
 
-  const activeContextList = React.useMemo(
-    () => (contextType === 'class'
-      ? classes.map(classItem => ({ id: String(classItem.id), name: String(classItem.name || '') }))
-      : internalSubjects),
-    [contextType, classes, internalSubjects]
-  );
-
-  React.useEffect(() => {
-    if (!activeContextList.length) {
-      setSelectedAttendanceContextId('');
-      return;
-    }
-
-    const exists = activeContextList.some(item => String(item.id) === String(selectedAttendanceContextId));
-    if (!exists) {
-      setSelectedAttendanceContextId(String(activeContextList[0].id));
-    }
-  }, [activeContextList, selectedAttendanceContextId]);
-
-  const fallbackAttendanceStudents = React.useMemo(() => {
-    if (!selectedAttendanceContextId) return [] as Student[];
-
-    if (contextType === 'class') {
-      const selectedClassForAttendance = classes.find(classItem => String(classItem.id) === String(selectedAttendanceContextId));
-      const classStudentIds = (selectedClassForAttendance?.student_ids || []).map(id => String(id));
-      const sourceStudents = initialAllStudents && initialAllStudents.length > 0 ? initialAllStudents : internalStudents;
-      return sourceStudents.filter(student => classStudentIds.includes(String(student.id)));
-    }
-
-    return internalStudents;
-  }, [selectedAttendanceContextId, contextType, classes, initialAllStudents, internalStudents]);
-
-  const activeAttendanceStudents = React.useMemo(() => {
-    if (linkedAttendanceStudents.length > 0) {
-      return linkedAttendanceStudents;
-    }
-
-    return fallbackAttendanceStudents.map(student => ({
-      id: String(student.id),
-      name: String(student.name || ''),
-      email: String(student.email || ''),
-    }));
-  }, [linkedAttendanceStudents, fallbackAttendanceStudents]);
-
-  const loadAttendance = React.useCallback(async () => {
-    if (!selectedAttendanceContextId || !attendanceDate) return;
-
-    setIsAttendanceLoading(true);
-
-    const contextTypeCandidates = contextType === 'class'
-      ? ['class', 'batch']
-      : ['subject', 'course', 'class_course'];
-
-    if (!supabase) {
-      setIsAttendanceLoading(false);
-      return;
-    }
-
-    const { schoolId } = await getCurrentTenantContext();
-    const primaryResult = await supabase
-      .schema('public')
-      .from('attendance_records')
-      .select('student_id, status, context_type')
-      .in('context_type', contextTypeCandidates)
-      .eq('context_id', selectedAttendanceContextId)
-      .eq('attendance_date', attendanceDate)
-      .eq('school_id', schoolId);
-
-    let data: any[] | null = (primaryResult.data as any[] | null);
-    let error = primaryResult.error;
-
-    if (!error && (!data || data.length === 0)) {
-       if (!supabase) {
-        setIsAttendanceLoading(false);
-        return;
-      }
-      const { schoolId } = await getCurrentTenantContext();
-      const fallbackResult = await supabase
-        .schema('public')
-        .from('attendance_records')
-        .select('student_id, status')
-        .eq('context_id', selectedAttendanceContextId)
-        .eq('attendance_date', attendanceDate)
-        .eq('school_id', schoolId);
-
-      data = (fallbackResult.data as any[] | null);
-      error = fallbackResult.error;
-    }
-
-    setIsAttendanceLoading(false);
-
-    if (error) {
-      safeNotify(`Failed to load attendance: ${error.message}`);
-      return;
-    }
-
-    const nextMap: Record<string, AttendanceStatus> = {};
-    (data || []).forEach((row: any) => {
-      const normalizedStatus = normalizeAttendanceStatus(row.status);
-      if (!normalizedStatus) return;
-      nextMap[String(row.student_id)] = normalizedStatus;
-    });
-
-    setAttendanceMap(nextMap);
-  }, [selectedAttendanceContextId, attendanceDate, contextType, safeNotify]);
-
-  React.useEffect(() => {
-    void loadAttendance();
-  }, [loadAttendance]);
-
-  const saveSingleAttendance = async (studentId: string, status: AttendanceStatus) => {
-    if (!selectedAttendanceContextId || !attendanceDate) return;
-
-    setIsAttendanceSaving(true);
-    try {
-      const { schoolId } = await getCurrentTenantContext();
-
-      const payload = withSchoolId({
-        context_type: contextType,
-        context_id: selectedAttendanceContextId,
-        attendance_date: attendanceDate,
-        student_id: String(studentId),
-        status,
-      }, schoolId);
-
-      if (!supabase) throw new Error('Supabase client not initialized.');
-      const upsertResult = await supabase
-        .from('attendance_records')
-        .upsert([payload], { onConflict: 'context_type,context_id,attendance_date,student_id' });
-
-      if (upsertResult.error) {
-        safeNotify(`Failed to save attendance: ${upsertResult.error.message}`);
-        return;
-      }
-
-      setAttendanceMap(prev => ({ ...prev, [String(studentId)]: status }));
-    } catch (e: any) {
-      safeNotify(`Save failed: ${e.message}`);
-    } finally {
-      setIsAttendanceSaving(false);
-    }
-  };
-
-  const markAllPresent = async () => {
-    if (!selectedAttendanceContextId || !attendanceDate || activeAttendanceStudents.length === 0) {
-      safeNotify('No students available to mark.');
-      return;
-    }
-
-    setIsAttendanceSaving(true);
-    try {
-      const { schoolId } = await getCurrentTenantContext();
-
-      const payload = activeAttendanceStudents.map(student => withSchoolId({
-        context_type: contextType,
-        context_id: selectedAttendanceContextId,
-        attendance_date: attendanceDate,
-        student_id: String(student.id),
-        status: 'P' as const,
-      }, schoolId));
-
-      if (!supabase) throw new Error('Supabase client not initialized.');
-      const upsertResult = await supabase
-        .from('attendance_records')
-        .upsert(payload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
-
-      if (upsertResult.error) {
-        safeNotify(`Failed to bulk save attendance: ${upsertResult.error.message}`);
-        return;
-      }
-
-      const nextMap: Record<string, AttendanceStatus> = {};
-      activeAttendanceStudents.forEach(student => {
-        nextMap[String(student.id)] = 'P';
-      });
-
-      setAttendanceMap(nextMap);
-      safeNotify('All students marked Present.');
-    } catch (e: any) {
-      safeNotify(`Bulk save failed: ${e.message}`);
-    } finally {
-      setIsAttendanceSaving(false);
-    }
-  };
-
-  const removeAttendanceStudent = async (studentId: string) => {
-    if (!selectedAttendanceContextId) {
-      safeNotify('No attendance context selected.');
-      return;
-    }
-
-    setDeletingAttendanceStudentId(studentId);
-
-    try {
-      if (!supabase) throw new Error('Supabase client not initialized.');
-      if (contextType === 'class') {
-        const { schoolId } = await getCurrentTenantContext();
-        const enrollmentDelete = await supabase
-          .from('class_course_students')
-          .delete()
-          .eq('class_id', selectedAttendanceContextId)
-          .eq('student_id', studentId)
-          .eq('school_id', schoolId);
-
-        if (enrollmentDelete.error) throw enrollmentDelete.error;
-      } else {
-        const { schoolId } = await getCurrentTenantContext();
-        const enrollmentDelete = await supabase
-          .from('class_course_students')
-          .delete()
-          .eq('class_course_id', selectedAttendanceContextId)
-          .eq('student_id', studentId)
-          .eq('school_id', schoolId);
-
-        if (enrollmentDelete.error) throw enrollmentDelete.error;
-      }
-
-      const contextTypeCandidates = contextType === 'class'
-        ? ['class', 'batch']
-        : ['subject', 'course', 'class_course'];
-
-      const { schoolId } = await getCurrentTenantContext();
-      const attendanceDelete = await supabase
-        .from('attendance_records')
-        .delete()
-        .eq('context_id', selectedAttendanceContextId)
-        .eq('student_id', studentId)
-        .in('context_type', contextTypeCandidates)
-        .eq('school_id', schoolId);
-
-      if (attendanceDelete.error) {
-        console.error('Failed to delete attendance records:', attendanceDelete.error);
-      }
-
-      setAttendanceMap(prev => {
-        const next = { ...prev };
-        delete next[studentId];
-        return next;
-      });
-
-      await loadLinkedAttendanceStudents();
-      safeNotify('Student removed from Supabase successfully.');
-    } catch (error: any) {
-      safeNotify(`Delete failed: ${error?.message || 'Unknown error'}`);
-    } finally {
-      setDeletingAttendanceStudentId(null);
-    }
-  };
-
   return (
     <div className="space-y-12 animate-fadeIn text-slate-800">
       {/* HEADER SECTION */}
@@ -789,7 +482,8 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
         </div>
         {isTeacher && (
           <button
-            onClick={() => { setEditingClassId(null); setClassName(''); setIsClassFormOpen(true); }}
+            type="button" onClick={() => { setEditingClassId(null); setClassName(''); setIsClassFormOpen(true); }}
+            aria-label="Open Form Hub"
             className="group relative px-10 py-5 rounded-[24px] bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
           >
             <i className="fa-solid fa-plus-circle text-slate-600 group-hover:text-slate-900 transition-colors"></i> 
@@ -798,309 +492,75 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
         )}
       </header>
 
-      {/* CREATE CLASS SECTION */}
-      {isClassFormOpen && (
-        <div className="bg-white/10 backdrop-blur-2xl shadow-premium p-10 rounded-[40px] border border-white/20 animate-slideIn">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#4ea59d]">Class Identity</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Grade 10-A, Computer Science 2024"
-                  value={className}
-                  onChange={(e) => setClassName(e.target.value)}
-                  className="w-full bg-[#0a1a19] border border-white/10 p-5 rounded-[24px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all"
-                />
-              </div>
+      <ClassForm
+        className={className}
+        setClassName={setClassName}
+        classOuterColor={classOuterColor}
+        setClassOuterColor={setClassOuterColor}
+        isClassFormOpen={isClassFormOpen}
+        setIsClassFormOpen={setIsClassFormOpen}
+        editingClassId={editingClassId}
+        resetClassForm={resetClassForm}
+        createOrUpdateClass={createOrUpdateClass}
+        classImageInputRef={classImageInputRef}
+        classImage={classImage}
+        setClassImage={setClassImage}
+      />
 
-              <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#4ea59d]">Visual Identity (Optional)</label>
-                <div className="bg-[#0a1a19] rounded-[24px] border border-white/10 p-5 flex items-center gap-4">
-                  <div 
-                     className="w-14 h-14 rounded-2xl flex items-center justify-center cursor-pointer border border-white/10"
-                     style={{ backgroundColor: classOuterColor }}
-                     onClick={() => document.getElementById('colorPicker')?.click()}
-                  >
-                    <i className="fas fa-palette text-slate-600"></i>
-                    <input
-                      id="colorPicker"
-                      type="color"
-                      value={classOuterColor}
-                      onChange={(e) => setClassOuterColor(e.target.value)}
-                      className="hidden"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <button
-                      type="button"
-                      onClick={() => classImageInputRef.current?.click()}
-                      className="w-full py-4 rounded-xl bg-white/5 border border-white/10 text-slate-900 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
-                    >
-                      {classImage ? 'Change Image' : 'Add Cover Image'}
-                    </button>
-                    <input
-                      ref={classImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) setClassImage(e.target.files[0]);
-                      }}
-                      className="hidden"
-                    />
-                    {classImage && <p className="mt-2 text-[9px] text-[#4ea59d] font-bold uppercase truncate">Selected: {classImage.name}</p>}
-                  </div>
-                </div>
-              </div>
-            </div>
+      <ClassesGrid
+        classes={classes}
+        filteredClasses={filteredClasses}
+        classSearchQuery={classSearchQuery}
+        setClassSearchQuery={setClassSearchQuery}
+        selectedClassId={selectedClassId}
+        setSelectedClassId={setSelectedClassId}
+        onOpenClassPage={onOpenClassPage}
+        isTeacher={isTeacher}
+        startEditClass={startEditClass}
+        deleteClass={deleteClass}
+      />
 
-            <div className="p-8 bg-[#0a1a19]/50 rounded-[32px] border border-white/5 flex flex-col justify-between">
-              <div>
-                <h4 className="text-sm font-black text-slate-900 uppercase mb-4">Creation Preview</h4>
-                <div className="p-6 rounded-3xl border border-white/10" style={{ backgroundColor: '#0a1a19' }}>
-                   <div 
-                      className="w-full aspect-video rounded-2xl mb-4 border border-white/5 flex items-center justify-center overflow-hidden" 
-                      style={{ backgroundColor: classOuterColor }}
-                    >
-                      {classImage ? (
-                        <img src={URL.createObjectURL(classImage)} className="w-full h-full object-cover" alt="preview" />
-                      ) : (
-                        <i className="fas fa-graduation-cap text-3xl text-slate-400"></i>
-                      )}
-                   </div>
-                   <p className="font-black text-lg">{className || 'Your Class Name'}</p>
-                   <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mt-1">Ready for registration</p>
-                </div>
-              </div>
+      <CoursesSection
+        selectedClass={selectedClass}
+        classCourses={classCourses}
+        isClassCoursesLoading={isClassCoursesLoading}
+        deletingCourseId={deletingCourseId}
+        onOpenCoursePage={onOpenCoursePage}
+        isTeacher={isTeacher}
+        safeNotify={safeNotify}
+        setIsCreateCourseModalOpen={setIsCreateCourseModalOpen}
+        openEditCourseModal={openEditCourseModal}
+      />
 
-              <div className="flex gap-4 mt-8">
-                 <button
-                    onClick={resetClassForm}
-                    className="flex-1 py-4 rounded-[20px] bg-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-900 transition-all"
-                  >
-                    Discard
-                  </button>
-                  <button
-                    onClick={() => void createOrUpdateClass()}
-                    className="flex-[2] py-4 rounded-[20px] bg-[#4ea59d] text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-[#4ea59d]/20 active:scale-95 transition-all"
-                  >
-                    {editingClassId ? 'Save Changes' : 'Confirm Registration'}
-                  </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreateCourseModal
+        isOpen={isCreateCourseModalOpen}
+        onClose={() => setIsCreateCourseModalOpen(false)}
+        newCourseName={newCourseName}
+        setNewCourseName={setNewCourseName}
+        newCourseImage={newCourseImage}
+        setNewCourseImage={setNewCourseImage}
+        newCourseError={newCourseError}
+        setNewCourseError={setNewCourseError}
+        newCourseImageInputRef={newCourseImageInputRef}
+        createClassCourse={createClassCourse}
+        isCreating={isClassCourseCreating}
+      />
 
-      {/* SEARCH AND GRID SECTION */}
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-           <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#4ea59d]/60">Active Formations ({classes.length})</p>
-           <div className="relative w-full md:w-80">
-              <i className="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-[#4ea59d]/40 text-xs"></i>
-              <input
-                type="text"
-                value={classSearchQuery}
-                onChange={(e) => setClassSearchQuery(e.target.value)}
-                placeholder="Lookup classes..."
-                className="w-full bg-white/5 border border-white/10 p-4 pl-12 rounded-[20px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all text-sm"
-              />
-           </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredClasses.map((classItem) => {
-            const isActive = selectedClassId === String(classItem.id);
-            return (
-              <div
-                key={classItem.id}
-                onClick={() => {
-                  setSelectedClassId(String(classItem.id));
-                  if (onOpenClassPage) {
-                    onOpenClassPage(classItem);
-                  }
-                }}
-                className={`group relative rounded-[32px] border transition-all cursor-pointer overflow-hidden ${isActive ? 'border-[#4ea59d] bg-[#4ea59d]/10' : 'border-white/10 bg-white/5 hover:border-[#4ea59d]/50 shadow-none hover:shadow-2xl hover:shadow-[#000]/20'}`}
-              >
-                {/* ACTIONS OVERLAY */}
-                {isTeacher && (
-                  <div className="absolute top-4 right-4 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); startEditClass(classItem); }}
-                      className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-slate-900 border border-white/20 hover:bg-[#4ea59d] flex items-center justify-center transition-all"
-                    >
-                      <i className="fas fa-pen text-[10px]"></i>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); void deleteClass(String(classItem.id)); }}
-                      className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-slate-900 border border-white/20 hover:bg-rose-500 flex items-center justify-center transition-all"
-                    >
-                      <i className="fas fa-trash text-[10px]"></i>
-                    </button>
-                  </div>
-                )}
-
-                <div 
-                   className="w-full aspect-[4/3] relative overflow-hidden flex items-center justify-center"
-                   style={{ backgroundColor: classItem.outer_color || classItem.color || '#134e4a' }}
-                >
-                  {classItem.image_url ? (
-                    <img src={classItem.image_url} alt={classItem.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                  ) : (
-                    <div className="text-slate-400 text-4xl"><i className="fas fa-building-columns"></i></div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
-                </div>
-
-                <div className="p-6 space-y-3 relative">
-                  <h4 className="font-black text-slate-900 text-lg tracking-tight truncate">{classItem.name}</h4>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-3 py-1 rounded-lg bg-black/20 border border-white/5 text-[8px] font-black uppercase text-slate-400 tracking-widest">{classItem.class_code || 'CLASS-ID'}</span>
-                    <span className="px-3 py-1 rounded-lg bg-[#4ea59d]/20 border border-[#4ea59d]/20 text-[8px] font-black uppercase text-[#4ea59d] tracking-widest">{classItem.student_count || 0} Students</span>
-                  </div>
-                </div>
-                
-                {isActive && <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#4ea59d]"></div>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* COURSES (SUBJECTS) SECTION */}
-      {selectedClass && (
-        <div className="space-y-8 p-10 bg-white/5 backdrop-blur-3xl rounded-[48px] border border-white/10 animate-fadeIn">
-          <header className="flex justify-between items-center">
-             <div>
-                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Academic Curricula</h3>
-                <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[0.3em] mt-1">Managed Courses for {selectedClass.name}</p>
-             </div>
-             {isTeacher && (
-               <button
-                  onClick={() => setIsCreateCourseModalOpen(true)}
-                  className="w-12 h-12 rounded-2xl bg-[#4ea59d] text-slate-900 shadow-lg shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
-                >
-                  <i className="fas fa-plus"></i>
-                </button>
-             )}
-          </header>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
-             {isClassCoursesLoading ? (
-               <div className="col-span-full p-20 flex flex-col items-center justify-center text-slate-500 gap-4">
-                  <i className="fas fa-circle-notch fa-spin text-3xl text-[#4ea59d]"></i>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Building Catalog...</p>
-               </div>
-             ) : classCourses.length === 0 ? (
-                <div className="col-span-full p-20 border-2 border-dashed border-white/5 rounded-[40px] text-center space-y-4">
-                   <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">No courses found in this formation</p>
-                   <button onClick={() => setIsCreateCourseModalOpen(true)} className="text-[#4ea59d] text-[9px] font-black uppercase underline decoration-2 underline-offset-4">Initialize Curriculum</button>
-                </div>
-             ) : classCourses.map(course => (
-              <div
-                key={course.id}
-                className="group bg-white rounded-[32px] overflow-hidden border border-slate-100 hover:border-[#4ea59d]/40 transition-all hover:-translate-y-2 relative shadow- premium text-slate-800"
-              >
-                {isTeacher && (
-                  <div className="absolute top-8 right-8 z-10 flex gap-4 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => openEditCourseModal(course)} className="w-10 h-10 rounded-xl bg-white/90 backdrop-blur-md text-slate-600 border border-slate-200 hover:bg-[#4ea59d] hover:text-white flex items-center justify-center transition-all shadow-lg">
-                       <i className="fas fa-pen text-[12px]"></i>
-                    </button>
-                  </div>
-                )}
-
-                <div 
-                  onClick={() => {
-                    if (onOpenCoursePage) {
-                      onOpenCoursePage({ id: course.id, name: course.name, classId: course.class_id, className: selectedClass.name });
-                    } else {
-                      safeNotify('Course selector is not bound.');
-                    }
-                  }}
-                  className="cursor-pointer space-y-10"
-                >
-                  <div className="w-full aspect-video bg-slate-50 overflow-hidden relative">
-                    {course.image_url ? (
-                      <img src={course.image_url} alt={course.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-slate-100">
-                        <i className="fas fa-book-open text-slate-300 text-5xl"></i>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-br from-black/10 via-transparent to-transparent"></div>
-                  </div>
-                  <div className="p-8 space-y-4">
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1.5">Course</p>
-                      <h4 className="text-2xl font-black text-[#4ea59d] leading-tight group-hover:text-slate-900 transition-colors line-clamp-1 uppercase tracking-tighter">{course.name}</h4>
-                    </div>
-                    <div className="flex items-center justify-between pt-6 border-t border-slate-50 mt-4">
-                      <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest group-hover:text-slate-900 transition-colors">Catalog Entry</span>
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-[#4ea59d] group-hover:bg-[#4ea59d] group-hover:text-white transition-all shadow-sm">
-                        <i className="fas fa-arrow-right text-[10px]"></i>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* MODALS (Simplified Aesthetics for Speed) */}
-      {isCreateCourseModalOpen && (
-        <div className="fixed inset-0 z-[1000] glass-panel bg-black/60 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-[#0a1a19] rounded-[40px] border border-white/10 p-10 space-y-8 animate-fadeIn">
-             <header className="flex justify-between items-center">
-                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Add Course</h3>
-                <button onClick={() => setIsCreateCourseModalOpen(false)} className="text-slate-500 hover:text-slate-900 transition-colors"><i className="fas fa-times"></i></button>
-             </header>
-             <div className="space-y-6">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#4ea59d]">Curriculum Title</label>
-                  <input
-                    type="text"
-                    value={newCourseName}
-                    onChange={(e) => { setNewCourseName(e.target.value); if (newCourseError) setNewCourseError(null); }}
-                    placeholder="Enter course name"
-                    className="w-full bg-white/5 border border-white/10 p-5 rounded-[24px] outline-none font-bold text-slate-900 focus:border-[#4ea59d] transition-all"
-                  />
-                  {newCourseError && <p className="text-[10px] font-bold text-rose-500 px-2">{newCourseError}</p>}
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-[#4ea59d]">Course Illustration</label>
-                  <div className="bg-white/5 rounded-[24px] border border-white/10 p-5">
-                    <button
-                      type="button"
-                      onClick={() => newCourseImageInputRef.current?.click()}
-                      className="w-full py-4 rounded-xl bg-white/5 text-slate-900 text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
-                    >
-                      {newCourseImage ? 'Change Image' : 'Select Graphic'}
-                    </button>
-                    <input
-                      ref={newCourseImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => { if (e.target.files?.[0]) setNewCourseImage(e.target.files[0]); }}
-                      className="hidden"
-                    />
-                    {newCourseImage && <p className="mt-2 text-[9px] text-[#4ea59d] font-bold uppercase truncate">Selected: {newCourseImage.name}</p>}
-                  </div>
-                </div>
-             </div>
-             <button
-                onClick={() => void createClassCourse()}
-                disabled={isClassCourseCreating}
-                className="w-full py-5 rounded-[24px] bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isClassCourseCreating ? 'Registering...' : 'Add to Catalog'}
-              </button>
-          </div>
-        </div>
-      )}
-
-      {/* ATTENDANCE SECTION REMOVED FROM MAIN MANAGER AS REQUESTED */}
+      <EditCourseModal
+        isOpen={isEditCourseModalOpen}
+        onClose={closeEditCourseModal}
+        editCourseName={editCourseName}
+        setEditCourseName={setEditCourseName}
+        editCourseCurrentImageUrl={editCourseCurrentImageUrl}
+        setEditCourseCurrentImageUrl={setEditCourseCurrentImageUrl}
+        editCourseImage={editCourseImage}
+        setEditCourseImage={setEditCourseImage}
+        editCourseError={editCourseError}
+        setEditCourseError={setEditCourseError}
+        editCourseImageInputRef={editCourseImageInputRef}
+        saveCourseEdits={saveCourseEdits}
+        isUpdating={isClassCourseUpdating}
+      />
     </div>
   );
 };

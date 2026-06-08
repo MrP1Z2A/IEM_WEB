@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { fetchEvents, fetchStudentActivities, fetchParentAnnouncements, fetchLiveIntel } from '../services/smsService';
 import { Calendar, Tag, ExternalLink, ChevronRight, Bell, Loader2 } from 'lucide-react';
 
@@ -7,7 +7,7 @@ interface CommunicationsProps {
 }
 
 const Communications: React.FC<CommunicationsProps> = ({ schoolId }) => {
-  const [events, setEvents] = useState<any[]>([]);
+  const eventsRef = useRef<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [intel, setIntel] = useState<any[]>([]);
@@ -24,7 +24,7 @@ const Communications: React.FC<CommunicationsProps> = ({ schoolId }) => {
           fetchParentAnnouncements(schoolId),
           fetchLiveIntel(schoolId)
         ]);
-        setEvents(evs);
+        eventsRef.current = evs;
         setActivities(acts);
         setAnnouncements(anns);
         setIntel(intels);
@@ -182,7 +182,7 @@ const Communications: React.FC<CommunicationsProps> = ({ schoolId }) => {
           </div>
 
           {intel.length > 0 && (
-            <button className="mt-10 w-full py-4 bg-emerald-900/50 text-emerald-100 font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] border border-white/5 hover:bg-emerald-900 transition-all hover:border-emerald-500/30 active:scale-95 shadow-lg">
+            <button className="mt-10 w-full py-4 bg-emerald-900/50 text-emerald-100 font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] border border-white/5 hover:bg-emerald-900 transition-all hover:border-emerald-500/30 active:scale-95 shadow-lg" type="button">
               Historical Log
             </button>
           )}

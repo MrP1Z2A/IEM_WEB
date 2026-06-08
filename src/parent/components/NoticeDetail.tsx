@@ -19,7 +19,7 @@ const NoticeDetail: React.FC<NoticeDetailProps> = ({ notice, onBack }) => {
         <button
           onClick={onBack}
           className="group flex items-center gap-2 text-slate-500 hover:text-brand-600 font-bold transition-all active:scale-95"
-        >
+         type="button">
           <div className="p-2 bg-white rounded-xl border border-slate-100 group-hover:border-emerald-100 group-hover:bg-emerald-50 transition-all">
             <ArrowLeft className="w-5 h-5" />
           </div>
@@ -27,10 +27,10 @@ const NoticeDetail: React.FC<NoticeDetailProps> = ({ notice, onBack }) => {
         </button>
 
         <div className="flex gap-2">
-          <button className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-emerald-600 transition-all shadow-sm">
+          <button className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-emerald-600 transition-all shadow-sm" type="button">
             <Printer className="w-5 h-5" />
           </button>
-          <button className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-emerald-600 transition-all shadow-sm">
+          <button className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-emerald-600 transition-all shadow-sm" type="button">
             <Share2 className="w-5 h-5" />
           </button>
         </div>

@@ -57,10 +57,11 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ schoolName, onLoginSuccess, onB
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Corporate Email</label>
+              <label htmlFor="corporateEmail" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Corporate Email</label>
               <div className="relative group">
                 <i className="fas fa-envelope absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-brand-500 transition-colors"></i>
                 <input
+                  id="corporateEmail"
                   required
                   type="email"
                   value={email}
@@ -73,10 +74,11 @@ const StaffLogin: React.FC<StaffLoginProps> = ({ schoolName, onLoginSuccess, onB
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Secure Password</label>
+              <label htmlFor="securePassword" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Secure Password</label>
               <div className="relative group">
                 <i className="fas fa-lock absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-brand-500 transition-colors"></i>
                 <input
+                  id="securePassword"
                   required
                   type="password"
                   value={password}

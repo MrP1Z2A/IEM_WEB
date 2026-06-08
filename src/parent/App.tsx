@@ -77,7 +77,7 @@ const Sidebar = ({
           <button
             onClick={onClose}
             className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-all"
-          >
+           type="button">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -89,7 +89,7 @@ const Sidebar = ({
             return (
               <button
                 key={item.id}
-                onClick={() => { setView(item.id); if (window.innerWidth < 768) onClose(); }}
+                type="button" onClick={() => { setView(item.id); if (window.innerWidth < 768) onClose(); }}
                 className={`
                   w-full group flex items-center justify-between px-4 py-3.5 rounded-xl
                   transition-all duration-200 text-sm font-bold whitespace-nowrap
@@ -112,8 +112,8 @@ const Sidebar = ({
         <div className="px-4 pb-5 border-t border-slate-800/60 shrink-0 pt-4">
           <button
             onClick={onLogout}
-            className="w-full flex items-center space-x-3 px-4 py-3.5 text-slate-500 hover:text-rose-400 rounded-xl hover:bg-rose-400/10 transition-all font-bold text-sm"
-          >
+            className="w-full flex items-center space-x-3 px-4 py-3.5 text-white hover:text-rose-400 rounded-xl hover:bg-rose-400/10 transition-all font-bold text-sm"
+           type="button">
             <LogOut className="w-5 h-5" />
             <span>Sign Out</span>
           </button>
@@ -123,6 +123,7 @@ const Sidebar = ({
       {/* Overlay (mobile) */}
       {isOpen && (
         <div
+          role="presentation"
           className="fixed inset-0 z-[90] bg-slate-900/50 backdrop-blur-sm md:hidden"
           onClick={onClose}
         />
@@ -148,13 +149,13 @@ const Header = ({
         onClick={onMenuClick}
         title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
         className="p-2.5 bg-slate-50 hover:bg-brand-50 rounded-xl text-slate-500 hover:text-brand-600 border border-slate-100 hover:border-brand-100 active:scale-95 transition-all shadow-sm"
-      >
+       type="button">
         {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
 
       {/* Switch Environment Button */}
       <button
-        onClick={() => { (window as any).switchEnvironment?.() }}
+        type="button" onClick={() => { (window as any).switchEnvironment?.() }}
         title="Switch Environment"
         className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white border border-slate-700 active:scale-95 transition-all shadow-md flex items-center gap-2"
       >

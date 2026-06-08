@@ -355,8 +355,8 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
           </div>
         </div>
         <button
-          onClick={() => { setIsEditorOpen(true); setEditingExamId(null); }}
-          className="px-8 py-4 bg-[#4ea59d] text-slate-900 rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3"
+          type="button" onClick={() => { setIsEditorOpen(true); setEditingExamId(null); }}
+          className="px-8 py-4 bg-[#4ea59d] text-white rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3"
         >
           <i className="fa-solid fa-plus"></i> Create New Exam
         </button>
@@ -382,7 +382,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
             <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Search Assessments</label>
             <div className="relative">
               <i className="fa-solid fa-magnifying-glass absolute left-6 top-1/2 -translate-y-1/2 text-slate-500"></i>
-              <input
+              <input aria-label="Action"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -414,8 +414,8 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
             filteredExams.map(exam => (
               <div key={exam.id} className="group bg-white/5 hover:bg-white/10 backdrop-blur-2xl rounded-[40px] border border-white/10 hover:border-[#4ea59d]/50 p-8 transition-all flex flex-col h-full relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => openEditEditor(exam)} className="w-8 h-8 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center hover:bg-orange-500/40 transition-all"><i className="fa-solid fa-pen-to-square"></i></button>
-                  <button onClick={() => deleteExam(exam.id)} disabled={deletingExamId === exam.id} className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center hover:bg-rose-500/40 transition-all">{deletingExamId === exam.id ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-trash"></i>}</button>
+                  <button aria-label="Action" type="button" onClick={() => openEditEditor(exam)} className="w-8 h-8 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center hover:bg-orange-500/40 transition-all"><i className="fa-solid fa-pen-to-square"></i></button>
+                  <button type="button" onClick={() => deleteExam(exam.id)} disabled={deletingExamId === exam.id} className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center hover:bg-rose-500/40 transition-all">{deletingExamId === exam.id ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-trash"></i>}</button>
                 </div>
 
                 <div className="space-y-4 flex-1">
@@ -429,14 +429,14 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
 
                 <div className="mt-8 pt-6 border-t border-white/5 grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => loadGradingData(exam)}
-                    className="flex-1 py-3 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-[#3d8c85] shadow-lg shadow-[#4ea59d]/20"
+                    type="button" onClick={() => loadGradingData(exam)}
+                    className="flex-1 py-3 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-[#3d8c85] shadow-lg shadow-[#4ea59d]/20"
                   >
                     Grade Students
                   </button>
                   {exam.file_url ? (
                     <button
-                      onClick={() => window.open(exam.file_url!, '_blank')}
+                      type="button" onClick={() => window.open(exam.file_url!, '_blank')}
                       className="py-3 bg-white/5 border border-white/10 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
                     >
                       Question Paper
@@ -456,7 +456,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
       {/* Editor Modal */}
       {isEditorOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={closeEditor}></div>
+          <div role="presentation" className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" onClick={closeEditor}></div>
           <div className="relative w-full max-w-2xl bg-[#0a1a19] border border-white/10 rounded-[48px] shadow-3xl overflow-hidden animate-zoomIn flex flex-col max-h-[90vh]">
             <div className="p-10 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
               <div className="flex justify-between items-start">
@@ -464,13 +464,13 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                   <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.4em]">{editingExamId ? 'Update Record' : 'Fresh Evaluation'}</p>
                   <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tight">{editingExamId ? 'Modify Assessment' : 'New Exam Protocol'}</h3>
                 </div>
-                <button onClick={closeEditor} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-slate-900 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 transition-all"><i className="fa-solid fa-xmark"></i></button>
+                <button aria-label="Action" onClick={closeEditor} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 transition-all" type="button"><i className="fa-solid fa-xmark"></i></button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Assessment Title</label>
-                  <input
+                  <input aria-label="Action"
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
@@ -498,30 +498,30 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                     <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Question Paper (PDF)</label>
                     <div className="flex items-center gap-4">
                       <button
-                        onClick={() => fileInputRef.current?.click()}
+                        type="button" onClick={() => fileInputRef.current?.click()}
                         className="flex-1 py-4 bg-white/5 border-2 border-dashed border-white/10 hover:border-[#4ea59d]/50 rounded-2xl text-slate-400 text-xs font-bold uppercase flex items-center justify-center gap-3 transition-all"
                       >
                         {selectedPdfFile ? <i className="fa-solid fa-file-pdf text-[#4ea59d]"></i> : <i className="fa-solid fa-cloud-arrow-up"></i>}
                         {selectedPdfFile ? selectedPdfFile.name : 'Choose File'}
                       </button>
                     </div>
-                    <input type="file" ref={fileInputRef} onChange={handlePickPdfFile} accept=".pdf" className="hidden" />
+                    <input aria-label="Action" type="file" ref={fileInputRef} onChange={handlePickPdfFile} accept=".pdf" className="hidden" />
                   </div>
                 )}
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Exam Date</label>
-                  <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none" />
+                  <input aria-label="Action" type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none" />
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Starting Time</label>
-                  <input type="time" value={examTime} onChange={(e) => setExamTime(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none" />
+                  <input aria-label="Action" type="time" value={examTime} onChange={(e) => setExamTime(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-slate-900 font-bold focus:border-[#4ea59d] transition-all outline-none" />
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Instructions / Summary</label>
-                  <textarea
+                  <textarea aria-label="Action"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={4}
@@ -535,8 +535,8 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
                 <button
                   onClick={saveExam}
                   disabled={isSavingExam}
-                  className="w-full py-5 bg-[#4ea59d] text-slate-900 rounded-[24px] text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-[#4ea59d]/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
-                >
+                  className="w-full py-5 bg-[#4ea59d] text-white rounded-[24px] text-xs font-black uppercase tracking-[0.3em] shadow-xl shadow-[#4ea59d]/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+                 type="button">
                   {isSavingExam ? <span className="flex items-center justify-center gap-3"><i className="fa-solid fa-spinner animate-spin"></i> Finalizing Details...</span> : (editingExamId ? 'Update Assessment Protocol' : 'Deploy Assessment Protocol')}
                 </button>
               </div>

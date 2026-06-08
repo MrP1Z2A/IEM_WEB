@@ -95,10 +95,10 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
             <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Crop Image</h3>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Adjust the area you want to keep</p>
           </div>
-          <button
+          <button aria-label="Action"
             onClick={onCancel}
             className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors"
-          >
+           type="button">
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -139,13 +139,13 @@ const ImageCropper: React.FC<ImageCropperProps> = ({
             <button
               onClick={onCancel}
               className="flex-1 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-black uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
-            >
+             type="button">
               Cancel
             </button>
             <button
               onClick={handleSave}
               className="flex-1 py-3 rounded-2xl bg-brand-500 text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-brand-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-            >
+             type="button">
               Apply Crop
             </button>
           </div>

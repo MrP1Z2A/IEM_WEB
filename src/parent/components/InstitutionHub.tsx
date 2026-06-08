@@ -166,10 +166,10 @@ const InstitutionHub: React.FC<InstitutionHubProps> = ({ schoolId, parentEmail }
                 <Share2 className="w-5 h-5 text-brand-600" /> Digital Community
               </h3>
               <div className="flex gap-4">
-                <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Share2 className="w-5 h-5" /></button>
-                <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Globe className="w-5 h-5" /></button>
-                <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><MessageSquare className="w-5 h-5" /></button>
-                <button className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm"><Send className="w-5 h-5" /></button>
+                <button className="p-4 bg-slate-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm" type="button"><Share2 className="w-5 h-5" /></button>
+                <button className="p-4 bg-slate-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm" type="button"><Globe className="w-5 h-5" /></button>
+                <button className="p-4 bg-slate-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm" type="button"><MessageSquare className="w-5 h-5" /></button>
+                <button className="p-4 bg-slate-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all hover:scale-110 active:scale-95 shadow-sm" type="button"><Send className="w-5 h-5" /></button>
               </div>
             </div>
           </div>
@@ -230,7 +230,7 @@ const InstitutionHub: React.FC<InstitutionHubProps> = ({ schoolId, parentEmail }
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Subject Header</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 value={subject}
                 onChange={e => { setSubject(e.target.value); setSendSuccess(false); setSendError(null); }}
@@ -241,7 +241,7 @@ const InstitutionHub: React.FC<InstitutionHubProps> = ({ schoolId, parentEmail }
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Your Message</label>
-              <textarea
+              <textarea aria-label="Action"
                 rows={6}
                 value={message}
                 onChange={e => { setMessage(e.target.value); setSendSuccess(false); setSendError(null); }}

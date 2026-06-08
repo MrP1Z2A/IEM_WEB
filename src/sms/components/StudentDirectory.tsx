@@ -540,7 +540,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
         <div className="flex flex-wrap gap-3 items-center">
           <div className="bg-white dark:bg-slate-900 p-2 rounded-[24px] sm:rounded-[32px] shadow-premium border border-slate-100 dark:border-slate-800 flex items-center gap-2">
             <i className="fas fa-search text-slate-400 px-2"></i>
-            <input
+            <input aria-label="Action"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -552,7 +552,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                type="button" onClick={() => setSearchQuery('')}
                 className="px-3 py-2 rounded-[14px] text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
                 Clear
@@ -560,7 +560,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
             )}
           </div>
           <div className="bg-white dark:bg-slate-900 p-2 rounded-[24px] sm:rounded-[32px] shadow-premium border border-slate-100 dark:border-slate-800 flex items-center gap-2">
-            <input
+            <input aria-label="Action"
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
@@ -569,7 +569,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
             />
             {selectedDate && (
               <button
-                onClick={() => setSelectedDate('')}
+                type="button" onClick={() => setSelectedDate('')}
                 className="px-3 py-2 rounded-[14px] text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
                 Clear
@@ -589,7 +589,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
             </select>
           </div>
           <button
-            onClick={() => {
+            type="button" onClick={() => {
               setIsSelectMode(prev => {
                 const next = !prev;
                 if (!next) {
@@ -608,13 +608,13 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
           <button
             onClick={downloadDirectoryPdf}
             className="px-4 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest bg-slate-900 text-white"
-          >
+           type="button">
             Download PDF
           </button>
           <button
             onClick={downloadDirectoryExcel}
             className="px-4 py-3 rounded-[18px] text-xs font-black uppercase tracking-widest bg-emerald-600 text-white flex items-center gap-2"
-          >
+           type="button">
             <i className="fas fa-file-excel"></i>
             Export Excel
           </button>
@@ -630,18 +630,18 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                 onClick={toggleSelectAllFiltered}
                 disabled={!filteredStudentIds.length || isBulkDeleting || isBulkAssigning}
                 className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!filteredStudentIds.length || isBulkDeleting || isBulkAssigning ? 'bg-slate-300 cursor-not-allowed' : 'bg-slate-700 dark:bg-slate-600'}`}
-              >
+               type="button">
                 {areAllFilteredSelected ? 'Unselect All' : 'Select All'}
               </button>
               <button
-                onClick={() => void handleBulkAssign()}
+                type="button" onClick={() => void handleBulkAssign()}
                 disabled={!selectedStudentIds.length || !bulkTargets.length || isBulkAssigning || isBulkDeleting}
                 className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!selectedStudentIds.length || !bulkTargets.length || isBulkAssigning || isBulkDeleting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
               >
                 {isBulkAssigning ? 'Assigning...' : `Add To ${bulkTargets.length} Course${bulkTargets.length === 1 ? '' : 's'}`}
               </button>
               <button
-                onClick={() => void handleBulkDelete()}
+                type="button" onClick={() => void handleBulkDelete()}
                 disabled={!selectedStudentIds.length || isBulkDeleting || isBulkAssigning}
                 className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!selectedStudentIds.length || isBulkDeleting || isBulkAssigning ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
               >
@@ -741,7 +741,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
             <div key={s.id} className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-premium p-5 flex flex-col gap-4 hover:shadow-lg transition-all">
               <div className="flex items-center gap-3">
                 {isSelectMode && (
-                  <input
+                  <input aria-label="Action"
                     type="checkbox"
                     checked={selectedStudentIds.includes(String(s.id))}
                     onChange={(e) => toggleStudentSelection(String(s.id), e.target.checked)}
@@ -784,14 +784,14 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
               </div>
               <div className="flex items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
                 <button
-                  onClick={() => requestOpenStudentInfo(s)}
+                  type="button" onClick={() => requestOpenStudentInfo(s)}
                   disabled={isSelectMode}
                   className="flex-1 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 hover:text-brand-500 text-xs font-black uppercase tracking-widest transition-all"
                 >
                   <i className="fas fa-circle-info mr-1"></i> Info
                 </button>
-                <button
-                  onClick={() => deleteEntity(s.id, 'student')}
+                <button aria-label="Action"
+                  type="button" onClick={() => deleteEntity(s.id, 'student')}
                   disabled={isSelectMode}
                   className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 flex items-center justify-center transition-all"
                   title="Delete"
@@ -816,8 +816,8 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
           <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-xl font-black tracking-tight">{title.replace('Directory', 'Information')}</h3>
-              <button
-                onClick={() => setSelectedStudent(null)}
+              <button aria-label="Action"
+                type="button" onClick={() => setSelectedStudent(null)}
                 className="w-10 h-10 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400"
               >
                 <i className="fas fa-times"></i>
@@ -844,10 +844,10 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                   onClick={handleChangeProfilePhoto}
                   disabled={isPhotoUploading}
                   className="mt-3 px-3 py-1.5 rounded-lg bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest"
-                >
+                 type="button">
                   {isPhotoUploading ? 'Uploading...' : 'Change Profile Photo'}
                 </button>
-                <input
+                <input aria-label="Action"
                   ref={profilePhotoInputRef}
                   type="file"
                   accept="image/*"
@@ -885,7 +885,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                   </p>
                   {!isTempPasswordVisible && (
                     <button
-                      onClick={() => setTempPasswordAuthDialogOpen(true)}
+                      type="button" onClick={() => setTempPasswordAuthDialogOpen(true)}
                       className="px-3 py-1.5 rounded-lg bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest"
                     >
                       View
@@ -897,13 +897,13 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => handleRequestStudentEdit(selectedStudent)}
+                type="button" onClick={() => handleRequestStudentEdit(selectedStudent)}
                 className="px-4 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs uppercase tracking-widest"
               >
                 Edit (Admin Password)
               </button>
               <button
-                onClick={() => setSelectedStudent(null)}
+                type="button" onClick={() => setSelectedStudent(null)}
                 className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
               >
                 Close
@@ -919,7 +919,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
             <h3 className="text-lg font-black tracking-tight">Admin Verification</h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">Enter admin password to view temp password.</p>
 
-            <input
+            <input aria-label="Action"
               type="password"
               value={tempPasswordAuthInput}
               onChange={(e) => setTempPasswordAuthInput(e.target.value)}
@@ -935,7 +935,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
+                type="button" onClick={() => {
                   if (isTempPasswordAuthSubmitting) return;
                   setTempPasswordAuthDialogOpen(false);
                   setTempPasswordAuthInput('');
@@ -949,7 +949,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                 onClick={unlockTempPassword}
                 disabled={isTempPasswordAuthSubmitting}
                 className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isTempPasswordAuthSubmitting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
-              >
+               type="button">
                 {isTempPasswordAuthSubmitting ? 'Verifying...' : 'Unlock'}
               </button>
             </div>

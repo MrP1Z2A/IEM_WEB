@@ -27,6 +27,18 @@ const EditModal: React.FC<EditModalProps> = ({
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
+  // Track the previous target ID and open state to reset avatar states during render
+  const [prevTargetId, setPrevTargetId] = React.useState<string | null>(null);
+  const [prevIsOpen, setPrevIsOpen] = React.useState<boolean>(false);
+
+  const currentTargetId = editTarget?.data?.id || null;
+  if (isOpen !== prevIsOpen || currentTargetId !== prevTargetId) {
+    setPrevIsOpen(isOpen);
+    setPrevTargetId(currentTargetId);
+    setNewAvatarFile(null);
+    setPreviewUrl(null);
+  }
+
   React.useEffect(() => {
     if (newAvatarFile) {
       const url = URL.createObjectURL(newAvatarFile);
@@ -35,14 +47,6 @@ const EditModal: React.FC<EditModalProps> = ({
     }
     setPreviewUrl(null);
   }, [newAvatarFile]);
-
-  // Reset local state when modal opens/closes or target changes
-  React.useEffect(() => {
-    if (isOpen) {
-      setNewAvatarFile(null);
-      setPreviewUrl(null);
-    }
-  }, [isOpen, editTarget?.data?.id]);
 
   if (!isOpen || !editTarget) return null;
 
@@ -70,11 +74,11 @@ const EditModal: React.FC<EditModalProps> = ({
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">ID: {editTarget.data.id}</p>
             </div>
           </div>
-          <button
+          <button aria-label="Action"
             onClick={onClose}
             disabled={isSubmitting}
             className="w-10 h-10 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 disabled:opacity-50"
-          >
+           type="button">
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -94,7 +98,7 @@ const EditModal: React.FC<EditModalProps> = ({
                     <i className="fas fa-camera text-2xl text-slate-300"></i>
                   )}
                 </div>
-                <input
+                <input aria-label="Action"
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
@@ -104,7 +108,7 @@ const EditModal: React.FC<EditModalProps> = ({
                     if (file) setNewAvatarFile(file);
                   }}
                 />
-                <button
+                <button aria-label="Action"
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl bg-brand-500 text-white flex items-center justify-center shadow-lg hover:bg-brand-600 transition-all"
@@ -141,7 +145,7 @@ const EditModal: React.FC<EditModalProps> = ({
               <div key={key}>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">{key.replace(/_/g, ' ')}</label>
                 {key === 'address' ? (
-                  <textarea
+                  <textarea aria-label="Action"
                     rows={2}
                     disabled={isSubmitting}
                     className="w-full bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all disabled:opacity-50 resize-none"
@@ -149,7 +153,7 @@ const EditModal: React.FC<EditModalProps> = ({
                     onChange={(e) => setEditTarget({ ...editTarget, data: { ...editTarget.data, [key]: e.target.value } })}
                   />
                 ) : (
-                  <input
+                  <input aria-label="Action"
                     type={typeof value === 'number' ? 'number' : 'text'}
                     disabled={isSubmitting}
                     className="w-full bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all disabled:opacity-50"
@@ -168,7 +172,7 @@ const EditModal: React.FC<EditModalProps> = ({
             onClick={handleConfirm}
             disabled={isSubmitting}
             className={`flex-1 py-5 ${isSubmitting ? 'bg-brand-300' : 'bg-brand-500'} text-white font-black rounded-3xl text-sm uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all flex items-center justify-center gap-2`}
-          >
+           type="button">
             {isSubmitting && <i className="fas fa-circle-notch fa-spin"></i>}
             {isSubmitting ? 'Updating...' : 'Update'}
           </button>
@@ -176,7 +180,7 @@ const EditModal: React.FC<EditModalProps> = ({
             onClick={onClose}
             disabled={isSubmitting}
             className="px-10 py-5 bg-white dark:bg-slate-800 font-black rounded-3xl text-sm uppercase tracking-widest border border-slate-100 dark:border-slate-700 active:scale-95 transition-all disabled:opacity-50"
-          >
+           type="button">
             Cancel
           </button>
         </div>

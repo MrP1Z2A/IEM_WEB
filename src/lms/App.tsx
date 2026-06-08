@@ -1552,7 +1552,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </div>
           </div>
           <div className="flex gap-4">
-            <button className="px-6 py-3 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-slate-900 transition-all">
+            <button className="px-6 py-3 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all" type="button">
               <i className="fa-solid fa-cloud-arrow-down mr-2"></i> Download Full Report
             </button>
           </div>
@@ -1629,13 +1629,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-xl">
               <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-8">Contact Faculty</h3>
               <div className="space-y-4">
-                <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all">
+                <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all" type="button">
                   <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center text-xs">
                     <i className="fa-solid fa-message"></i>
                   </div>
                   <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Message Head Teacher</span>
                 </button>
-                <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all">
+                <button className="w-full py-4 bg-[#0a1a19] border border-white/20 rounded-2xl flex items-center gap-4 px-6 group hover:border-[#4ea59d] transition-all" type="button">
                   <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-xs">
                     <i className="fa-solid fa-video"></i>
                   </div>
@@ -1814,7 +1814,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               {(['day', 'week', 'month'] as const).map(v => (
                 <button
                   key={v}
-                  onClick={() => setCalendarSubView(v)}
+                  type="button" onClick={() => setCalendarSubView(v)}
                   className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${calendarSubView === v ? 'bg-[#4ea59d] text-slate-900 shadow-lg' : 'text-slate-400 hover:text-slate-900'}`}
                 >
                   {v}
@@ -1822,9 +1822,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               ))}
             </div>
             <div className="flex items-center gap-4 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-2 rounded-2xl border border-white/20">
-              <button onClick={handlePrev} className="w-8 h-8 rounded-lg hover:bg-[#1f4e4a] flex items-center justify-center transition-all"><i className="fa-solid fa-chevron-left text-xs"></i></button>
+              <button onClick={handlePrev} className="w-8 h-8 rounded-lg hover:bg-[#1f4e4a] flex items-center justify-center transition-all" type="button"><i className="fa-solid fa-chevron-left text-xs"></i></button>
               <span className="text-xs font-black uppercase tracking-widest px-2">{calendarSubView === 'day' ? `${monthName} ${calendarDate.getDate()}` : `${monthName} ${year}`}</span>
-              <button onClick={handleNext} className="w-8 h-8 rounded-lg hover:bg-[#1f4e4a] flex items-center justify-center transition-all"><i className="fa-solid fa-chevron-right text-xs"></i></button>
+              <button onClick={handleNext} className="w-8 h-8 rounded-lg hover:bg-[#1f4e4a] flex items-center justify-center transition-all" type="button"><i className="fa-solid fa-chevron-right text-xs"></i></button>
             </div>
           </div>
         </header>
@@ -1854,12 +1854,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </div>
           </div>
           <div className="bg-[#4ea59d]/5 border border-[#4ea59d]/20 p-8 rounded-[32px] flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-16 h-16 bg-[#4ea59d] rounded-full flex items-center justify-center text-slate-900 shadow-2xl shadow-[#4ea59d]/40">
+            <div className="w-16 h-16 bg-[#4ea59d] rounded-full flex items-center justify-center text-white shadow-2xl shadow-[#4ea59d]/40">
               <i className="fa-solid fa-plus text-2xl"></i>
             </div>
             <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">Sync Schedules</h4>
             <p className="text-xs text-[#4ea59d] font-bold leading-relaxed">Connect your external calendar to auto-import course modules and assignment deadlines.</p>
-            <button className="w-full py-4 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Link Account</button>
+            <button className="w-full py-4 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl" type="button">Link Account</button>
           </div>
         </section>
       </div>
@@ -1914,12 +1914,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         {/* Live Intel Ticker */}
         {dynamicLiveIntel.length > 0 && (
-          <div
+          <button type="button"
             onClick={() => {
               setSelectedLiveIntel(dynamicLiveIntel[0]);
               setCurrentView('live-intel-detail');
             }}
-            className="bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-2xl flex items-center gap-4 animate-fadeIn cursor-pointer hover:bg-emerald-500/20 transition-all group"
+            className="w-full text-left bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-2xl flex items-center gap-4 animate-fadeIn cursor-pointer hover:bg-emerald-500/20 transition-all group"
           >
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0 group-hover:scale-110 transition-transform">
               <i className="fa-solid fa-bolt-lightning animate-pulse"></i>
@@ -1931,14 +1931,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 <i className="fa-solid fa-chevron-right text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"></i>
               </h4>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Messaging Notification Ticker */}
         {unreadMessagesCount > 0 && (
-          <div
+          <button type="button"
             onClick={() => setCurrentView('contact')}
-            className="bg-rose-500/10 border-l-4 border-rose-500 p-4 rounded-2xl flex items-center justify-between gap-4 animate-bounce hover:bg-rose-500/20 transition-all cursor-pointer group shadow-lg shadow-rose-500/5"
+            className="w-full text-left bg-rose-500/10 border-l-4 border-rose-500 p-4 rounded-2xl flex items-center justify-between gap-4 animate-bounce hover:bg-rose-500/20 transition-all cursor-pointer group shadow-lg shadow-rose-500/5"
           >
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center text-rose-500 shrink-0 group-hover:rotate-12 transition-transform">
@@ -1951,16 +1951,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 </h4>
               </div>
             </div>
-            <span className="px-4 py-1.5 bg-rose-500 text-slate-900 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">
+            <span className="px-4 py-1.5 bg-rose-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">
               Open Vault
             </span>
-          </div>
+          </button>
         )}
 
         {/* Metric Row */}
         {user.role !== UserRole.TEACHER && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#4ea59d] p-8 rounded-[32px] text-slate-900 shadow-xl relative overflow-hidden md:col-span-2 group">
+            <div className="bg-[#4ea59d] p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden md:col-span-2 group">
               <div className="relative z-10">
                 <h3 className="text-[10px] font-black opacity-80 uppercase tracking-[0.2em] text-slate-900">Academic Standing</h3>
                 <p className="text-5xl font-black my-4 text-slate-900 uppercase ">{standingText}</p>
@@ -1993,7 +1993,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </div>
               Recent Notifications
             </h3>
-            <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#4ea59d] transition-colors">
+            <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#4ea59d] transition-colors" type="button">
               Mark all as read
             </button>
           </div>
@@ -2104,14 +2104,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         </div>
         <div className="flex items-center gap-4 w-full md:w-auto">
           <button
-            onClick={() => performSmsSync(false)}
+            type="button" onClick={() => performSmsSync(false)}
             className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 bg-[#1f4e4a] border border-[#4ea59d]/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] transition-all flex items-center justify-center gap-2"
           >
             <i className={`fa-solid fa-rotate ${isLoading ? 'animate-spin' : ''}`}></i> Refresh
           </button>
           {user.role === UserRole.TEACHER && (
             <button
-              onClick={() => {
+              type="button" onClick={() => {
                 setNoticeTitle('');
                 setNoticeMessage('');
                 setNoticeDate(new Date().toISOString().split('T')[0]);
@@ -2119,7 +2119,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 setNoticeFile(null);
                 setIsNoticeComposerOpen(true);
               }}
-              className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 bg-[#4ea59d] text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#4ea59d]/20"
+              className="flex-1 md:flex-none px-4 sm:px-6 py-2.5 bg-[#4ea59d] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#4ea59d]/20"
             >
               <i className="fa-solid fa-plus"></i> Create Notice
             </button>
@@ -2135,12 +2135,17 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </div>
           )}
           {dynamicAnnouncements.map(item => (
-            <button
+            <div
               key={item.id}
-              onClick={() => handleNoticeOpen(item, 'notice-board')}
-              className="w-full p-5 sm:p-6 lg:p-8 bg-[#f6f1e8] rounded-[28px] sm:rounded-[32px] lg:rounded-[36px] border border-[#e2d6c2] group hover:border-[#4ea59d]/60 transition-all text-left min-h-[180px] sm:min-h-[210px] lg:min-h-[240px] shadow-[0_14px_32px_rgba(95,79,53,0.08)] hover:shadow-[0_18px_36px_rgba(78,165,157,0.12)]"
+              className="relative w-full p-5 sm:p-6 lg:p-8 bg-[#f6f1e8] rounded-[28px] sm:rounded-[32px] lg:rounded-[36px] border border-[#e2d6c2] group hover:border-[#4ea59d]/60 transition-all text-left min-h-[180px] sm:min-h-[210px] lg:min-h-[240px] shadow-[0_14px_32px_rgba(95,79,53,0.08)] hover:shadow-[0_18px_36px_rgba(78,165,157,0.12)] cursor-pointer"
             >
-              <div className="h-full flex flex-col">
+              <button
+                type="button"
+                className="absolute inset-0 z-0 w-full h-full opacity-0 cursor-pointer"
+                aria-label={`Open notice ${item.title}`}
+                onClick={() => handleNoticeOpen(item, 'notice-board')}
+              />
+              <div className="h-full flex flex-col relative z-10 pointer-events-none">
                 <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
                   <span className="text-[11px] sm:text-sm font-black text-slate-400 uppercase tracking-wider">{item.date}</span>
                   <span className={`text-[10px] sm:text-xs font-black px-2.5 sm:px-3 py-1 rounded-xl uppercase tracking-wider ${item.priority === 'Urgent'
@@ -2167,11 +2172,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   )}
                   {user.role === UserRole.TEACHER && item.createdBy === user.id && (
                     <button
-                      onClick={(e) => {
+                      type="button" onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteNotice(item.id);
                       }}
-                      className="px-3 py-1 rounded-lg bg-rose-500/10 text-rose-500 text-[9px] font-black uppercase tracking-widest border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-colors"
+                      className="px-3 py-1 rounded-lg bg-rose-500/10 text-rose-500 text-[9px] font-black uppercase tracking-widest border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-colors pointer-events-auto"
                     >
                       <i className="fa-solid fa-trash-can mr-1"></i> Delete
                     </button>
@@ -2185,7 +2190,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <i className="fa-solid fa-chevron-right text-[#4ea59d] text-xs sm:text-sm group-hover:translate-x-1 transition-transform shrink-0"></i>
                 </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </section>
@@ -2197,7 +2202,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       return (
         <div className="space-y-8 animate-fadeIn text-slate-800 pb-20">
           <button
-            onClick={() => setCurrentView(noticeOriginView)}
+            type="button" onClick={() => setCurrentView(noticeOriginView)}
             className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2"
           >
             <i className="fa-solid fa-arrow-left"></i> Back
@@ -2212,7 +2217,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     return (
       <div className="space-y-8 animate-fadeIn text-slate-800 pb-20">
         <button
-          onClick={() => setCurrentView(noticeOriginView)}
+          type="button" onClick={() => setCurrentView(noticeOriginView)}
           className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group"
         >
           <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Notices
@@ -2238,7 +2243,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
           {selectedNotice.fileUrl && (
             <button
-              onClick={() => {
+              type="button" onClick={() => {
                 if (selectedNotice.fileUrl) {
                   setPreviewPdfUrl(selectedNotice.fileUrl);
                   setPreviewPdfTitle(selectedNotice.title || 'Announcement Attachment');
@@ -2284,7 +2289,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               {dynamicAnnouncements.map(ann => (
                 <button
                   key={ann.id}
-                  onClick={() => handleNoticeOpen(ann, 'instruction')}
+                  type="button" onClick={() => handleNoticeOpen(ann, 'instruction')}
                   className="w-full p-6 bg-[#f6f1e8] rounded-[28px] border border-[#e2d6c2] hover:border-[#4ea59d]/60 transition-all group text-left shadow-[0_14px_30px_rgba(95,79,53,0.08)]"
                 >
                   <div className="flex items-center justify-between gap-4">
@@ -2359,7 +2364,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         </div>
         {user.role === UserRole.TEACHER && (
           <button
-            onClick={() => {
+            type="button" onClick={() => {
               setHomeworkTitle('');
               setHomeworkDescription('');
               setHomeworkDueDate('');
@@ -2368,7 +2373,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               setAssignedCourseId('');
               setIsHomeworkComposerOpen(true);
             }}
-            className="px-8 py-4 bg-[#4ea59d] text-slate-900 rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3"
+            className="px-8 py-4 bg-[#4ea59d] text-white rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3"
           >
             <i className="fa-solid fa-plus"></i> Create Assignment
           </button>
@@ -2418,7 +2423,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                           {ass.submissions.map((sub: any, idx: number) => (
                             <button
                               key={sub.id || idx}
-                              onClick={() => {
+                              type="button" onClick={() => {
                                 setPreviewPdfUrl(sub.url);
                                 setPreviewPdfTitle(`Submission: ${sub.studentName}`);
                               }}
@@ -2450,15 +2455,15 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         </div>
                       ) : ass.status === 'Reopened' ? (
                         <button
-                          onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
-                          className="flex-1 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2"
+                          type="button" onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
+                          className="flex-1 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2"
                         >
                           <i className="fa-solid fa-rotate-left"></i> Resubmit Task
                         </button>
                       ) : (
                         <button
-                          onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
-                          className="flex-1 px-6 py-3 bg-[#7fc9c2] hover:bg-[#3d8c85] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
+                          type="button" onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
+                          className="flex-1 px-6 py-3 bg-[#7fc9c2] hover:bg-[#3d8c85] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
                         >
                           Submit Homework
                         </button>
@@ -2466,8 +2471,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       <div className="flex gap-2">
                         {/* Standardized Download Buttons */}
                         {ass.submissionUrl ? (
-                          <button
-                            onClick={() => {
+                          <button aria-label="Action"
+                            type="button" onClick={() => {
                               setPreviewPdfUrl(ass.submissionUrl);
                               setPreviewPdfTitle(`My Submission: ${ass.title}`);
                             }}
@@ -2477,8 +2482,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                             <i className="fa-solid fa-eye shadow-sm"></i>
                           </button>
                         ) : ass.fileUrl ? (
-                          <button
-                            onClick={() => {
+                          <button aria-label="Action"
+                            type="button" onClick={() => {
                               setPreviewPdfUrl(ass.fileUrl);
                               setPreviewPdfTitle(`Work: ${ass.title}`);
                             }}
@@ -2537,7 +2542,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         {ass.submissions.map((sub: any, idx: number) => (
                           <button
                             key={sub.id || idx}
-                            onClick={() => {
+                            type="button" onClick={() => {
                               setPreviewPdfUrl(sub.url);
                               setPreviewPdfTitle(`Submission: ${sub.studentName}`);
                             }}
@@ -2569,21 +2574,21 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       </div>
                     ) : ass.status === 'Reopened' ? (
                       <button
-                        onClick={() => {
+                        type="button" onClick={() => {
                           setSelectedAssignment(ass);
                           setIsSubmissionModalOpen(true);
                         }}
-                        className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-orange-500/20"
+                        className="px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-orange-500/20"
                       >
                         <i className="fa-solid fa-rotate-left"></i> Resubmit
                       </button>
                     ) : (
                       <button
-                        onClick={() => {
+                        type="button" onClick={() => {
                           setSelectedAssignment(ass);
                           setIsSubmissionModalOpen(true);
                         }}
-                        className="group px-6 py-3 bg-[#a9ddd7] hover:bg-[#3d8c85] border-2 border-[#5fa79f] hover:border-[#2f6f69] text-slate-900 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-[0_8px_20px_rgba(78,165,157,0.12)]"
+                        className="group px-6 py-3 bg-[#a9ddd7] hover:bg-[#3d8c85] border-2 border-[#5fa79f] hover:border-[#2f6f69] text-white hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-[0_8px_20px_rgba(78,165,157,0.12)]"
                       >
                         <span>Submit Task</span>
                         <i className="fa-solid fa-arrow-right text-[10px] transition-all group-hover:translate-x-0.5 group-hover:text-white"></i>
@@ -2592,8 +2597,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
                     {/* Standardized Download Buttons */}
                     {ass.submissionUrl ? (
-                      <button
-                        onClick={() => {
+                      <button aria-label="Action"
+                        type="button" onClick={() => {
                           setPreviewPdfUrl(ass.submissionUrl);
                           setPreviewPdfTitle(`Your Submission: ${ass.title}`);
                         }}
@@ -2603,8 +2608,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         <i className="fa-solid fa-eye shadow-sm"></i>
                       </button>
                     ) : ass.fileUrl ? (
-                      <button
-                        onClick={() => {
+                      <button aria-label="Action"
+                        type="button" onClick={() => {
                           setPreviewPdfUrl(ass.fileUrl);
                           setPreviewPdfTitle(`Instructions: ${ass.title}`);
                         }}
@@ -2673,7 +2678,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             ))}
           </div>
           <button 
-            onClick={() => {
+            type="button" onClick={() => {
               if (fullExamScheduleUrl) {
                 setPreviewPdfUrl(fullExamScheduleUrl);
                 setPreviewPdfTitle('Full Exam Schedule');
@@ -2681,7 +2686,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 alert('Official Exam Schedule has not been published yet. Please contact the administration.');
               }
             }}
-            className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-slate-900 transition-all flex items-center justify-center gap-2"
+            className="w-full mt-10 py-4 bg-[#4ea59d]/5 border border-[#4ea59d]/20 text-[#4ea59d] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center justify-center gap-2"
           >
             <i className="fa-solid fa-cloud-arrow-down"></i> Download Full Schedule
           </button>
@@ -2822,7 +2827,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       <div className="space-y-12 animate-fadeIn text-slate-800 pb-20">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
           <div className="space-y-4 flex-1">
-            <button onClick={() => setCurrentView('courses')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
+            <button type="button" onClick={() => setCurrentView('courses')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
               <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Campus Manager
             </button>
             <h2 className="text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">{selectedClass.name}</h2>
@@ -2997,13 +3002,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       </span>
                       {rc.fileUrl && (
                         <button
-                          onClick={() => {
+                          type="button" onClick={() => {
                             if (rc.fileUrl) {
                               setPreviewPdfUrl(rc.fileUrl);
                               setPreviewPdfTitle(rc.title || `${rc.reportType} Report Card`);
                             }
                           }}
-                          className="px-6 py-3 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#3d8c85] transition-all shadow-lg shadow-[#4ea59d]/20 flex items-center gap-2"
+                          className="px-6 py-3 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#3d8c85] transition-all shadow-lg shadow-[#4ea59d]/20 flex items-center gap-2"
                         >
                           <i className="fa-solid fa-cloud-arrow-down"></i> Download
                         </button>
@@ -3074,7 +3079,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         <div className="space-y-12 animate-fadeIn text-slate-800 pb-20">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
           <div className="space-y-4 flex-1">
-            <button onClick={() => setCurrentView('courses')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
+            <button type="button" onClick={() => setCurrentView('courses')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
               <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Courses
             </button>
             <h2 className="text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">{selectedCourse.title}</h2>
@@ -3088,7 +3093,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </div>
           </div>
           {selectedCourse.onlineClassUrl && (
-            <a href={selectedCourse.onlineClassUrl} target="_blank" rel="noopener noreferrer" className="px-8 py-4 bg-[#4ea59d] text-slate-900 rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3">
+            <a href={selectedCourse.onlineClassUrl} target="_blank" rel="noopener noreferrer" className="px-8 py-4 bg-[#4ea59d] text-white rounded-[24px] text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/30 hover:scale-105 transition-all flex items-center gap-3">
               <i className="fa-solid fa-video animate-pulse"></i> Join Online Class
             </a>
           )}
@@ -3140,20 +3145,20 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   {user.role === UserRole.TEACHER && (
                     <>
                       <button
-                        onClick={() => setIsCreateFolderModalOpen(true)}
+                        type="button" onClick={() => setIsCreateFolderModalOpen(true)}
                         className="px-5 py-2.5 bg-white/5 border border-white/10 text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-[#4ea59d] hover:text-[#4ea59d] transition-all flex items-center gap-2 group/btn"
                       >
                         <i className="fa-solid fa-folder-plus transition-transform group-hover/btn:scale-110"></i> Add Folder
                       </button>
                       <button
-                        onClick={() => {
+                        type="button" onClick={() => {
                           setResourceTitle('');
                           setResourceContent('');
                           setResourceFile(null);
                           setSelectedUploadFolder('');
                           setIsUploadResourceModalOpen(true);
                         }}
-                        className="px-5 py-2.5 bg-[#4ea59d] text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-[#4ea59d]/20"
+                        className="px-5 py-2.5 bg-[#4ea59d] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-[#4ea59d]/20"
                       >
                         <i className="fa-solid fa-cloud-arrow-up"></i> Upload File
                       </button>
@@ -3208,7 +3213,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                                       <div className="flex justify-between items-start flex-col sm:flex-row gap-4">
                                         <h4 className="text-xl font-black text-slate-100">{note.title}</h4>
                                         {note.ebookUrl && (
-                                          <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-slate-900 transition-all flex items-center gap-2">
+                                          <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center gap-2">
                                             <i className="fa-solid fa-download"></i> Download Asset
                                           </a>
                                         )}
@@ -3228,7 +3233,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                             <div className="flex justify-between items-start flex-col sm:flex-row gap-4">
                               <h4 className="text-xl font-black text-slate-100">{note.title}</h4>
                               {note.ebookUrl && (
-                                <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-slate-900 transition-all flex items-center gap-2">
+                                <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center gap-2">
                                   <i className="fa-solid fa-download"></i> Download Resource
                                 </a>
                               )}
@@ -3337,7 +3342,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <div className="space-y-6">
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Folder Name</label>
-                  <input
+                  <input aria-label="Action"
                     type="text"
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
@@ -3349,7 +3354,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div className="flex gap-4 pt-4">
                 <button
-                  onClick={() => setIsCreateFolderModalOpen(false)}
+                  type="button" onClick={() => setIsCreateFolderModalOpen(false)}
                   className="flex-1 py-4 bg-white/5 border border-white/10 text-slate-400 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-slate-900 transition-all"
                 >
                   Cancel
@@ -3357,8 +3362,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 <button
                   onClick={handleCreateFolder}
                   disabled={isSavingTeacherData || !newFolderName}
-                  className="flex-1 py-4 bg-[#4ea59d] text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-50 disabled:scale-100"
-                >
+                  className="flex-1 py-4 bg-[#4ea59d] text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-50 disabled:scale-100"
+                 type="button">
                   {isSavingTeacherData ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-check mr-2"></i>}
                   Create Folder
                 </button>
@@ -3369,7 +3374,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         {isUploadResourceModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-fadeIn">
-            <div className="w-full max-w-2xl bg-[#0a1a19] border border-white/20 rounded-[48px] overflow-hidden shadow-4xl p-10 space-y-8 text-slate-800">
+            <div className="w-full max-w-2xl bg-[#0a1a19] border border-white/20 rounded-[48px] overflow-hidden shadow-4xl p-10 space-y-8 text-white">
               <div className="space-y-2">
                 <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">Upload Resource</h3>
                 <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.4em]">Broadcast New Materials</p>
@@ -3379,7 +3384,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 <div className="space-y-6">
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Title</label>
-                    <input
+                    <input aria-label="Action"
                       type="text"
                       value={resourceTitle}
                       onChange={(e) => setResourceTitle(e.target.value)}
@@ -3413,7 +3418,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">File Attachment</label>
                     <div className="relative group">
-                      <input
+                      <input aria-label="Action"
                         type="file"
                         onChange={(e) => setResourceFile(e.target.files?.[0] || null)}
                         className="absolute inset-0 opacity-0 cursor-pointer z-10"
@@ -3429,7 +3434,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Description</label>
-                    <textarea
+                    <textarea aria-label="Action"
                       value={resourceContent}
                       onChange={(e) => setResourceContent(e.target.value)}
                       placeholder="Contextual details for students..."
@@ -3442,7 +3447,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div className="flex gap-4 pt-4">
                 <button
-                  onClick={() => setIsUploadResourceModalOpen(false)}
+                  type="button" onClick={() => setIsUploadResourceModalOpen(false)}
                   className="flex-1 py-4 bg-white/5 border border-white/10 text-slate-400 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all"
                 >
                   Cancel
@@ -3450,8 +3455,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 <button
                   onClick={handleUploadResource}
                   disabled={isSavingTeacherData || !resourceTitle || !resourceFile}
-                  className="flex-1 py-4 bg-[#4ea59d] text-slate-900 rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-50 disabled:scale-100"
-                >
+                  className="flex-1 py-4 bg-[#4ea59d] text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-50 disabled:scale-100"
+                 type="button">
                   {isSavingTeacherData ? <i className="fas fa-spinner fa-spin mr-2"></i> : <i className="fa-solid fa-upload mr-2"></i>}
                   Execute Upload
                 </button>
@@ -3469,7 +3474,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       <div className="space-y-8 animate-fadeIn text-slate-800 pb-20">
         <header className="flex justify-between items-center">
           <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight">{activeQuiz.title}</h2>
-          <button onClick={() => setCurrentView('course-detail')} className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-slate-900 rounded-2xl text-xs font-bold transition-all">Exit Quiz</button>
+          <button type="button" onClick={() => setCurrentView('course-detail')} className="px-6 py-3 bg-[#1f4e4a] hover:bg-[#4ea59d] text-white rounded-2xl text-xs font-bold transition-all">Exit Quiz</button>
         </header>
         <div className="max-w-3xl mx-auto space-y-6">
           {activeQuiz.questions.map((q, qIdx) => (
@@ -3477,13 +3482,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <h4 className="text-lg font-bold text-slate-900 mb-6 flex gap-4"><span className="text-[#4ea59d]">Q{qIdx + 1}.</span>{q.question}</h4>
               <div className="grid grid-cols-1 gap-3">
                 {q.options.map((opt, oIdx) => (
-                  <button key={oIdx} className="p-5 text-left bg-[#0a1a19] border border-white/20 rounded-2xl hover:border-[#4ea59d] transition-all text-sm">{opt}</button>
+                  <button key={oIdx} className="p-5 text-left bg-[#0a1a19] border border-white/20 rounded-2xl hover:border-[#4ea59d] transition-all text-sm" type="button">{opt}</button>
                 ))}
               </div>
             </div>
           ))}
           <button
-            onClick={() => {
+            type="button" onClick={() => {
               setConfirmDialog({
                 title: 'Quiz Submitted',
                 message: 'Your answers have been securely transmitted to the faculty board. Evaluation is now in progress.',
@@ -3494,7 +3499,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 }
               });
             }}
-            className="w-full py-5 bg-[#4ea59d] text-slate-900 rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl"
+            className="w-full py-5 bg-[#4ea59d] text-white rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl"
           >
             Submit Answers
           </button>
@@ -3509,7 +3514,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       <div className="space-y-12 animate-fadeIn text-slate-800 pb-20">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
           <div className="space-y-4 flex-1">
-            <button onClick={() => setCurrentView('dashboard')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
+            <button type="button" onClick={() => setCurrentView('dashboard')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
               <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Dashboard
             </button>
             <h2 className="text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">{selectedLiveIntel.title}</h2>
@@ -3581,16 +3586,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   }
 
   return (
-    <div className="flex flex-col md:flex-row bg-[#f3f0e8] min-h-screen text-slate-900 relative">
+    <div className="flex flex-col md:flex-row bg-[#f3f0e8] min-h-screen text-white relative">
       {/* Background Ambient Orbs for Glass Effect */}
       <div className="fixed top-[-10%] left-[-5%] w-[500px] h-[500px] bg-[#4ea59d]/20 rounded-full blur-[120px] pointer-events-none z-[0]"></div>
       <div className="fixed bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#1f4e4a]/40 rounded-full blur-[150px] pointer-events-none z-0"></div>
       <header className="md:hidden flex items-center justify-between p-4 bg-[#eee7da]/95 backdrop-blur-xl shadow-lg border-b border-[#ddd1bd] sticky top-0 z-[50]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[#4ea59d] rounded-lg flex items-center justify-center text-slate-900"><i className="fa-solid fa-graduation-cap"></i></div>
+          <div className="w-8 h-8 bg-[#4ea59d] rounded-lg flex items-center justify-center text-white"><i className="fa-solid fa-graduation-cap"></i></div>
           <h1 className="text-lg font-black tracking-tighter text-slate-900 uppercase ">IEM</h1>
         </div>
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-900 p-2">
+        <button aria-label="Action" type="button" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-900 p-2">
           <i className={`fa-solid ${isSidebarOpen ? 'fa-xmark' : 'fa-bars'} text-xl`}></i>
         </button>
       </header>
@@ -3666,7 +3671,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <div className="relative group">
                     <img src={user.avatar} className="w-32 h-32 md:w-40 md:h-40 rounded-[24px] md:rounded-[40px] border-4 border-[#4ea59d] p-1 shadow-2xl object-cover" />
                     <button
-                      onClick={() => fileInputRef.current?.click()}
+                      type="button" onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingAvatar}
                       className="absolute inset-0 bg-black/40 rounded-[24px] md:rounded-[40px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-slate-900"
                     >
@@ -3675,7 +3680,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         <p className="text-[10px] font-black uppercase tracking-widest">{uploadingAvatar ? 'Uploading...' : 'Change Photo'}</p>
                       </div>
                     </button>
-                    <input
+                    <input aria-label="Action"
                       type="file"
                       ref={fileInputRef}
                       onChange={handleAvatarUpload}
@@ -3773,7 +3778,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   </h4>
                   {!isChangingPassword && (
                     <button
-                      onClick={() => setIsChangingPassword(true)}
+                      type="button" onClick={() => setIsChangingPassword(true)}
                       className="px-4 py-2 bg-[#4ea59d]/10 hover:bg-[#4ea59d]/20 border border-[#4ea59d]/30 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                     >
                       Change Password
@@ -3786,7 +3791,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Current Password</label>
-                        <input
+                        <input aria-label="Action"
                           type="password"
                           required
                           value={oldPassword}
@@ -3797,7 +3802,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       </div>
                       <div className="space-y-2">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-1">New Password</label>
-                        <input
+                        <input aria-label="Action"
                           type="password"
                           required
                           value={newPassword}
@@ -3808,7 +3813,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       </div>
                       <div className="space-y-2">
                         <label className="text-[9px] font-black text-slate-400 uppercase ml-1">Retype New Password</label>
-                        <input
+                        <input aria-label="Action"
                           type="password"
                           required
                           value={confirmPassword}
@@ -3834,7 +3839,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       <button
                         type="submit"
                         disabled={passwordLoading}
-                        className="px-8 py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50 shadow-lg shadow-[#4ea59d]/20"
+                        className="px-8 py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50 shadow-lg shadow-[#4ea59d]/20"
                       >
                         {passwordLoading ? (
                           <span className="flex items-center gap-2">
@@ -3879,8 +3884,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <div className="w-full max-w-xl bg-[#0a1a19] rounded-[32px] sm:rounded-[40px] border border-white/20 p-5 sm:p-8 shadow-2xl animate-in zoom-in duration-300 max-h-[95vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-black text-white tracking-tighter uppercase underline decoration-[#4ea59d] decoration-4 underline-offset-8">Submit Homework</h3>
-              <button
-                onClick={() => setIsSubmissionModalOpen(false)}
+              <button aria-label="Action"
+                type="button" onClick={() => setIsSubmissionModalOpen(false)}
                 className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
               >
                 <i className="fa-solid fa-xmark"></i>
@@ -3897,7 +3902,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div>
                 <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Upload PDF (Max 200 MB)</label>
-                <input
+                <input aria-label="Action"
                   type="file"
                   accept="application/pdf"
                   onChange={(e) => {
@@ -3922,7 +3927,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div>
                 <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Comments (Optional)</label>
-                <textarea
+                <textarea aria-label="Action"
                   value={submissionComment}
                   onChange={(e) => setSubmissionComment(e.target.value)}
                   placeholder="Add any notes here..."
@@ -3931,7 +3936,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </div>
 
               <button
-                onClick={() => setShowSubmitConfirm(true)}
+                type="button" onClick={() => setShowSubmitConfirm(true)}
                 disabled={isSubmitting || !submissionFile || !!submissionFileError || submissionStatus === 'success'}
                 className="w-full py-4 bg-[#4ea59d] hover:bg-[#3d8c85] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-[#4ea59d]/20"
               >
@@ -3964,7 +3969,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </p>
             <div className="grid grid-cols-2 gap-4">
               <button
-                onClick={() => setShowSubmitConfirm(false)}
+                type="button" onClick={() => setShowSubmitConfirm(false)}
                 className="py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
               >
                 Cancel
@@ -3972,7 +3977,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <button
                 onClick={executeHomeworkSubmission}
                 className="py-3 bg-[#4ea59d] hover:bg-[#3d8c85] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
-              >
+               type="button">
                 Confirm
               </button>
             </div>
@@ -3985,7 +3990,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <div className="w-full max-w-2xl bg-[#0a1a19] rounded-[40px] border border-white/20 p-10 shadow-3xl animate-in zoom-in-95 duration-500 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-10">
               <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Create New Assignment</h3>
-              <button onClick={() => setIsHomeworkComposerOpen(false)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-all">
+              <button aria-label="Action" type="button" onClick={() => setIsHomeworkComposerOpen(false)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-all">
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -3994,7 +3999,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Assignment Title</label>
-                  <input
+                  <input aria-label="Action"
                     type="text"
                     value={homeworkTitle}
                     onChange={(e) => setHomeworkTitle(e.target.value)}
@@ -4004,7 +4009,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Due Date</label>
-                  <input
+                  <input aria-label="Action"
                     type="date"
                     value={homeworkDueDate}
                     onChange={(e) => setHomeworkDueDate(e.target.value)}
@@ -4029,7 +4034,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Instructions / Description</label>
-                <textarea
+                <textarea aria-label="Action"
                   value={homeworkDescription}
                   onChange={(e) => setHomeworkDescription(e.target.value)}
                   placeholder="Provide detailed instructions for the students..."
@@ -4039,18 +4044,18 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attachment (PDF preferred)</label>
-                <input
+                <input aria-label="Action"
                   type="file"
                   onChange={(e) => setHomeworkFile(e.target.files?.[0] || null)}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-[#4ea59d] file:text-slate-900"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-[#4ea59d] file:text-white"
                 />
               </div>
 
               <button
                 onClick={handleSaveHomework}
                 disabled={isSavingTeacherData || !homeworkTitle || !assignedCourseId}
-                className="w-full py-5 bg-[#4ea59d] text-slate-900 rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
-              >
+                className="w-full py-5 bg-[#4ea59d] text-white rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
+               type="button">
                 {isSavingTeacherData ? 'Publishing...' : 'Publish Assignment'}
               </button>
             </div>
@@ -4064,7 +4069,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <div className="w-full max-w-2xl bg-[#0a1a19] rounded-[40px] border border-white/20 p-10 shadow-3xl animate-in zoom-in-95 duration-500 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-10">
               <h3 className="text-3xl font-black text-white uppercase tracking-tighter">Publish New Notice</h3>
-              <button onClick={() => setIsNoticeComposerOpen(false)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-all">
+              <button aria-label="Action" type="button" onClick={() => setIsNoticeComposerOpen(false)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-all">
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -4073,7 +4078,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Notice Title</label>
-                  <input
+                  <input aria-label="Action"
                     type="text"
                     value={noticeTitle}
                     onChange={(e) => setNoticeTitle(e.target.value)}
@@ -4083,7 +4088,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 </div>
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Notice Date</label>
-                  <input
+                  <input aria-label="Action"
                     type="date"
                     value={noticeDate}
                     onChange={(e) => setNoticeDate(e.target.value)}
@@ -4137,7 +4142,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   {['Low', 'Medium', 'High', 'Urgent'].map(p => (
                     <button
                       key={p}
-                      onClick={() => setNoticePriority(p as any)}
+                      type="button" onClick={() => setNoticePriority(p as any)}
                       className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${noticePriority === p
                         ? 'bg-[#4ea59d] text-slate-900 shadow-lg shadow-[#4ea59d]/20'
                         : 'bg-white/5 text-slate-400 hover:bg-white/10'
@@ -4151,7 +4156,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Detailed Message</label>
-                <textarea
+                <textarea aria-label="Action"
                   value={noticeMessage}
                   onChange={(e) => setNoticeMessage(e.target.value)}
                   placeholder="Compose your notice details here..."
@@ -4161,18 +4166,18 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attachment (Optional)</label>
-                <input
+                <input aria-label="Action"
                   type="file"
                   onChange={(e) => setNoticeFile(e.target.files?.[0] || null)}
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-[#4ea59d] file:text-slate-900"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-[#4ea59d] file:text-white"
                 />
               </div>
 
               <button
                 onClick={handleSaveNotice}
                 disabled={isSavingTeacherData || !noticeTitle || !noticeMessage}
-                className="w-full py-5 bg-[#4ea59d] text-slate-900 rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
-              >
+                className="w-full py-5 bg-[#4ea59d] text-white rounded-[24px] font-black uppercase tracking-[0.2em] shadow-xl shadow-[#4ea59d]/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all"
+               type="button">
                 {isSavingTeacherData ? 'Publishing...' : 'Publish Notice'}
               </button>
             </div>
@@ -4193,7 +4198,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <div className="flex gap-4">
               {confirmDialog.type === 'confirm' && (
                 <button
-                  onClick={() => setConfirmDialog(null)}
+                  type="button" onClick={() => setConfirmDialog(null)}
                   className="flex-1 py-4 bg-white/5 border border-white/10 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all"
                 >
                   Cancel
@@ -4201,8 +4206,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               )}
               <button
                 onClick={confirmDialog.onConfirm}
-                className="flex-1 py-4 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all"
-              >
+                className="flex-1 py-4 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all"
+               type="button">
                 {confirmDialog.type === 'confirm' ? 'Confirm' : 'Continue'}
               </button>
             </div>

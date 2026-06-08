@@ -60,7 +60,7 @@ export default function GradingModal({
           <button
             onClick={onBack}
             className="px-6 py-3 bg-white/5 border border-white/10 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-all flex items-center gap-2"
-          >
+           type="button">
             <i className="fa-solid fa-arrow-left"></i> Back to Exams
           </button>
         </div>
@@ -121,7 +121,7 @@ export default function GradingModal({
                     {/* Numeric Input & Notes */}
                     <div className="flex flex-col sm:flex-row items-center gap-3">
                       <div className="relative w-full sm:w-28">
-                        <input
+                        <input aria-label="Action"
                           type="text"
                           value={percentages[student.id] || ''}
                           onChange={(e) => onPercentageChange(student.id, e.target.value)}
@@ -132,7 +132,7 @@ export default function GradingModal({
                       </div>
 
                       <div className="flex-1 w-full relative">
-                        <input
+                        <input aria-label="Action"
                           type="text"
                           value={notes[student.id] || ''}
                           onChange={(e) => onNoteChange(student.id, e.target.value)}

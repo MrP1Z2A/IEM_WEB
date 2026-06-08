@@ -45,7 +45,7 @@ const RegistrationHub: React.FC<RegistrationHubProps> = ({
           <h4 className="text-xl sm:text-2xl font-black tracking-tight">New Student Protocol</h4>
           <p className="text-slate-400 text-sm font-semibold max-w-xs mx-auto">Register a student profile and set up their account.</p>
           <button 
-            onClick={() => enrollStudentAction('New')} 
+            type="button" onClick={() => enrollStudentAction('New')} 
             className="w-full py-4 bg-indigo-500 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/20 active:scale-95 transition-all"
           >
             Register Student
@@ -59,7 +59,7 @@ const RegistrationHub: React.FC<RegistrationHubProps> = ({
           <h4 className="text-xl sm:text-2xl font-black tracking-tight">Batch Student Registration</h4>
           <p className="text-slate-400 text-sm font-semibold max-w-xs mx-auto">Import students from spreadsheet files (.csv, .xls, .xlsx, .ods).</p>
           <button
-            onClick={() => {
+            type="button" onClick={() => {
               if (isBatchRegistering) return;
               batchFileInputRef.current?.click();
             }}
@@ -68,7 +68,7 @@ const RegistrationHub: React.FC<RegistrationHubProps> = ({
           >
             {isBatchRegistering ? 'Importing...' : 'Upload Spreadsheet'}
           </button>
-          <input
+          <input aria-label="Action"
             ref={batchFileInputRef}
             type="file"
             accept=".csv,.tsv,.xls,.xlsx,.ods"
@@ -102,8 +102,8 @@ const RegistrationHub: React.FC<RegistrationHubProps> = ({
                     <p className="text-[10px] text-slate-400 font-bold uppercase">{s.studentschool_id || `IEM-${s.id}`}</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => deleteEntity(s.id, 'student')} 
+                <button aria-label="Action" 
+                  type="button" onClick={() => deleteEntity(s.id, 'student')} 
                   className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 text-slate-300 hover:text-rose-500 transition-all shadow-sm flex items-center justify-center"
                 >
                   <i className="fas fa-trash-can text-sm"></i>

@@ -9,9 +9,10 @@ interface CourseCardProps {
 
 const CourseCard: React.FC<CourseCardProps> = ({ course, onClick }) => {
   return (
-    <div 
+    <button 
+      type="button"
       onClick={onClick}
-      className="group bg-white rounded-[32px] overflow-hidden shadow- premium border border-slate-100 hover:border-[#4ea59d]/40 transition-all hover:-translate-y-2 cursor-pointer"
+      className="group bg-white rounded-[32px] overflow-hidden shadow- premium border border-slate-100 hover:border-[#4ea59d]/40 transition-all hover:-translate-y-2 cursor-pointer text-left w-full block"
     >
       <div className="relative aspect-video overflow-hidden bg-slate-50">
         <img 
@@ -48,7 +49,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onClick }) => {
           </div>
         </div>
       </div>
-    </div>
+    </button>
   );
 };
 

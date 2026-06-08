@@ -33,6 +33,32 @@ const getTodayIsoDate = () => {
   return `${year}-${month}-${day}`;
 };
 
+type StatusState = {
+  isLoading: boolean;
+  isSaving: boolean;
+};
+
+type StatusAction =
+  | { type: 'START_LOADING' }
+  | { type: 'STOP_LOADING' }
+  | { type: 'START_SAVING' }
+  | { type: 'STOP_SAVING' };
+
+function statusReducer(state: StatusState, action: StatusAction): StatusState {
+  switch (action.type) {
+    case 'START_LOADING':
+      return { ...state, isLoading: true };
+    case 'STOP_LOADING':
+      return { ...state, isLoading: false };
+    case 'START_SAVING':
+      return { ...state, isSaving: true };
+    case 'STOP_SAVING':
+      return { ...state, isSaving: false };
+    default:
+      return state;
+  }
+}
+
 const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
   students,
   allStudents,
@@ -42,10 +68,10 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 }) => {
   const [contextType, setContextType] = React.useState<AttendanceContextType>('class');
   const [selectedContextId, setSelectedContextId] = React.useState<string>('');
-  const [attendanceDate, setAttendanceDate] = React.useState(getTodayIsoDate());
+  const [attendanceDate, setAttendanceDate] = React.useState(() => getTodayIsoDate());
   const [attendanceMap, setAttendanceMap] = React.useState<Record<string, AttendanceStatus>>({});
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [isSaving, setIsSaving] = React.useState(false);
+  const [statusState, dispatchStatus] = React.useReducer(statusReducer, { isLoading: false, isSaving: false });
+  const { isLoading, isSaving } = statusState;
 
   const activeContextList = contextType === 'class' ? classes : subjects;
 
@@ -77,7 +103,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
   const loadAttendance = React.useCallback(async () => {
     if (!selectedContextId || !attendanceDate) return;
 
-    setIsLoading(true);
+    dispatchStatus({ type: 'START_LOADING' });
 
     const { data, error } = await supabase
       .from('attendance_records')
@@ -88,7 +114,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
     if (error) {
       notify?.(`Failed to load attendance: ${error.message}`);
-      setIsLoading(false);
+      dispatchStatus({ type: 'STOP_LOADING' });
       return;
     }
 
@@ -98,7 +124,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
     });
 
     setAttendanceMap(nextMap);
-    setIsLoading(false);
+    dispatchStatus({ type: 'STOP_LOADING' });
   }, [selectedContextId, attendanceDate, contextType, notify]);
 
   React.useEffect(() => {
@@ -108,7 +134,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
   const saveSingle = async (studentId: string, status: AttendanceStatus) => {
     if (!selectedContextId || !attendanceDate) return;
 
-    setIsSaving(true);
+    dispatchStatus({ type: 'START_SAVING' });
 
     const { schoolId } = await getCurrentTenantContext();
 
@@ -124,7 +150,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
       .from('attendance_records')
       .upsert([payload], { onConflict: 'context_type,context_id,attendance_date,student_id' });
 
-    setIsSaving(false);
+    dispatchStatus({ type: 'STOP_SAVING' });
 
     if (upsertResult.error) {
       notify?.(`Failed to save attendance: ${upsertResult.error.message}`);
@@ -140,7 +166,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
       return;
     }
 
-    setIsSaving(true);
+    dispatchStatus({ type: 'START_SAVING' });
 
     const { schoolId } = await getCurrentTenantContext();
 
@@ -156,7 +182,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
       .from('attendance_records')
       .upsert(payload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
 
-    setIsSaving(false);
+    dispatchStatus({ type: 'STOP_SAVING' });
 
     if (upsertResult.error) {
       notify?.(`Failed to bulk save attendance: ${upsertResult.error.message}`);
@@ -199,7 +225,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
             ))}
           </select>
 
-          <input
+          <input aria-label="Action"
             type="date"
             value={attendanceDate}
             onChange={(e) => setAttendanceDate(e.target.value)}

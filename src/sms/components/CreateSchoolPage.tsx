@@ -167,7 +167,7 @@ const CreateSchoolPage: React.FC<CreateSchoolPageProps> = ({ onCreated, onBackTo
             <label className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
               School Name
             </label>
-            <input
+            <input aria-label="Action"
               type="text"
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
@@ -181,7 +181,7 @@ const CreateSchoolPage: React.FC<CreateSchoolPageProps> = ({ onCreated, onBackTo
             <label className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
               Slug <span className="font-normal normal-case tracking-normal text-slate-400">(unique URL identifier)</span>
             </label>
-            <input
+            <input aria-label="Action"
               type="text"
               value={slug}
               onChange={(e) => handleSlugChange(e.target.value)}
@@ -197,7 +197,7 @@ const CreateSchoolPage: React.FC<CreateSchoolPageProps> = ({ onCreated, onBackTo
               <label className="text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
                 {accessMode === 'set-password' ? 'Set School Password' : 'School Password'}
               </label>
-              <input
+              <input aria-label="Action"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

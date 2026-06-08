@@ -11,9 +11,11 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ url, title, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 md:p-10 animate-in fade-in duration-300">
-      <div 
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity" 
+      <button 
+        type="button"
+        className="absolute inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity w-full h-full border-none cursor-default" 
         onClick={onClose}
+        aria-label="Close preview backdrop"
       />
       
       <div className="relative w-full max-w-6xl h-full bg-white dark:bg-slate-900 rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col z-10 animate-in zoom-in-95 duration-300">
@@ -30,21 +32,21 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ url, title, onClose }) => {
           </div>
           
           <div className="flex items-center gap-2">
-            <a 
+            <a aria-label="Action" 
               href={url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="p-2 w-10 h-10 rounded-xl bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-400 hover:bg-brand-500 hover:text-white transition-all flex items-center justify-center"
+              className="p-2 w-10 h-10 rounded-xl bg-slate-100 dark:bg-dark-800 text-slate-500 dark:text-white hover:bg-brand-500 hover:text-white transition-all flex items-center justify-center"
               title="Open in New Tab"
             >
               <i className="fa-solid fa-up-right-from-square text-xs"></i>
             </a>
 
-            <button 
+            <button aria-label="Action" 
               onClick={onClose}
-              className="p-2 w-10 h-10 rounded-xl bg-slate-100 dark:bg-dark-800 text-slate-600 dark:text-slate-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"
+              className="p-2 w-10 h-10 rounded-xl bg-slate-100 dark:bg-dark-800 text-slate-700 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-rose-600 dark:hover:text-rose-400 transition-all flex items-center justify-center"
               title="Close Preview"
-            >
+             type="button">
               <i className="fa-solid fa-xmark text-lg"></i>
             </button>
           </div>
@@ -56,6 +58,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ url, title, onClose }) => {
             src={`${url}#toolbar=0&navpanes=0&scrollbar=0`}
             className="w-full h-full border-none"
             title={title}
+            sandbox=""
           />
         </div>
 
@@ -68,7 +71,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ url, title, onClose }) => {
             <button 
               onClick={onClose}
               className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 transition-colors"
-            >
+             type="button">
               Close
             </button>
             <a 

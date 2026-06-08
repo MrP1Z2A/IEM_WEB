@@ -46,7 +46,7 @@ const StudentHub: React.FC<StudentHubProps> = ({ studentNames, studentIds, schoo
         <div className="h-36 bg-gradient-to-r from-emerald-900 via-emerald-700 to-emerald-900 relative overflow-hidden">
           <div className="absolute top-5 right-7">
             <div className="flex items-center gap-2">
-              <button onClick={fetchData} disabled={syncing} className="bg-white/10 backdrop-blur-md text-white text-[10px] px-3 py-1.5 rounded-xl font-black uppercase tracking-widest border border-white/10 flex items-center gap-1.5 hover:bg-white/20 transition-all active:scale-95 disabled:opacity-60">
+              <button onClick={fetchData} disabled={syncing} className="bg-white/10 backdrop-blur-md text-white text-[10px] px-3 py-1.5 rounded-xl font-black uppercase tracking-widest border border-white/10 flex items-center gap-1.5 hover:bg-white/20 transition-all active:scale-95 disabled:opacity-60" type="button">
                 <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? 'Syncing…' : `Last: ${data?.lastSync || '—'}`}
               </button>
@@ -78,7 +78,7 @@ const StudentHub: React.FC<StudentHubProps> = ({ studentNames, studentIds, schoo
                   <BookOpen className="w-4 h-4" /> Download {reportCard.file_name || reportCard.title || 'Report Card'}
                 </a>
               ) : (
-                <button disabled className="px-7 py-3.5 bg-slate-200 text-slate-400 font-black rounded-2xl text-[10px] uppercase tracking-widest flex items-center gap-2 cursor-not-allowed">
+                <button disabled className="px-7 py-3.5 bg-slate-200 text-slate-400 font-black rounded-2xl text-[10px] uppercase tracking-widest flex items-center gap-2 cursor-not-allowed" type="button">
                   <BookOpen className="w-4 h-4" /> No File Available
                 </button>
               )}

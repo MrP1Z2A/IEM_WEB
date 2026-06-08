@@ -417,10 +417,10 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
           <p className="text-slate-400 text-sm mt-1">Assign teachers and students to classes and courses</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => void loadAll()} className="flex items-center gap-2 px-4 py-2.5 bg-brand-500/10 border border-brand-500/20 text-brand-500 hover:bg-brand-500 hover:text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all">
+          <button type="button" onClick={() => void loadAll()} className="flex items-center gap-2 px-4 py-2.5 bg-brand-500/10 border border-brand-500/20 text-brand-500 hover:bg-brand-500 hover:text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all">
             <i className="fas fa-rotate-right"></i> Refresh
           </button>
-          <button onClick={openNewClass} className="flex items-center gap-2 px-4 py-2.5 bg-brand-500 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/25">
+          <button onClick={openNewClass} className="flex items-center gap-2 px-4 py-2.5 bg-brand-500 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/25" type="button">
             <i className="fas fa-plus"></i> New Class
           </button>
         </div>
@@ -456,13 +456,13 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
               <h3 className="text-sm font-black text-slate-700 dark:text-white uppercase tracking-widest flex items-center gap-2">
                 <i className="fas fa-layer-group text-brand-500 text-xs"></i> Classes
               </h3>
-              <button onClick={openNewClass} className="w-7 h-7 rounded-lg bg-brand-500/10 hover:bg-brand-500 text-brand-500 hover:text-white flex items-center justify-center transition-all" title="New Class">
+              <button aria-label="Action" onClick={openNewClass} className="w-7 h-7 rounded-lg bg-brand-500/10 hover:bg-brand-500 text-brand-500 hover:text-white flex items-center justify-center transition-all" title="New Class" type="button">
                 <i className="fas fa-plus text-xs"></i>
               </button>
             </div>
             <div className="relative">
               <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-              <input type="text" value={searchClasses} onChange={e => setSearchClasses(e.target.value)}
+              <input aria-label="Action" type="text" value={searchClasses} onChange={e => setSearchClasses(e.target.value)}
                 placeholder="Search classes..." className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2 pl-8 pr-3 text-xs font-semibold text-slate-700 dark:text-white focus:outline-none focus:border-brand-500 transition-all placeholder:text-slate-400" />
             </div>
           </div>
@@ -480,9 +480,9 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
               const isActive = selectedClass?.id === cls.id;
               const courseCount = courses.filter(c => c.class_id === cls.id).length;
               return (
-                <div key={cls.id}
+                <button type="button" key={cls.id}
                   onClick={() => { setSelectedClass(cls); setSelectedCourse(null); setSearchCourses(''); setActiveTab('overview'); }}
-                  className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all group ${isActive ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-white'}`}>
+                  className={`w-full text-left flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all group ${isActive ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-white'}`}>
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-black text-base overflow-hidden"
                     style={{ backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : (cls.color || '#f1f5f9') }}>
                     {cls.image_url
@@ -494,14 +494,14 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                     <p className={`text-[9px] font-bold ${isActive ? 'text-white/70' : 'text-slate-400'}`}>{courseCount} course{courseCount !== 1 ? 's' : ''}</p>
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => openEditClass(cls)} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500'}`} title="Edit">
+                    <button type="button" onClick={() => openEditClass(cls)} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500'}`} title="Edit">
                       <i className="fas fa-pencil text-[9px]"></i>
                     </button>
-                    <button onClick={() => deleteClass(cls)} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isActive ? 'hover:bg-rose-500/20 text-white' : 'hover:bg-rose-50 text-rose-400'}`} title="Delete">
+                    <button type="button" onClick={() => deleteClass(cls)} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isActive ? 'hover:bg-rose-500/20 text-white' : 'hover:bg-rose-50 text-rose-400'}`} title="Delete">
                       <i className="fas fa-trash text-[9px]"></i>
                     </button>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -516,14 +516,14 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                 {selectedClass ? <span className="truncate max-w-[120px]">{selectedClass.name}</span> : 'Courses'}
               </h3>
               {selectedClass && (
-                <button onClick={openNewCourse} className="w-7 h-7 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-500 hover:text-white flex items-center justify-center transition-all" title="New Course">
+                <button aria-label="Action" onClick={openNewCourse} className="w-7 h-7 rounded-lg bg-indigo-500/10 hover:bg-indigo-500 text-indigo-500 hover:text-white flex items-center justify-center transition-all" title="New Course" type="button">
                   <i className="fas fa-plus text-xs"></i>
                 </button>
               )}
             </div>
             <div className="relative">
               <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-              <input type="text" value={searchCourses} onChange={e => setSearchCourses(e.target.value)}
+              <input aria-label="Action" type="text" value={searchCourses} onChange={e => setSearchCourses(e.target.value)}
                 placeholder="Search courses..." className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2 pl-8 pr-3 text-xs font-semibold text-slate-700 dark:text-white focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-400" />
             </div>
           </div>
@@ -543,9 +543,9 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
               const tCount = assignedTeachers.filter(a => a.class_course_id === course.id).length;
               const sCount = assignedStudents.filter(a => a.class_course_id === course.id).length;
               return (
-                <div key={course.id}
+                <button type="button" key={course.id}
                   onClick={() => { setSelectedCourse(course); setActiveTab('overview'); setSearchPeople(''); }}
-                  className={`flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all group ${isActive ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-white'}`}>
+                  className={`w-full text-left flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-all group ${isActive ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-white'}`}>
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden ${isActive ? 'bg-white/20' : 'bg-indigo-500/10'}`}>
                     {course.image_url
                       ? <img src={course.image_url} alt={course.name} className="w-full h-full object-cover" />
@@ -556,14 +556,14 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                     <p className={`text-[9px] font-bold ${isActive ? 'text-white/70' : 'text-slate-400'}`}>{tCount}T · {sCount}S</p>
                   </div>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => openEditCourse(course)} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500'}`} title="Edit">
+                    <button type="button" onClick={() => openEditCourse(course)} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isActive ? 'hover:bg-white/20 text-white' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500'}`} title="Edit">
                       <i className="fas fa-pencil text-[9px]"></i>
                     </button>
-                    <button onClick={() => deleteCourse(course)} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isActive ? 'hover:bg-rose-500/30 text-white' : 'hover:bg-rose-50 text-rose-400'}`} title="Delete">
+                    <button type="button" onClick={() => deleteCourse(course)} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${isActive ? 'hover:bg-rose-500/30 text-white' : 'hover:bg-rose-50 text-rose-400'}`} title="Delete">
                       <i className="fas fa-trash text-[9px]"></i>
                     </button>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -591,11 +591,11 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => openAssign('teacher')}
+                    <button type="button" onClick={() => openAssign('teacher')}
                       className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-600 hover:bg-amber-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                       <i className="fas fa-user-plus text-xs"></i> Teacher
                     </button>
-                    <button onClick={() => openAssign('student')}
+                    <button type="button" onClick={() => openAssign('student')}
                       className="flex items-center gap-1.5 px-3 py-2 bg-brand-500/10 border border-brand-500/20 text-brand-600 hover:bg-brand-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                       <i className="fas fa-user-plus text-xs"></i> Student
                     </button>
@@ -604,7 +604,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                 {/* Tabs */}
                 <div className="flex gap-1 mt-4">
                   {(['overview', 'teachers', 'students'] as Tab[]).map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)}
+                    <button key={tab} type="button" onClick={() => setActiveTab(tab)}
                       className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                       {tab === 'overview' ? 'Overview' : tab === 'teachers' ? `Teachers (${teachersForCourse.length})` : `Students (${studentsForCourse.length})`}
                     </button>
@@ -617,7 +617,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                 <div className="px-5 pt-4">
                   <div className="relative">
                     <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-                    <input type="text" value={searchPeople} onChange={e => setSearchPeople(e.target.value)}
+                    <input aria-label="Action" type="text" value={searchPeople} onChange={e => setSearchPeople(e.target.value)}
                       placeholder={`Search ${activeTab}...`}
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2 pl-8 pr-3 text-xs font-semibold text-slate-700 dark:text-white focus:outline-none focus:border-brand-500 transition-all placeholder:text-slate-400" />
                   </div>
@@ -633,7 +633,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                         { label: 'Teachers', count: teachersForCourse.length, icon: 'fa-chalkboard-teacher', color: 'text-amber-500 bg-amber-500/10', tab: 'teachers' as Tab },
                         { label: 'Students', count: studentsForCourse.length, icon: 'fa-user-graduate', color: 'text-brand-500 bg-brand-500/10', tab: 'students' as Tab },
                       ].map(card => (
-                        <button key={card.label} onClick={() => setActiveTab(card.tab)}
+                        <button key={card.label} type="button" onClick={() => setActiveTab(card.tab)}
                           className="p-5 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-brand-500/30 hover:shadow-lg transition-all text-left">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.color}`}>
                             <i className={`fas ${card.icon}`}></i>
@@ -693,8 +693,8 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                           <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">Teacher</p>
                           {t.email && <p className="text-[9px] text-slate-400 truncate">{t.email}</p>}
                         </div>
-                        <button onClick={() => removeTeacher(String(t.id))}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all" title="Remove">
+                        <button aria-label="Action" type="button" onClick={() => removeTeacher(String(t.id))}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all" title="Remove">
                           <i className="fas fa-xmark text-xs"></i>
                         </button>
                       </div>
@@ -717,8 +717,8 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                           <p className="text-[9px] font-bold text-brand-500 uppercase tracking-widest">Student</p>
                           {s.email && <p className="text-[9px] text-slate-400 truncate">{s.email}</p>}
                         </div>
-                        <button onClick={() => removeStudent(String(s.id))}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all" title="Remove">
+                        <button aria-label="Action" type="button" onClick={() => removeStudent(String(s.id))}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all" title="Remove">
                           <i className="fas fa-xmark text-xs"></i>
                         </button>
                       </div>
@@ -737,7 +737,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[28px] shadow-2xl w-full max-w-sm">
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-base font-black text-slate-800 dark:text-white">{editingClass ? 'Edit Class' : 'New Class'}</h3>
-              <button onClick={() => setIsClassModalOpen(false)} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all">
+              <button aria-label="Action" type="button" onClick={() => setIsClassModalOpen(false)} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all">
                 <i className="fas fa-xmark"></i>
               </button>
             </div>
@@ -760,20 +760,20 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
               </div>
               <div>
                 <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Class Name</label>
-                <input type="text" value={classFormName} onChange={e => setClassFormName(e.target.value)} placeholder="e.g. Grade 5"
+                <input aria-label="Action" type="text" value={classFormName} onChange={e => setClassFormName(e.target.value)} placeholder="e.g. Grade 5"
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-4 text-sm font-semibold text-slate-800 dark:text-white focus:outline-none focus:border-brand-500 transition-all" />
               </div>
               <div>
                 <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Accent Color</label>
                 <div className="flex flex-wrap gap-2">
                   {COLOR_OPTIONS.map(c => (
-                    <button key={c} onClick={() => setClassFormColor(c)}
+                    <button aria-label="Action" key={c} type="button" onClick={() => setClassFormColor(c)}
                       className={`w-8 h-8 rounded-xl border-2 transition-all ${classFormColor === c ? 'border-brand-500 scale-110 shadow-lg' : 'border-transparent hover:scale-105'}`}
                       style={{ backgroundColor: c }} />
                   ))}
                 </div>
               </div>
-              <button onClick={() => void saveClass()} disabled={isSavingClass || !classFormName.trim()}
+              <button type="button" onClick={() => void saveClass()} disabled={isSavingClass || !classFormName.trim()}
                 className="w-full py-3 bg-brand-500 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-brand-600 transition-all disabled:opacity-40 shadow-lg shadow-brand-500/25">
                 {isSavingClass ? 'Uploading & Saving…' : editingClass ? 'Update Class' : 'Create Class'}
               </button>
@@ -788,7 +788,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[28px] shadow-2xl w-full max-w-sm">
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-base font-black text-slate-800 dark:text-white">{editingCourse ? 'Edit Course' : 'New Course'}</h3>
-              <button onClick={() => setIsCourseModalOpen(false)} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all">
+              <button aria-label="Action" type="button" onClick={() => setIsCourseModalOpen(false)} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all">
                 <i className="fas fa-xmark"></i>
               </button>
             </div>
@@ -812,10 +812,10 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
               </div>
               <div>
                 <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1 block">Course Name</label>
-                <input type="text" value={courseFormName} onChange={e => setCourseFormName(e.target.value)} placeholder="e.g. Mathematics"
+                <input aria-label="Action" type="text" value={courseFormName} onChange={e => setCourseFormName(e.target.value)} placeholder="e.g. Mathematics"
                   className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 px-4 text-sm font-semibold text-slate-800 dark:text-white focus:outline-none focus:border-indigo-500 transition-all" />
               </div>
-              <button onClick={() => void saveCourse()} disabled={isSavingCourse || !courseFormName.trim()}
+              <button type="button" onClick={() => void saveCourse()} disabled={isSavingCourse || !courseFormName.trim()}
                 className="w-full py-3 bg-indigo-500 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-indigo-600 transition-all disabled:opacity-40 shadow-lg shadow-indigo-500/25">
                 {isSavingCourse ? 'Uploading & Saving…' : editingCourse ? 'Update Course' : 'Create Course'}
               </button>
@@ -833,7 +833,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                 Assign {assignMode === 'teacher' ? 'Teachers' : 'Students'}
                 <span className="ml-2 text-[10px] font-bold text-slate-400">to {selectedCourse?.name}</span>
               </h3>
-              <button onClick={() => setIsAssignModalOpen(false)} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all">
+              <button aria-label="Action" type="button" onClick={() => setIsAssignModalOpen(false)} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all">
                 <i className="fas fa-xmark"></i>
               </button>
             </div>
@@ -863,7 +863,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
                   );
                 })}
               </div>
-              <button onClick={() => void handleAssign()} disabled={isAssigning || selectedAssignIds.size === 0}
+              <button type="button" onClick={() => void handleAssign()} disabled={isAssigning || selectedAssignIds.size === 0}
                 className={`w-full py-3 text-white rounded-2xl text-sm font-black uppercase tracking-widest transition-all disabled:opacity-40 shadow-lg ${assignMode === 'teacher' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/25' : 'bg-brand-500 hover:bg-brand-600 shadow-brand-500/25'}`}>
                 {isAssigning ? 'Assigning…' : `Assign ${selectedAssignIds.size || ''} ${assignMode}${selectedAssignIds.size !== 1 ? 's' : ''}`}
               </button>
@@ -881,10 +881,10 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
             </div>
             <p className="text-sm font-bold text-slate-700 dark:text-slate-300 text-center">{deleteConfirm.label}</p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
+              <button type="button" onClick={() => setDeleteConfirm(null)} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">
                 Cancel
               </button>
-              <button onClick={deleteConfirm.onConfirm} className="flex-1 py-3 bg-rose-500 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/25">
+              <button onClick={deleteConfirm.onConfirm} className="flex-1 py-3 bg-rose-500 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/25" type="button">
                 Delete
               </button>
             </div>

@@ -168,7 +168,7 @@ const TeacherAttendance: React.FC<TeacherAttendanceProps> = ({ schoolId }) => {
           <p className="text-slate-400 text-sm mt-1">Global daily roll call for teaching staff</p>
         </div>
         {teachers.length > 0 && (
-          <button onClick={() => void saveAttendance()} disabled={isSaving}
+          <button type="button" onClick={() => void saveAttendance()} disabled={isSaving}
             className="flex items-center gap-2 px-5 py-3 bg-brand-500 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/25 disabled:opacity-50">
             <i className={`fas ${isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`}></i>
             {isSaving ? 'Saving…' : 'Save Attendance'}
@@ -178,8 +178,8 @@ const TeacherAttendance: React.FC<TeacherAttendanceProps> = ({ schoolId }) => {
 
       {/* Date Selector */}
       <div className="max-w-xs relative">
-        <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">Attendance Date</label>
-        <button onClick={() => setIsCalendarOpen(p => !p)}
+        <label htmlFor="attendance-date-select-btn" className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1.5 block">Attendance Date</label>
+        <button id="attendance-date-select-btn" type="button" onClick={() => setIsCalendarOpen(p => !p)}
           className="w-full flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl py-3 px-4 text-sm font-semibold text-slate-700 dark:text-white focus:outline-none hover:border-brand-500 transition-all shadow-sm">
           <span className="flex items-center gap-3">
             <i className="fas fa-calendar text-brand-500"></i>
@@ -191,14 +191,14 @@ const TeacherAttendance: React.FC<TeacherAttendanceProps> = ({ schoolId }) => {
         {isCalendarOpen && (
           <div className="absolute top-full mt-2 left-0 right-0 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[20px] shadow-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="flex items-center justify-between mb-4">
-              <button onClick={() => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth()-1, 1))}
+              <button aria-label="Previous month" type="button" onClick={() => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth()-1, 1))}
                 className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-brand-500 hover:text-white transition-all">
                 <i className="fas fa-chevron-left text-xs"></i>
               </button>
               <h4 className="text-sm font-black text-slate-700 dark:text-white">
                 {MONTHS[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
               </h4>
-              <button onClick={() => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth()+1, 1))}
+              <button aria-label="Next month" type="button" onClick={() => setCalendarMonth(d => new Date(d.getFullYear(), d.getMonth()+1, 1))}
                 className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-brand-500 hover:text-white transition-all">
                 <i className="fas fa-chevron-right text-xs"></i>
               </button>
@@ -210,7 +210,7 @@ const TeacherAttendance: React.FC<TeacherAttendanceProps> = ({ schoolId }) => {
               {calendarDays.map((day, i) => (
                 <div key={i}>
                   {day ? (
-                    <button onClick={() => { setSelectedDate(day); setIsCalendarOpen(false); }}
+                    <button type="button" onClick={() => { setSelectedDate(day); setIsCalendarOpen(false); }}
                       className={`w-full aspect-square flex items-center justify-center rounded-xl text-xs font-bold transition-all
                         ${isSelected(day) ? 'bg-brand-500 text-white shadow-lg shadow-brand-500/30' :
                           isToday(day) ? 'border-2 border-brand-500 text-brand-500 font-black' :
@@ -221,7 +221,7 @@ const TeacherAttendance: React.FC<TeacherAttendanceProps> = ({ schoolId }) => {
                 </div>
               ))}
             </div>
-            <button onClick={() => { setSelectedDate(new Date()); setCalendarMonth(new Date()); setIsCalendarOpen(false); }}
+            <button type="button" onClick={() => { setSelectedDate(new Date()); setCalendarMonth(new Date()); setIsCalendarOpen(false); }}
               className="w-full mt-3 py-2 text-[10px] font-black uppercase tracking-widest text-brand-500 hover:bg-brand-500/5 rounded-xl transition-all">
               Today
             </button>
@@ -258,8 +258,8 @@ const TeacherAttendance: React.FC<TeacherAttendanceProps> = ({ schoolId }) => {
             <span className="text-[10px] font-bold text-slate-400 ml-1">— {stats.total} total teachers</span>
           </h3>
           <div className="flex gap-2">
-            <button onClick={() => markAll('P')} className="px-3 py-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">Mark All Present</button>
-            <button onClick={unmarkAll} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">Unmark All</button>
+            <button type="button" onClick={() => markAll('P')} className="px-3 py-1.5 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">Mark All Present</button>
+            <button onClick={unmarkAll} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all" type="button">Unmark All</button>
           </div>
         </div>
 
@@ -298,7 +298,7 @@ const TeacherAttendance: React.FC<TeacherAttendanceProps> = ({ schoolId }) => {
                     const c = STATUS_CONFIG[s];
                     const active = teacher.status === s;
                     return (
-                      <button key={s} onClick={() => setStatus(teacher.id, active ? null : s)}
+                      <button aria-label="Action" key={s} type="button" onClick={() => setStatus(teacher.id, active ? null : s)}
                         className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all border ${
                           active ? `${c.bg} text-white border-transparent shadow-md` : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-slate-300'
                         }`}>

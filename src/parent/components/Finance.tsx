@@ -164,7 +164,7 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
       {showQr && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-10 relative text-center">
-            <button onClick={() => setShowQr(false)} className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 bg-slate-50 p-2 rounded-xl transition-colors">
+            <button type="button" onClick={() => setShowQr(false)} className="absolute top-6 right-6 text-slate-400 hover:text-rose-500 bg-slate-50 p-2 rounded-xl transition-colors">
               <X className="w-5 h-5" />
             </button>
             <div className="bg-emerald-50 w-16 h-16 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto mb-6">
@@ -175,7 +175,7 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
             <div className="bg-slate-50 p-6 rounded-3xl border-2 border-dashed border-slate-100 flex justify-center mb-8">
               <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IEMPayment&color=059669" alt="QR" className="w-40 h-40 rounded-xl" />
             </div>
-            <button onClick={() => setShowQr(false)} className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl hover:bg-emerald-600 transition-all text-[10px] uppercase tracking-[0.2em] active:scale-95">
+            <button type="button" onClick={() => setShowQr(false)} className="w-full py-4 bg-slate-900 text-white font-black rounded-2xl hover:bg-emerald-600 transition-all text-[10px] uppercase tracking-[0.2em] active:scale-95">
               Return to Dashboard
             </button>
           </div>
@@ -202,7 +202,7 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
               onClick={downloadHistory}
               className="bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-all border border-white/10 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest"
               title="Download Full History"
-            >
+             type="button">
               <Download className="w-3.5 h-3.5" /> PDF
             </button>
           </div>
@@ -211,10 +211,10 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
           </div>
         </div>
         <div className="flex flex-col justify-center gap-3">
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-brand-600 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest shadow-xl active:scale-[0.98]">
+          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-brand-600 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest shadow-xl active:scale-[0.98]" type="button">
             <Plus className="w-5 h-5" /> Online Payment
           </button>
-          <button onClick={() => setShowQr(true)} className="w-full bg-white text-emerald-600 border-2 border-emerald-100 font-black py-3 rounded-2xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest">
+          <button type="button" onClick={() => setShowQr(true)} className="w-full bg-white text-emerald-600 border-2 border-emerald-100 font-black py-3 rounded-2xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest">
             <QrCode className="w-5 h-5" /> Quick QR Token
           </button>
         </div>
@@ -223,10 +223,10 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
       {/* Tabs */}
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="flex p-1.5 bg-slate-50/30 border-b border-slate-100">
-          <button onClick={() => setActiveTab('pending')} className={`flex-1 py-3.5 text-[10px] font-black rounded-2xl transition-all uppercase tracking-[0.2em] ${activeTab === 'pending' ? 'bg-white shadow-md text-emerald-600 border border-emerald-50' : 'text-slate-400 hover:text-slate-600'}`}>
+          <button type="button" onClick={() => setActiveTab('pending')} className={`flex-1 py-3.5 text-[10px] font-black rounded-2xl transition-all uppercase tracking-[0.2em] ${activeTab === 'pending' ? 'bg-white shadow-md text-emerald-600 border border-emerald-50' : 'text-slate-400 hover:text-slate-600'}`}>
             Pending ({pendingPayments.length})
           </button>
-          <button onClick={() => setActiveTab('history')} className={`flex-1 py-3.5 text-[10px] font-black rounded-2xl transition-all uppercase tracking-[0.2em] ${activeTab === 'history' ? 'bg-white shadow-md text-emerald-600 border border-emerald-50' : 'text-slate-400 hover:text-slate-600'}`}>
+          <button type="button" onClick={() => setActiveTab('history')} className={`flex-1 py-3.5 text-[10px] font-black rounded-2xl transition-all uppercase tracking-[0.2em] ${activeTab === 'history' ? 'bg-white shadow-md text-emerald-600 border border-emerald-50' : 'text-slate-400 hover:text-slate-600'}`}>
             History ({paidPayments.length})
           </button>
         </div>
@@ -263,14 +263,14 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
                   </div>
                   {payment.status === 'Paid' ? (
                     <button
-                      onClick={() => downloadInvoice(payment)}
+                      type="button" onClick={() => downloadInvoice(payment)}
                       className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-100 shadow-sm"
                       title="Download Invoice"
                     >
                       <FileDown className="w-5 h-5" />
                     </button>
                   ) : (
-                    <button onClick={() => setShowQr(true)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 active:scale-95">
+                    <button type="button" onClick={() => setShowQr(true)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 active:scale-95">
                       Pay Now
                     </button>
                   )}

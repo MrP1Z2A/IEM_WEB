@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useReducer } from 'react';
 import { supabase } from '../supabaseClient';
-import { updateSchoolDeletePassword } from '../services/adminSecurity';
 import { getUnicornSchoolLogoDataUri, isUnicornSchoolLogo } from '../../shared/branding/unicornSchoolLogo';
+import { ProfileForm } from './AboutSchool/ProfileForm';
+import { SecuritySettings } from './AboutSchool/SecuritySettings';
 
 interface AboutSchoolProps {
   schoolId: string | undefined;
@@ -19,17 +20,64 @@ interface SchoolMetadata {
   address: string | null;
 }
 
+type OperationState = {
+  isLoading: boolean;
+  isSaving: boolean;
+  status: string | null;
+  error: string | null;
+};
+
+type OperationAction =
+  | { type: 'FETCH_START' }
+  | { type: 'FETCH_SUCCESS' }
+  | { type: 'FETCH_FAILURE'; error: string }
+  | { type: 'SAVE_START' }
+  | { type: 'SAVE_START_WITH_STATUS'; status: string }
+  | { type: 'SAVE_SUCCESS'; status: string }
+  | { type: 'SAVE_FAILURE'; error: string }
+  | { type: 'CLEAR_STATUS' }
+  | { type: 'SET_STATUS'; status: string | null }
+  | { type: 'SET_ERROR'; error: string | null };
+
+const initialOperationState: OperationState = {
+  isLoading: true,
+  isSaving: false,
+  status: null,
+  error: null,
+};
+
+function operationReducer(state: OperationState, action: OperationAction): OperationState {
+  switch (action.type) {
+    case 'FETCH_START':
+      return { ...state, isLoading: true, error: null, status: null };
+    case 'FETCH_SUCCESS':
+      return { ...state, isLoading: false };
+    case 'FETCH_FAILURE':
+      return { ...state, isLoading: false, error: action.error };
+    case 'SAVE_START':
+      return { ...state, isSaving: true, error: null, status: null };
+    case 'SAVE_START_WITH_STATUS':
+      return { ...state, isSaving: true, status: action.status, error: null };
+    case 'SAVE_SUCCESS':
+      return { ...state, isSaving: false, status: action.status };
+    case 'SAVE_FAILURE':
+      return { ...state, isSaving: false, error: action.error };
+    case 'CLEAR_STATUS':
+      return { ...state, status: null, error: null };
+    case 'SET_STATUS':
+      return { ...state, status: action.status };
+    case 'SET_ERROR':
+      return { ...state, error: action.error };
+    default:
+      return state;
+  }
+}
+
 export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSchoolProps) {
   const [data, setData] = useState<SchoolMetadata | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [operationState, dispatch] = useReducer(operationReducer, initialOperationState);
+  const { isLoading, isSaving, status, error } = operationState;
 
-  const [deletePassword, setDeletePassword] = useState('');
-  const [isSecuritySaving, setIsSecuritySaving] = useState(false);
-  const [securityStatus, setSecurityStatus] = useState<string | null>(null);
-  const [securityError, setSecurityError] = useState<string | null>(null);
   const [defaultLogoUrl, setDefaultLogoUrl] = useState('');
 
   const [formData, setFormData] = useState({
@@ -41,11 +89,10 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
     logo_url: '',
     banner_url: ''
   });
-  const isHeaderLogoPreview = Boolean(defaultLogoUrl) && formData.logo_url === defaultLogoUrl;
 
   const loadSchoolData = async () => {
     if (!schoolId) return;
-    setIsLoading(true);
+    dispatch({ type: 'FETCH_START' });
     try {
       const nextLogoUrl = await getUnicornSchoolLogoDataUri();
       const { data: school, error: loadError } = await supabase
@@ -65,7 +112,7 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
             .eq('id', schoolId);
 
           if (logoUpdateError) throw logoUpdateError;
-          setStatus('Header logo applied to this school profile.');
+          dispatch({ type: 'SET_STATUS', status: 'Header logo applied to this school profile.' });
         }
 
         const resolvedLogoUrl = usesManagedLogo ? nextLogoUrl : (school.logo_url || '');
@@ -89,11 +136,10 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
           banner_url: school.banner_url || '',
         });
       }
+      dispatch({ type: 'FETCH_SUCCESS' });
     } catch (err: any) {
       console.error('Error loading school data:', err);
-      setError(err.message || 'Failed to load school data');
-    } finally {
-      setIsLoading(false);
+      dispatch({ type: 'FETCH_FAILURE', error: err.message || 'Failed to load school data' });
     }
   };
 
@@ -124,8 +170,7 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsSaving(true);
-    setStatus(`Uploading ${field.split('_')[0]}...`);
+    dispatch({ type: 'SAVE_START_WITH_STATUS', status: `Uploading ${field.split('_')[0]}...` });
     try {
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const filePath = `school/${field}-${Date.now()}-${sanitizedName}`;
@@ -142,13 +187,13 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
 
       if (urlData?.publicUrl) {
         setFormData(prev => ({ ...prev, [field]: urlData.publicUrl }));
-        setStatus(`${field.split('_')[0].toUpperCase()} uploaded.`);
+        dispatch({ type: 'SAVE_SUCCESS', status: `${field.split('_')[0].toUpperCase()} uploaded.` });
+      } else {
+        dispatch({ type: 'SAVE_SUCCESS', status: '' });
       }
     } catch (err: any) {
       console.error('Upload error:', err);
-      setError(`Failed to upload image: ${err.message}`);
-    } finally {
-      setIsSaving(false);
+      dispatch({ type: 'SAVE_FAILURE', error: `Failed to upload image: ${err.message}` });
     }
   };
 
@@ -156,9 +201,7 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
     e.preventDefault();
     if (!schoolId) return;
 
-    setIsSaving(true);
-    setError(null);
-    setStatus(null);
+    dispatch({ type: 'SAVE_START' });
 
     try {
       const { error: updateError } = await supabase
@@ -194,39 +237,10 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
         logo_url: formData.logo_url,
         banner_url: formData.banner_url,
       });
-      setStatus('School profile updated successfully!');
+      dispatch({ type: 'SAVE_SUCCESS', status: 'School profile updated successfully!' });
     } catch (err: any) {
       console.error('Update error:', err);
-      setError(err.message || 'Failed to update school profile');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSecuritySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const normalizedSchoolId = String(schoolId || '').trim();
-    if (!normalizedSchoolId) return;
-
-    const nextDeletePassword = deletePassword.trim();
-    if (!nextDeletePassword) {
-      setSecurityError('Please enter a password.');
-      return;
-    }
-
-    setIsSecuritySaving(true);
-    setSecurityError(null);
-    setSecurityStatus(null);
-
-    try {
-      await updateSchoolDeletePassword(normalizedSchoolId, nextDeletePassword);
-      setSecurityStatus('Universal delete password updated successfully!');
-      setDeletePassword('');
-    } catch (err: any) {
-      console.error('Security update error:', err);
-      setSecurityError(err.message || 'Failed to update security settings');
-    } finally {
-      setIsSecuritySaving(false);
+      dispatch({ type: 'SAVE_FAILURE', error: err.message || 'Failed to update school profile' });
     }
   };
 
@@ -253,207 +267,17 @@ export default function AboutSchool({ schoolId, onSchoolProfileChange }: AboutSc
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[32px] p-6 sm:p-8 shadow-premium space-y-8">
-        {/* Branding Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-[0.1em] text-slate-400">School Logo</h3>
-            <div className="flex items-center gap-6">
-              <div className="w-24 h-24 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-200 dark:border-slate-700 shadow-inner">
-                {formData.logo_url ? (
-                  <img src={formData.logo_url} alt="Logo" className={`w-full h-full ${isHeaderLogoPreview ? 'object-contain' : 'object-cover'}`} />
-                ) : (
-                  <i className="fas fa-school text-3xl text-slate-300"></i>
-                )}
-              </div>
-              <div className="flex-1">
-                <input
-                  type="file"
-                  onChange={(e) => handleFileUpload(e, 'logo_url')}
-                  className="hidden"
-                  id="logo-upload"
-                  accept="image/*"
-                />
-                <label
-                  htmlFor="logo-upload"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer transition-all"
-                >
-                  <i className="fas fa-upload"></i>
-                  Change Logo
-                </label>
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!defaultLogoUrl) return;
-                      setFormData(prev => ({ ...prev, logo_url: defaultLogoUrl }));
-                    }}
-                    disabled={!defaultLogoUrl}
-                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 hover:border-brand-400 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-brand-600 transition-all"
-                  >
-                    <i className="fas fa-wand-magic-sparkles"></i>
-                    Apply Header Logo
-                  </button>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                    {isHeaderLogoPreview ? 'Matches the top-left school badge' : 'Square image recommended (200x200)'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+      <ProfileForm
+        formData={formData}
+        setFormData={setFormData}
+        isSaving={isSaving}
+        defaultLogoUrl={defaultLogoUrl}
+        handleInputChange={handleInputChange}
+        handleFileUpload={handleFileUpload}
+        handleSubmit={handleSubmit}
+      />
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-[0.1em] text-slate-400">Campus Banner</h3>
-            <div className="relative group rounded-3xl overflow-hidden aspect-[3/1] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-inner">
-              {formData.banner_url ? (
-                <img src={formData.banner_url} alt="Banner" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-300">
-                   <i className="fas fa-image text-3xl"></i>
-                </div>
-              )}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <input
-                  type="file"
-                  onChange={(e) => handleFileUpload(e, 'banner_url')}
-                  className="hidden"
-                  id="banner-upload"
-                  accept="image/*"
-                />
-                <label
-                  htmlFor="banner-upload"
-                  className="px-4 py-2 bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-black uppercase tracking-widest rounded-xl cursor-pointer hover:bg-white/40 transition-all"
-                >
-                  Update Banner
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <hr className="border-slate-100 dark:border-slate-800" />
-
-        {/* Info Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <label className="space-y-2">
-            <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Institutional Title</span>
-            <input
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold"
-              placeholder="Full School Name"
-            />
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Contact Email</span>
-            <input
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold"
-              placeholder="admissions@school.edu"
-            />
-          </label>
-
-          <label className="space-y-2">
-            <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Phone Number</span>
-            <input
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold"
-              placeholder="+1 (555) 000-0000"
-            />
-          </label>
-
-           <label className="space-y-2">
-            <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Physical Address</span>
-            <input
-              name="address"
-              value={formData.address}
-              onChange={handleInputChange}
-              className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold"
-              placeholder="123 Campus Dr, Education City"
-            />
-          </label>
-        </div>
-
-        <label className="space-y-2 block">
-          <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">About the Institution</span>
-          <textarea
-            name="about"
-            value={formData.about}
-            onChange={handleInputChange}
-            className="w-full h-40 resize-none rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold"
-            placeholder="Describe your school's mission, history, and achievements..."
-          />
-        </label>
-
-        <div className="flex justify-end pt-4">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="rounded-2xl bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 text-xs font-black uppercase tracking-widest disabled:opacity-60 shadow-lg shadow-brand-500/20 transition-all hover:scale-105 active:scale-95"
-          >
-            {isSaving ? (
-              <span className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-white"></div>
-                Saving Profile...
-              </span>
-            ) : 'Update Institutional Profile'}
-          </button>
-        </div>
-      </form>
-
-      {/* Administrative Security Section */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[32px] p-6 sm:p-8 shadow-premium space-y-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center text-rose-500">
-            <i className="fas fa-shield-alt text-xl"></i>
-          </div>
-          <div>
-            <h3 className="text-xl font-black text-slate-900 tracking-tight">Administrative Security</h3>
-            <p className="text-slate-500 text-xs font-medium">Protect critical actions with a universal confirmation password.</p>
-          </div>
-        </div>
-
-        {securityError && <p className="text-xs font-bold text-rose-600 bg-rose-50 rounded-xl px-4 py-3">{securityError}</p>}
-        {securityStatus && <p className="text-xs font-bold text-brand-700 bg-brand-50 rounded-xl px-4 py-3">{securityStatus}</p>}
-
-        <form onSubmit={handleSecuritySubmit} className="space-y-4">
-          <label className="space-y-2 block">
-            <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Universal Delete Password</span>
-            <div className="relative">
-              <input
-                type="password"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-4 py-3 text-sm font-semibold pr-10"
-                placeholder="********"
-                autoComplete="new-password"
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
-                <i className="fas fa-lock"></i>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">
-              This password will be required when performing irreversible actions like deleting student or staff nodes.
-            </p>
-          </label>
-
-          <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              disabled={isSecuritySaving}
-              className="rounded-2xl bg-slate-900 hover:bg-black text-white px-8 py-3 text-[10px] font-black uppercase tracking-widest disabled:opacity-60 transition-all active:scale-95 shadow-lg shadow-slate-200"
-            >
-              {isSecuritySaving ? 'Syncing Security...' : 'Save Security Settings'}
-            </button>
-          </div>
-        </form>
-      </div>
+      <SecuritySettings schoolId={schoolId} />
     </div>
   );
 }

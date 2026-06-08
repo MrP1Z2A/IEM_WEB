@@ -160,7 +160,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToHubs }) => {
 
           {/* Name or email input field */}
           <div className="mb-4">
-            <input
+            <input aria-label="Action"
               type="text"
               placeholder="Name or Email"
               value={identifier}
@@ -171,7 +171,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToHubs }) => {
 
           {/* Password input with visibility toggle button */}
           <div className="mb-4 relative">
-            <input
+            <input aria-label="Action"
               type={passwordVisible ? 'text' : 'password'}
               placeholder="Password"
               value={password}
@@ -179,8 +179,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToHubs }) => {
               className="w-full px-4 py-3 rounded-2xl border bg-[#f8fafc] text-black caret-black"
             />
             {/* Toggle password visibility icon */}
-            <button
-              onClick={() => setPasswordVisible(!passwordVisible)}
+            <button aria-label="Action"
+              type="button" onClick={() => setPasswordVisible(!passwordVisible)}
               className="absolute right-4 top-1/2 -translate-y-1/2"
             >
               <i className={`fa-solid ${passwordVisible ? 'fa-eye-slash' : 'fa-eye'}`}></i>
@@ -197,7 +197,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToHubs }) => {
             onClick={handleAuth}
             disabled={loading}
             className="w-full py-4 bg-[#4ea59d] text-slate-900 rounded-2xl font-black uppercase"
-          >
+           type="button">
             {loading ? 'Please wait...' : 'Sign In'}
           </button>
 

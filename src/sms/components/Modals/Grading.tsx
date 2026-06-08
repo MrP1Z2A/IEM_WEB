@@ -109,6 +109,7 @@ export default function GradingModal({
                           value={percentages[student.id] || ''}
                           onChange={(event) => onPercentageChange(student.id, event.target.value)}
                           placeholder="0"
+                          aria-label="Percentage"
                           className="w-full rounded-xl border border-zinc-200 bg-white pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">%</span>
@@ -119,6 +120,7 @@ export default function GradingModal({
                         value={notes[student.id] || ''}
                         onChange={(event) => onNoteChange(student.id, event.target.value)}
                         placeholder="Add teacher comment for this student"
+                        aria-label="Teacher comment"
                         className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
                       />
                       <button

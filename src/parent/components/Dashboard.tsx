@@ -148,7 +148,7 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
         <button
           onClick={fetchData} disabled={syncing}
           className="bg-white border border-slate-100 px-4 py-2.5 rounded-xl text-slate-600 hover:text-brand-600 hover:border-brand-100 transition-all shadow-sm flex items-center gap-2 text-sm font-bold active:scale-95 disabled:opacity-50 self-start"
-        >
+         type="button">
           <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin text-brand-600' : ''}`} />
           {syncing ? 'Syncing…' : 'Refresh'}
         </button>
@@ -252,16 +252,16 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
               ))
             ) : data?.notices && data.notices.length > 0 ? (
               data.notices.map((note, idx) => (
-                <div
+                <button type="button"
                    key={idx}
                    onClick={() => onNoticeClick?.(note)}
-                   className="flex flex-col gap-2 p-5 bg-slate-50 rounded-2xl border-l-4 border-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer group"
+                   className="w-full text-left block flex flex-col gap-2 p-5 bg-slate-50 rounded-2xl border-l-4 border-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer group"
                 >
                   <div className="flex justify-between items-center">
                     <h4 className="text-sm font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{note.title}</h4>
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{note.date}</span>
                   </div>
-                </div>
+                </button>
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-slate-300 gap-2">
@@ -318,7 +318,7 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
             <button
               onClick={downloadPaymentHistory}
               className="text-[10px] font-black bg-slate-100 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 uppercase tracking-widest"
-            >
+             type="button">
               <Download className="w-3.5 h-3.5" /> History
             </button>
           </div>
@@ -349,7 +349,7 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
                         }`}>{pay.status}</span>
                     </div>
                     <button
-                      onClick={() => downloadInvoice(pay)}
+                      type="button" onClick={() => downloadInvoice(pay)}
                       className="p-2 text-slate-300 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                       title="Download Invoice"
                     >

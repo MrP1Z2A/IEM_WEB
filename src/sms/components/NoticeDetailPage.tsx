@@ -248,7 +248,7 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
             </div>
             <div className="flex gap-3 pt-2">
               <button
-                onClick={() => setConfirmDialog(null)}
+                type="button" onClick={() => setConfirmDialog(null)}
                 className="flex-1 px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
               >
                 Cancel
@@ -256,7 +256,7 @@ export default function NoticeDetailPage({ noticeId, onBack }: NoticeDetailPageP
               <button
                 onClick={confirmDialog.onConfirm}
                 className="flex-1 px-4 py-3 rounded-2xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:bg-rose-600 active:scale-95 transition-all"
-              >
+               type="button">
                 Delete Notice
               </button>
             </div>

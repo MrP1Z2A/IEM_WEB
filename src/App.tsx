@@ -137,7 +137,8 @@ export default function Portal() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch h-full">
 
           {/* School SMS */}
-          <div
+          <button
+            type="button"
             onClick={() => setAppMode('sms')}
             className="group cursor-pointer bg-white/5 border border-white/10 backdrop-blur-2xl rounded-[2.5rem] p-8 hover:-translate-y-3 hover:bg-white/10 hover:border-sky-400/50 hover:shadow-[0_20px_50px_-20px_rgba(56,189,248,0.4)] transition-all duration-500 flex flex-col items-center text-center relative overflow-hidden"
           >
@@ -145,13 +146,14 @@ export default function Portal() {
             <div className="w-20 h-20 rounded-3xl bg-sky-500/20 shadow-inner flex items-center justify-center mb-6 text-4xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 border border-sky-500/20">
               🏫
             </div>
-            <h2 className="text-2xl font-black mb-3 tracking-tight uppercase">School SMS</h2>
+            <h2 className="text-2xl font-black mb-3 tracking-tight uppercase text-white">School SMS</h2>
             <p className="text-slate-400 text-xs font-medium leading-relaxed">Authority interface for staff, administrators, and organizational logistics.</p>
             <div className="mt-6 text-sky-400 font-bold text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Initialize Session →</div>
-          </div>
+          </button>
 
           {/* Student Service */}
-          <div
+          <button
+            type="button"
             onClick={() => setAppMode('student_service')}
             className="group cursor-pointer bg-white/5 border border-white/10 backdrop-blur-2xl rounded-[2.5rem] p-8 hover:-translate-y-3 hover:bg-white/10 hover:border-cyan-400/50 hover:shadow-[0_20px_50px_-20px_rgba(34,211,238,0.4)] transition-all duration-500 flex flex-col items-center text-center relative overflow-hidden"
           >
@@ -159,13 +161,14 @@ export default function Portal() {
             <div className="w-20 h-20 rounded-3xl bg-cyan-500/20 shadow-inner flex items-center justify-center mb-6 text-4xl group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500 border border-cyan-500/20">
               🤝
             </div>
-            <h2 className="text-2xl font-black mb-3 tracking-tight uppercase">Student Service</h2>
+            <h2 className="text-2xl font-black mb-3 tracking-tight uppercase text-white">Student Service</h2>
             <p className="text-slate-400 text-xs font-medium leading-relaxed">Support interface for student enrollment, queries, and service coordination.</p>
             <div className="mt-6 text-cyan-400 font-bold text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Initialize Session →</div>
-          </div>
+          </button>
 
           {/* Student LMS */}
-          <div
+          <button
+            type="button"
             onClick={() => setAppMode('lms')}
             className="group cursor-pointer bg-white/5 border border-white/10 backdrop-blur-2xl rounded-[2.5rem] p-8 hover:-translate-y-3 hover:bg-white/10 hover:border-emerald-400/50 hover:shadow-[0_20px_50px_-20px_rgba(52,211,153,0.4)] transition-all duration-500 flex flex-col items-center text-center relative overflow-hidden"
           >
@@ -173,13 +176,14 @@ export default function Portal() {
             <div className="w-20 h-20 rounded-3xl bg-emerald-500/20 shadow-inner flex items-center justify-center mb-6 text-4xl group-hover:scale-110 group-hover:-rotate-6 transition-all duration-500 border border-emerald-500/20">
               🎓
             </div>
-            <h2 className="text-2xl font-black mb-3 tracking-tight uppercase">Student LMS</h2>
+            <h2 className="text-2xl font-black mb-3 tracking-tight uppercase text-white">Student LMS</h2>
             <p className="text-slate-400 text-xs font-medium leading-relaxed">Interactive terminal for academic mastery and coursework.</p>
             <div className="mt-6 text-emerald-400 font-bold text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Initialize Session →</div>
-          </div>
+          </button>
 
           {/* Parent Portal */}
-          <div
+          <button
+            type="button"
             onClick={() => setAppMode('parent')}
             className="group cursor-pointer bg-white/5 border border-white/10 backdrop-blur-2xl rounded-[2.5rem] p-8 hover:-translate-y-3 hover:bg-white/10 hover:border-indigo-400/50 hover:shadow-[0_20px_50px_-20px_rgba(129,140,248,0.4)] transition-all duration-500 flex flex-col items-center text-center relative overflow-hidden"
           >
@@ -187,10 +191,10 @@ export default function Portal() {
             <div className="w-20 h-20 rounded-3xl bg-indigo-500/20 shadow-inner flex items-center justify-center mb-6 text-4xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 border border-indigo-500/20">
               👪
             </div>
-            <h2 className="text-2xl font-black mb-3 tracking-tight uppercase">Parent SMS</h2>
-            <p className="text-slate-400 text-xs font-medium leading-relaxed">Secure gateway for parental monitoring and fee management.</p>
+            <h2 className="text-2xl font-black mb-3 tracking-tight uppercase text-white">Parent Portal</h2>
+            <p className="text-slate-400 text-xs font-medium leading-relaxed">Engagement terminal for monitoring student progress and communications.</p>
             <div className="mt-6 text-indigo-400 font-bold text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Initialize Session →</div>
-          </div>
+          </button>
 
         </div>
       </div>

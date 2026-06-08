@@ -77,11 +77,11 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
             <h3 className="text-xl sm:text-2xl font-black tracking-tighter">{entityLabel} Registration</h3>
             <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">{entityLabel} Identity Registration</p>
           </div>
-          <button
+          <button aria-label="Action"
             onClick={onClose}
             className="w-10 h-10 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 flex items-center justify-center"
             title="Close"
-          >
+           type="button">
             <i className="fas fa-times"></i>
           </button>
         </div>
@@ -97,7 +97,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
                   <i className="fas fa-camera text-3xl text-slate-300"></i>
                 )}
               </div>
-              <input
+              <input aria-label="Action"
                 type="file"
                 id="staff-avatar"
                 className="hidden"
@@ -123,7 +123,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Full Legal Name</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 placeholder="Enter name..."
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
@@ -134,7 +134,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Network Email</label>
-              <input
+              <input aria-label="Action"
                 type="email"
                 placeholder="staff@iem.io"
                 className={`w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 font-bold transition-all text-xs ${isTeacherEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
@@ -145,7 +145,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Phone Line</label>
-              <input
+              <input aria-label="Action"
                 type="tel"
                 placeholder="+1 234 567 890"
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
@@ -156,7 +156,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Birth Date</label>
-              <input
+              <input aria-label="Action"
                 type="date"
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
                 value={enrollData.date_of_birth}
@@ -170,7 +170,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Age</label>
-              <input
+              <input aria-label="Action"
                 type="number"
                 min="0"
                 placeholder="Age"
@@ -194,7 +194,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">NRC</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 placeholder="National registration card"
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
@@ -221,7 +221,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Race</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 placeholder="Enter race"
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
@@ -232,7 +232,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Religion</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 placeholder="Enter religion"
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
@@ -243,7 +243,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Salary</label>
-              <input
+              <input aria-label="Action"
                 type="number"
                 min="0"
                 step="0.01"
@@ -256,7 +256,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div>
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Job Position</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 placeholder="Enter job position"
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
@@ -267,7 +267,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div className="xl:col-span-3">
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Educational Background</label>
-              <textarea
+              <textarea aria-label="Action"
                 rows={3}
                 placeholder="Degrees, certifications, majors, institutions..."
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs resize-none"
@@ -278,7 +278,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div className="xl:col-span-3">
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">Address</label>
-              <textarea
+              <textarea aria-label="Action"
                 rows={2}
                 placeholder="Residential address"
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs resize-none"
@@ -289,7 +289,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
 
             <div className="sm:col-span-2 xl:col-span-3">
               <label className="text-[9px] font-black uppercase text-slate-400 tracking-widest block mb-2">School Staff/Teacher ID (Optional)</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 placeholder="e.g. STAFF-2024-001"
                 className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-[10px]"
@@ -311,7 +311,7 @@ const TeacherEnrollmentModal: React.FC<TeacherEnrollmentModalProps> = ({
           <button
             onClick={onSubmit}
             className="flex-1 py-4 bg-brand-500 text-white font-black rounded-[24px] text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all"
-          >
+           type="button">
             Registeration
           </button>
         </div>

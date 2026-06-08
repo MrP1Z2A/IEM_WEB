@@ -39,7 +39,7 @@ const TeacherRegistrationHub: React.FC<TeacherRegistrationHubProps> = ({
           <button
             onClick={enrollTeacherAction}
             className="w-full py-4 bg-indigo-500 text-white font-black rounded-2xl text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/20 active:scale-95 transition-all"
-          >
+           type="button">
             Register Teacher
           </button>
         </div>
@@ -51,7 +51,7 @@ const TeacherRegistrationHub: React.FC<TeacherRegistrationHubProps> = ({
           <h4 className="text-xl sm:text-2xl font-black tracking-tight">Batch Teacher Registration</h4>
           <p className="text-slate-400 text-sm font-semibold max-w-xs mx-auto">Import teachers from spreadsheet files (.csv, .xls, .xlsx, .ods).</p>
           <button
-            onClick={() => {
+            type="button" onClick={() => {
               if (isBatchRegistering) return;
               batchFileInputRef.current?.click();
             }}
@@ -60,7 +60,7 @@ const TeacherRegistrationHub: React.FC<TeacherRegistrationHubProps> = ({
           >
             {isBatchRegistering ? 'Importing...' : 'Upload Spreadsheet'}
           </button>
-          <input
+          <input aria-label="Action"
             ref={batchFileInputRef}
             type="file"
             accept=".csv,.tsv,.xls,.xlsx,.ods"
@@ -93,8 +93,8 @@ const TeacherRegistrationHub: React.FC<TeacherRegistrationHubProps> = ({
                     <p className="text-[10px] text-slate-400 font-bold uppercase">{t.id}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => deleteEntity(t.id, 'student')}
+                <button aria-label="Action"
+                  type="button" onClick={() => deleteEntity(t.id, 'student')}
                   className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 text-slate-300 hover:text-rose-500 transition-all shadow-sm flex items-center justify-center"
                 >
                   <i className="fas fa-trash-can text-sm"></i>

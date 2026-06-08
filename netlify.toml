@@ -1,0 +1,12 @@
+# Netlify configuration file
+
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+# Proxy /api/get-livekit-token to the Netlify serverless function on the fly!
+# This keeps the frontend clean and platform-independent.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200

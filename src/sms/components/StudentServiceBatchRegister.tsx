@@ -38,7 +38,7 @@ const StudentServiceBatchRegister: React.FC<StudentServiceBatchRegisterProps> = 
           <button
             onClick={enrollStudentServiceAction}
             className="w-full py-6 bg-cyan-500 text-white font-black rounded-3xl text-xs uppercase tracking-widest shadow-xl shadow-cyan-500/20 active:scale-95 transition-all"
-          >
+           type="button">
             Register Staff
           </button>
         </div>
@@ -51,7 +51,7 @@ const StudentServiceBatchRegister: React.FC<StudentServiceBatchRegisterProps> = 
           <h4 className="text-2xl sm:text-3xl font-black tracking-tight">Batch Staff Registration</h4>
           <p className="text-slate-400 text-sm font-semibold max-w-xs mx-auto">Import staff members from spreadsheet files (.csv, .xls, .xlsx, .ods).</p>
           <button
-            onClick={() => {
+            type="button" onClick={() => {
               if (isBatchRegistering) return;
               batchFileInputRef.current?.click();
             }}
@@ -60,7 +60,7 @@ const StudentServiceBatchRegister: React.FC<StudentServiceBatchRegisterProps> = 
           >
             {isBatchRegistering ? 'Importing...' : 'Upload Spreadsheet'}
           </button>
-          <input
+          <input aria-label="Action"
             ref={batchFileInputRef}
             type="file"
             accept=".csv,.tsv,.xls,.xlsx,.ods"
@@ -108,8 +108,8 @@ const StudentServiceBatchRegister: React.FC<StudentServiceBatchRegisterProps> = 
                       <p className="text-xs text-slate-400 font-semibold">{staff.email}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => deleteEntity(staff.id, 'student-service')}
+                  <button aria-label="Action"
+                    type="button" onClick={() => deleteEntity(staff.id, 'student-service')}
                     className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-all text-sm"
                     title="Remove staff"
                   >

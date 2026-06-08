@@ -490,7 +490,7 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
           </p>
         </div>
         <button
-          onClick={() => void loadDesk()}
+          type="button" onClick={() => void loadDesk()}
           className="flex items-center gap-2 px-4 py-2.5 bg-brand-500/10 border border-brand-500/20 text-brand-600 hover:bg-brand-500 hover:text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all"
         >
           <i className="fas fa-rotate-right"></i> Refresh
@@ -527,7 +527,7 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-3">
             <div className="relative">
               <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-              <input
+              <input aria-label="Action"
                 type="text"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
@@ -535,7 +535,7 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 pl-9 pr-8 text-xs font-semibold text-slate-700 dark:text-white focus:outline-none focus:border-brand-500 transition-all placeholder:text-slate-400"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <button aria-label="Action" type="button" onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                   <i className="fas fa-xmark text-xs"></i>
                 </button>
               )}
@@ -576,7 +576,7 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
                       return (
                         <button
                           key={conversation.id}
-                          onClick={() => setActiveSelection({ kind: 'conversation', conversationId: conversation.id })}
+                          type="button" onClick={() => setActiveSelection({ kind: 'conversation', conversationId: conversation.id })}
                           className={`w-full text-left rounded-2xl border px-4 py-4 transition-all ${isActive ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-emerald-200 hover:bg-emerald-50/60 dark:hover:bg-slate-800/50'}`}
                         >
                           <div className="flex items-start gap-3">
@@ -623,7 +623,7 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
                       return (
                         <button
                           key={entry.parent.id}
-                          onClick={() => setActiveSelection({ kind: 'parent', parentId: entry.parent.id })}
+                          type="button" onClick={() => setActiveSelection({ kind: 'parent', parentId: entry.parent.id })}
                           className={`w-full text-left rounded-2xl border px-4 py-4 transition-all ${isActive ? 'bg-slate-900 border-slate-900 text-white shadow-lg shadow-slate-900/15' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-sky-200 hover:bg-sky-50/60 dark:hover:bg-slate-800/50'}`}
                         >
                           <div className="flex items-start gap-3">
@@ -698,7 +698,7 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
 
                 {!canReplyInActiveThread && selectedParent && (
                   <button
-                    onClick={() => setActiveSelection({ kind: 'parent', parentId: selectedParent.id })}
+                    type="button" onClick={() => setActiveSelection({ kind: 'parent', parentId: selectedParent.id })}
                     className="px-4 py-2 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 transition-all text-[10px] font-black uppercase tracking-widest shrink-0"
                   >
                     Message Parent Directly
@@ -772,7 +772,7 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
               {(canReplyInActiveThread || activeSelection.kind === 'parent') ? (
                 <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <form onSubmit={handleSendMessage} className="flex gap-3">
-                    <input
+                    <input aria-label="Action"
                       type="text"
                       value={draftMessage}
                       onChange={(event) => setDraftMessage(event.target.value)}

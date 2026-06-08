@@ -2,6 +2,9 @@ import React from 'react';
 import { Student } from '../types';
 import { supabase } from '../supabaseClient';
 import { verifySchoolAdminPassword } from '../services/adminSecurity';
+import { CalendarPanel } from './AttendanceProtocol/CalendarPanel';
+import { ResourcesPanel } from './AttendanceProtocol/ResourcesPanel';
+import { TimetablePanel } from './AttendanceProtocol/TimetablePanel';
 
 /**
  * AttendanceProtocol Component
@@ -100,15 +103,10 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
   const [selectedClassId, setSelectedClassId] = React.useState<string | null>(null);
   const [isClassFormOpen, setIsClassFormOpen] = React.useState(false);
   const [isAttendanceViewOpen, setIsAttendanceViewOpen] = React.useState(true);
-  const [isTimetableViewOpen, setIsTimetableViewOpen] = React.useState(false);
-  const [isTimetableUploading, setIsTimetableUploading] = React.useState(false);
-  const [isTimetableLoading, setIsTimetableLoading] = React.useState(false);
-  const [timetableFiles, setTimetableFiles] = React.useState<Array<{ name: string; path: string; url: string }>>([]);
   const [classCourses, setClassCourses] = React.useState<Array<{ id: string; name: string; class_id: string; teacher_id?: string | null; image_url?: string | null }>>([]);
   const [isClassCoursesLoading, setIsClassCoursesLoading] = React.useState(false);
   const [isClassCourseImageSupported, setIsClassCourseImageSupported] = React.useState(true);
   const [isClassCourseCreating, setIsClassCourseCreating] = React.useState(false);
-  const [isCourseResourcesOpen, setIsCourseResourcesOpen] = React.useState(true);
   const [isCreateCourseModalOpen, setIsCreateCourseModalOpen] = React.useState(false);
   const [isEditCourseModalOpen, setIsEditCourseModalOpen] = React.useState(false);
   const [isClassCourseUpdating, setIsClassCourseUpdating] = React.useState(false);
@@ -175,18 +173,6 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     const month = String(today.getMonth() + 1).padStart(2, '0');
     return `${year}-${month}`;
   });
-  const [isCourseCalendarOpen, setIsCourseCalendarOpen] = React.useState(true);
-  const [isCourseCalendarLoading, setIsCourseCalendarLoading] = React.useState(false);
-  const [courseCalendarEvents, setCourseCalendarEvents] = React.useState<Array<{
-    id: string;
-    title: string;
-    event_date: string;
-    start_time: string;
-    end_time: string;
-    class_name: string;
-    course_name: string | null;
-    notes: string | null;
-  }>>([]);
   const [courseStudentIds, setCourseStudentIds] = React.useState<string[]>([]);
   const [isCourseHomeworkLoading, setIsCourseHomeworkLoading] = React.useState(false);
   const [courseHomeworkItems, setCourseHomeworkItems] = React.useState<Array<{
@@ -196,22 +182,10 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     attachment_url: string | null;
     created_at: string | null;
   }>>([]);
-  const [isCourseFoldersLoading, setIsCourseFoldersLoading] = React.useState(false);
-  const [courseFolders, setCourseFolders] = React.useState<Array<{ name: string; filesCount: number }>>([]);
-  const [openCourseFolders, setOpenCourseFolders] = React.useState<Record<string, boolean>>({});
-  const [courseFolderFiles, setCourseFolderFiles] = React.useState<Record<string, Array<{ name: string; path: string; url: string; size: number }>>>({});
-  const [newCourseFolderName, setNewCourseFolderName] = React.useState('');
-  const [isCourseFolderCreating, setIsCourseFolderCreating] = React.useState(false);
-  const [uploadingCourseFolderName, setUploadingCourseFolderName] = React.useState<string | null>(null);
   const classImageInputRef = React.useRef<HTMLInputElement | null>(null);
-  const timetableInputRef = React.useRef<HTMLInputElement | null>(null);
   const newCourseImageInputRef = React.useRef<HTMLInputElement | null>(null);
   const editCourseImageInputRef = React.useRef<HTMLInputElement | null>(null);
-  const courseFolderUploadRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
   const didInitializeDailyDateRef = React.useRef(false);
-  const FOLDER_FILE_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.json,.xml,.jpg,.jpeg,.png,.gif,.webp,.svg,.mp3,.wav,.mp4,.mov,.zip,.rar,.7z,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv,application/json,image/*,audio/*,video/*,application/zip,application/x-rar-compressed,application/x-7z-compressed';
-  const FOLDER_MARKER_FILE = '__folder__.pdf';
-  const isFolderMarker = (name: string) => name === '.keep' || name === FOLDER_MARKER_FILE;
 
   const getTodayIsoDate = React.useCallback(() => {
     const now = new Date();
@@ -340,7 +314,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     };
 
     void loadCourseStudents();
-  }, [courseAttendanceOnly, focusCourse?.id, activeClassId, classes, notify]);
+  }, [courseAttendanceOnly, focusCourse?.id, activeClassId, schoolId, notify]);
 
   const activeAttendanceId = activeClassId || selectedAttendanceSubject;
   const attendanceStoreKey = activeClassId ? `class:${activeClassId}` : selectedAttendanceSubject ? `subject:${selectedAttendanceSubject}` : null;
@@ -373,55 +347,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     }
   }, [attendanceDate]);
 
-  React.useEffect(() => {
-    const loadCourseCalendarEvents = async () => {
-      if (!courseAttendanceOnly || !focusCourse?.id || !activeClassId || !attendanceDate || !schoolId) {
-        setCourseCalendarEvents([]);
-        setIsCourseCalendarLoading(false);
-        return;
-      }
 
-      setIsCourseCalendarLoading(true);
-      try {
-        const { data, error } = await supabase.from('live_calendar_events')
-          .select('id, title, event_date, start_time, end_time, class_id, class_name, course_id, course_name, notes')
-          .eq('class_id', activeClassId)
-          .eq('event_date', attendanceDate)
-          .eq('school_id', schoolId)
-          .order('event_date', { ascending: true })
-          .order('start_time', { ascending: true });
-
-        if (error) throw error;
-
-        const filtered = (data || [])
-          .filter((event: any) => {
-            const eventCourseId = event?.course_id ? String(event.course_id) : '';
-            const eventCourseName = event?.course_name ? String(event.course_name).toLowerCase() : '';
-            return eventCourseId === String(focusCourse.id) || eventCourseName === String(focusCourse.name || '').toLowerCase();
-          })
-          .map((event: any) => ({
-            id: String(event.id),
-            title: String(event.title || ''),
-            event_date: String(event.event_date || ''),
-            start_time: String(event.start_time || '').slice(0, 5),
-            end_time: String(event.end_time || '').slice(0, 5),
-            class_name: String(event.class_name || selectedClass?.name || ''),
-            course_name: event.course_name ? String(event.course_name) : null,
-            notes: event.notes ? String(event.notes) : null,
-          }));
-
-        setCourseCalendarEvents(filtered);
-      } catch (error: any) {
-        console.error('Failed to load course timetable events:', error);
-        notify(`Failed to load course timetable: ${error?.message || 'Unknown error'}`);
-        setCourseCalendarEvents([]);
-      } finally {
-        setIsCourseCalendarLoading(false);
-      }
-    };
-
-    void loadCourseCalendarEvents();
-  }, [courseAttendanceOnly, focusCourse?.id, focusCourse?.name, activeClassId, attendanceDate, notify, selectedClass?.name]);
 
   React.useEffect(() => {
     const loadCourseHomework = async () => {
@@ -496,285 +422,9 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     };
 
     void loadCourseHomework();
-  }, [courseAttendanceOnly, focusCourse?.id, activeClassId, getAttachmentValueFromRow]);
+  }, [courseAttendanceOnly, focusCourse?.id, activeClassId, schoolId, getAttachmentValueFromRow]);
 
-  const loadFilesForCourseFolder = React.useCallback(async (folderName: string) => {
-    if (!activeClassId || !focusCourse?.id || !schoolId) return;
 
-    try {
-      const { data, error } = await supabase
-        .from('resources_buckets')
-        .select('*')
-        .eq('school_id', schoolId)
-        .eq('class_id', activeClassId)
-        .eq('class_course_id', focusCourse.id)
-        .eq('metadata->>type', 'file')
-        .eq('metadata->>folder', folderName);
-
-      if (error) throw error;
-
-      const files = (data || []).map((res: any) => ({
-        id: res.id,
-        name: res.name || 'Untitled File',
-        path: res.image_url || (res.metadata as any)?.file_url || '',
-        url: res.image_url || (res.metadata as any)?.file_url || '',
-        size: Number((res.metadata as any)?.size || 0),
-      }));
-
-      setCourseFolderFiles(prev => ({ ...prev, [folderName]: files }));
-    } catch (error: any) {
-      console.error('Failed to load folder files from DB:', error);
-      notify(`Failed to load folder files: ${error?.message || 'Unknown error'}`);
-    }
-  }, [activeClassId, focusCourse, schoolId, notify]);
-
-  const loadCourseFolders = React.useCallback(async () => {
-    if (!activeClassId || !focusCourse?.id || !schoolId) {
-      setCourseFolders([]);
-      setOpenCourseFolders({});
-      setCourseFolderFiles({});
-      setIsCourseFoldersLoading(false);
-      return;
-    }
-
-    setIsCourseFoldersLoading(true);
-
-    try {
-      // Fetch folders from resources_buckets instead of storage list
-      const { data, error } = await supabase
-        .from('resources_buckets')
-        .select('*')
-        .eq('school_id', schoolId)
-        .eq('class_id', activeClassId)
-        .eq('class_course_id', focusCourse.id)
-        .eq('metadata->>type', 'folder');
-
-      if (error) throw error;
-
-      const folderRecords = data || [];
-      const nextFolders: Array<{ name: string; filesCount: number }> = [];
-
-      for (const res of folderRecords) {
-        const folderName = res.name;
-        // Count files in this folder
-        const { count, error: countError } = await supabase
-          .from('resources_buckets')
-          .select('*', { count: 'exact', head: true })
-          .eq('school_id', schoolId)
-          .eq('class_id', activeClassId)
-          .eq('class_course_id', focusCourse.id)
-          .eq('metadata->>type', 'file')
-          .eq('metadata->>folder', folderName);
-
-        if (countError) console.warn('Failed to count files for folder:', folderName, countError);
-        nextFolders.push({ name: folderName, filesCount: count || 0 });
-      }
-
-      nextFolders.sort((a, b) => a.name.localeCompare(b.name));
-      setCourseFolders(nextFolders);
-    } catch (error: any) {
-      console.error('Failed to load course folders from DB:', error);
-      notify(`Failed to load course folders: ${error?.message || 'Unknown error'}`);
-      setCourseFolders([]);
-    } finally {
-      setIsCourseFoldersLoading(false);
-    }
-  }, [activeClassId, focusCourse, schoolId, notify]);
-
-  const createCourseFolder = React.useCallback(async () => {
-    if (!activeClassId || !focusCourse?.id || !schoolId) {
-      notify('Select class and course first.');
-      return;
-    }
-
-    const normalizedName = newCourseFolderName.trim().replace(/[\\/:*?"<>|]+/g, '_');
-    if (!normalizedName) {
-      notify('Enter a folder name.');
-      return;
-    }
-
-    setIsCourseFolderCreating(true);
-    try {
-      // 1. Create a placeholder in storage (optional, but keep it for structure)
-      const keepPath = `course_folders/${activeClassId}/${focusCourse.id}/${normalizedName}/${FOLDER_MARKER_FILE}`;
-      const marker = new Blob([new Uint8Array([37, 80, 68, 70])], { type: 'application/pdf' });
-      await supabase.storage
-        .from(COURSE_RESOURCES_BUCKET)
-        .upload(keepPath, marker, {
-          upsert: true,
-          contentType: 'application/pdf',
-        });
-
-      const { data: publicUrlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(keepPath);
-
-      // 2. Insert folder record into resources_buckets
-      const { error: dbError } = await supabase
-        .from('resources_buckets')
-        .insert([{
-          school_id: schoolId,
-          class_id: activeClassId,
-          class_course_id: focusCourse.id,
-          name: normalizedName,
-          metadata: {
-            type: 'folder',
-            content: `Resource folder for ${focusCourse.name}`,
-            folder: null,
-            size: 0
-          },
-          image_url: publicUrlData?.publicUrl || null
-        }]);
-
-      if (dbError) throw dbError;
-
-      setNewCourseFolderName('');
-      await loadCourseFolders();
-      notify(`Folder "${normalizedName}" created.`);
-    } catch (error: any) {
-      console.error('Failed to create folder:', error);
-      notify(`Failed to create folder: ${error?.message || 'Unknown error'}`);
-    } finally {
-      setIsCourseFolderCreating(false);
-    }
-  }, [activeClassId, focusCourse, schoolId, newCourseFolderName, loadCourseFolders, notify]);
-
-  const toggleCourseFolderOpen = React.useCallback(async (folderName: string) => {
-    const nextOpen = !openCourseFolders[folderName];
-    setOpenCourseFolders(prev => ({ ...prev, [folderName]: nextOpen }));
-    if (!nextOpen) return;
-
-    try {
-      await loadFilesForCourseFolder(folderName);
-    } catch (error: any) {
-      console.error('Failed to load folder files:', error);
-      notify(`Failed to load folder files: ${error?.message || 'Unknown error'}`);
-    }
-  }, [openCourseFolders, loadFilesForCourseFolder, notify]);
-
-  const uploadFilesToCourseFolder = React.useCallback(async (folderName: string, files: FileList | null) => {
-    if (!activeClassId || !focusCourse?.id || !schoolId || !files?.length) return;
-
-    const selectedFiles = Array.from(files);
-    const oversized = selectedFiles.find(file => file.size > 200 * 1024 * 1024);
-    if (oversized) {
-      notify(`File too large: ${oversized.name}. Max size is 200MB.`);
-      return;
-    }
-
-    setUploadingCourseFolderName(folderName);
-    try {
-      for (const file of selectedFiles) {
-        const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const path = `course_folders/${activeClassId}/${focusCourse.id}/${folderName}/${Date.now()}-${sanitized}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from(COURSE_RESOURCES_BUCKET)
-          .upload(path, file, {
-            upsert: false,
-            contentType: file.type || undefined,
-          });
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage.from(COURSE_RESOURCES_BUCKET).getPublicUrl(path);
-        const publicUrl = publicUrlData?.publicUrl;
-
-        // Log file upload to resources_buckets with unified schema
-        const { error: dbError } = await supabase.from('resources_buckets').insert([{
-          school_id: schoolId,
-          class_id: activeClassId,
-          class_course_id: focusCourse.id,
-          name: file.name,
-          metadata: {
-            type: 'file',
-            content: `Learning material: ${file.name}`,
-            file_url: publicUrl,
-            folder: folderName,
-            size: file.size,
-            mime_type: file.type
-          },
-          image_url: publicUrl || null
-        }]);
-
-        if (dbError) throw dbError;
-      }
-
-      await loadFilesForCourseFolder(folderName);
-      await loadCourseFolders();
-      notify(`Uploaded ${selectedFiles.length} file(s) to "${folderName}".`);
-    } catch (error: any) {
-      console.error('Failed to upload files:', error);
-      notify(`Failed to upload files: ${error?.message || 'Unknown error'}`);
-    } finally {
-      setUploadingCourseFolderName(null);
-    }
-  }, [activeClassId, focusCourse, schoolId, loadFilesForCourseFolder, loadCourseFolders, notify]);
-
-  const deleteCourseFolder = async (folderName: string) => {
-    openConfirmDialog(`Are you sure you want to delete folder "${folderName}" and all its contents?`, async () => {
-      setIsConfirmActionSubmitting(true);
-      try {
-        // 1. Delete records from database
-        await supabase
-          .from('resources_buckets')
-          .delete()
-          .eq('school_id', schoolId)
-          .eq('class_id', activeClassId)
-          .eq('class_course_id', focusCourse?.id)
-          .or(`name.eq."${folderName}",metadata->>folder.eq."${folderName}"`);
-
-        // 2. Clean up storage (optional, but good practice)
-        const folderPath = `course_folders/${activeClassId}/${focusCourse?.id}/${folderName}`;
-        const listResult = await supabase.storage.from(COURSE_RESOURCES_BUCKET).list(folderPath, { limit: 1000 });
-        const filesToDelete = (listResult.data || []).map(f => `${folderPath}/${f.name}`);
-        if (filesToDelete.length > 0) {
-          await supabase.storage.from(COURSE_RESOURCES_BUCKET).remove(filesToDelete);
-        }
-
-        await loadCourseFolders();
-        notify(`Deleted folder "${folderName}"`);
-      } catch (error: any) {
-        console.error('Failed to delete folder:', error);
-        notify(`Failed to delete folder: ${error?.message || 'Unknown error'}`);
-      } finally {
-        setIsConfirmActionSubmitting(false);
-        setConfirmDialog(null);
-      }
-    });
-  };
-
-  const deleteCourseFile = async (folderName: string, file: any) => {
-    openConfirmDialog(`Are you sure you want to delete file "${file.name}"?`, async () => {
-      setIsConfirmActionSubmitting(true);
-      try {
-        // 1. Delete record from database
-        await supabase
-          .from('resources_buckets')
-          .delete()
-          .eq('school_id', schoolId)
-          .eq('class_id', activeClassId)
-          .eq('class_course_id', focusCourse?.id)
-          .eq('name', file.name)
-          .eq('metadata->>folder', folderName);
-
-        // 2. Delete from storage (optional, but good practice - logic uses url/path)
-        // Note: we might not have the original storage path easily, but image_url/file_url can help
-        // For now, focusing on the record deletion as it's the source of truth for the UI
-
-        await loadFilesForCourseFolder(folderName);
-        await loadCourseFolders();
-        notify(`Deleted file "${file.name}"`);
-      } catch (error: any) {
-        console.error('Failed to delete file:', error);
-        notify(`Failed to delete file: ${error?.message || 'Unknown error'}`);
-      } finally {
-        setIsConfirmActionSubmitting(false);
-        setConfirmDialog(null);
-      }
-    });
-  };
-
-  React.useEffect(() => {
-    void loadCourseFolders();
-  }, [loadCourseFolders]);
 
   React.useEffect(() => {
     if (activeAttendanceId) {
@@ -793,52 +443,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     );
   };
 
-  const loadTimetableFiles = React.useCallback(async (classId: string) => {
-    setIsTimetableLoading(true);
-    try {
-      const folder = `class-${classId}`;
-      const { data, error } = await supabase.storage
-        .from(TIMETABLE_BUCKET)
-        .list(folder, {
-          limit: 100,
-          sortBy: { column: 'created_at', order: 'desc' }
-        });
 
-      if (error) throw error;
-
-      const mapped = (data || [])
-        .filter((file: any) => file?.name && file.name.toLowerCase().endsWith('.pdf'))
-        .map((file: any) => {
-          const path = `${folder}/${file.name}`;
-          const { data: publicData } = supabase.storage.from(TIMETABLE_BUCKET).getPublicUrl(path);
-          return {
-            name: file.name,
-            path,
-            url: publicData?.publicUrl || '',
-          };
-        })
-        .filter(file => file.url);
-
-      setTimetableFiles(mapped);
-    } catch (error: any) {
-      console.error('Failed to load timetable files:', error);
-      notify(`Failed to load timetable files: ${error?.message || 'Unknown error'}`);
-      setTimetableFiles([]);
-    } finally {
-      setIsTimetableLoading(false);
-    }
-  }, [TIMETABLE_BUCKET, notify]);
-
-  React.useEffect(() => {
-    if (!activeClassId) {
-      setTimetableFiles([]);
-      setIsTimetableViewOpen(false);
-      setClassCourses([]);
-      return;
-    }
-
-    void loadTimetableFiles(activeClassId);
-  }, [activeClassId, loadTimetableFiles]);
 
   const loadClassCourses = React.useCallback(async (classId: string) => {
     setIsClassCoursesLoading(true);
@@ -891,7 +496,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     } finally {
       setIsClassCoursesLoading(false);
     }
-  }, [CLASS_COURSES_TABLE, notify]);
+  }, [CLASS_COURSES_TABLE, isClassCourseImageSupported, notify]);
 
   const uploadCourseImage = async (classId: string, file: File) => {
     const resizedFile = await new Promise<File>((resolve, reject) => {
@@ -978,61 +583,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
     void loadClassCourses(activeClassId);
   }, [activeClassId, loadClassCourses]);
 
-  const uploadTimetablePdf = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !activeClassId) return;
 
-    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-    if (!isPdf) {
-      notify('Only PDF files are allowed.');
-      event.target.value = '';
-      return;
-    }
-
-    setIsTimetableUploading(true);
-    try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `class-${activeClassId}/${Date.now()}-${safeName}`;
-
-      const { error } = await supabase.storage
-        .from(TIMETABLE_BUCKET)
-        .upload(path, file, {
-          upsert: false,
-          contentType: 'application/pdf',
-          cacheControl: '3600',
-        });
-
-      if (error) throw error;
-
-      notify('Timetable PDF uploaded successfully.');
-      setIsTimetableViewOpen(true);
-      await loadTimetableFiles(activeClassId);
-    } catch (error: any) {
-      console.error('Timetable PDF upload failed:', error);
-      notify(`Upload failed: ${error?.message || 'Unknown error'}`);
-    } finally {
-      setIsTimetableUploading(false);
-      event.target.value = '';
-    }
-  };
-
-  const deleteTimetablePdf = async (filePath: string) => {
-    if (!activeClassId) return;
-
-    try {
-      const { error } = await supabase.storage
-        .from(TIMETABLE_BUCKET)
-        .remove([filePath]);
-
-      if (error) throw error;
-
-      setTimetableFiles(prev => prev.filter(file => file.path !== filePath));
-      notify('Timetable PDF deleted.');
-    } catch (error: any) {
-      console.error('Failed to delete timetable PDF:', error);
-      notify(`Delete failed: ${error?.message || 'Unknown error'}`);
-    }
-  };
 
   const createClassCourse = async () => {
     if (!activeClassId || isClassCourseCreating) return;
@@ -1349,7 +900,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800 px-4 py-3 border border-slate-100 dark:border-slate-700">
             <i className="fas fa-calendar-day text-slate-400"></i>
-            <input
+            <input aria-label="Action"
               type="date"
               value={attendanceDate}
               onChange={(e) => handleGlobalDateChange(e.target.value)}
@@ -1358,7 +909,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
             />
           </div>
           <button
-            onClick={() => handleGlobalDateChange(getTodayIsoDate())}
+            type="button" onClick={() => handleGlobalDateChange(getTodayIsoDate())}
             className="px-4 py-2 rounded-xl bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest"
             title="Reset to today's date"
           >
@@ -1373,8 +924,8 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-10">
             <div className="flex items-start sm:items-center gap-4 sm:gap-8 lg:gap-10">
               {classAttendancePage ? (
-                <button
-                  onClick={() => onExitClassAttendancePage?.()}
+                <button aria-label="Action"
+                  type="button" onClick={() => onExitClassAttendancePage?.()}
                   className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-[24px] sm:rounded-[32px] lg:rounded-[40px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 text-2xl sm:text-3xl lg:text-4xl shadow-premium flex-shrink-0"
                   title="Back"
                 >
@@ -1388,7 +939,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               <div className="min-w-0">
                 <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter">CLASS DETAIL</h2>
                 <div className="flex flex-wrap items-center gap-3 sm:gap-6 mt-3">
-                  <input 
+                  <input aria-label="Action" 
                     type="date" 
                     value={attendanceDate} 
                     onChange={(e) => handleGlobalDateChange(e.target.value)} 
@@ -1411,7 +962,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
             <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-slate-400 mt-2">{editingClassId ? 'Update class appearance and details' : 'Build a class profile'}</p>
           </div>
           <button
-            onClick={() => setIsClassFormOpen(prev => !prev)}
+            type="button" onClick={() => setIsClassFormOpen(prev => !prev)}
             className="px-4 py-2 rounded-xl bg-brand-50 text-brand-500 border border-brand-100 text-[10px] font-black uppercase tracking-widest flex items-center gap-2"
           >
             <i className={`fas ${isClassFormOpen ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
@@ -1423,7 +974,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
           <>
         <div className="space-y-3">
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Class Name</label>
-          <input
+          <input aria-label="Action"
             type="text"
             placeholder="Enter class name"
             value={className}
@@ -1435,7 +986,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
         <div className="space-y-3">
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Class Image</label>
           <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-4">
-            <input
+            <input aria-label="Action"
               ref={classImageInputRef}
               type="file"
               accept="image/*"
@@ -1447,7 +998,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
             {classImage && (
               <div className="mt-2 flex items-center justify-between gap-3">
                 <p className="text-[11px] text-slate-500">Selected: {classImage.name}</p>
-                <button
+                <button aria-label="Action"
                   type="button"
                   onClick={() => {
                     setClassImage(null);
@@ -1468,7 +1019,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
         <div className="space-y-2">
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Image Area Color</label>
           <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 p-3 flex items-center gap-3">
-            <input
+            <input aria-label="Action"
               type="color"
               value={classOuterColor}
               onChange={(e) => setClassOuterColor(e.target.value)}
@@ -1487,14 +1038,14 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               <button
                 onClick={cancelEditClass}
                 className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-100 text-xs font-black uppercase tracking-widest"
-              >
+               type="button">
                 Cancel
               </button>
             )}
             <button
               onClick={editingClassId ? saveClassEdits : createClassWithStudents}
               className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-brand-500 text-white text-xs font-black uppercase tracking-widest shadow-xl shadow-brand-500/30 hover:brightness-105 active:scale-95 transition-all"
-            >
+             type="button">
               {editingClassId ? 'Update Class' : 'Create Class'}
             </button>
           </div>
@@ -1509,7 +1060,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
         <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[56px] p-6 sm:p-8 lg:p-10 border border-slate-100 dark:border-slate-800 shadow-premium space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Created Classes</p>
-            <input
+            <input aria-label="Action"
               type="text"
               value={classSearchQuery}
               onChange={(e) => setClassSearchQuery(e.target.value)}
@@ -1519,7 +1070,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredClasses.map((classItem) => (
-              <div
+              <button type="button"
                 key={classItem.id}
                 onClick={() => {
                   if (openClassAttendancePage) {
@@ -1529,12 +1080,12 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                     setSelectedAttendanceSubject(null);
                   }
                 }}
-                className="rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden cursor-pointer hover:-translate-y-1 transition-all"
+                className="w-full text-left block rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden cursor-pointer hover:-translate-y-1 transition-all"
                 style={{ backgroundColor: '#f8fafc' }}
               >
                 <div className="flex justify-end p-2">
-                  <button
-                    onClick={(e) => {
+                  <button aria-label="Action"
+                    type="button" onClick={(e) => {
                       e.stopPropagation();
                       startEditClass(classItem);
                     }}
@@ -1543,8 +1094,8 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                   >
                     <i className="fas fa-pen"></i>
                   </button>
-                  <button
-                    onClick={(e) => {
+                  <button aria-label="Action"
+                    type="button" onClick={(e) => {
                       e.stopPropagation();
                       deleteClass(String(classItem.id), () => {
                         if (activeClassId === String(classItem.id)) {
@@ -1574,7 +1125,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                     {(classItem.student_count ?? 0)} Students
                   </p>
                 </div>
-              </div>
+              </button>
             ))}
             {filteredClasses.length === 0 && (
               <div className="col-span-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-sm font-semibold text-slate-500">
@@ -1592,7 +1143,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
           {subjects.map(sub => (
             <button 
               key={sub.id} 
-              onClick={() => {
+              type="button" onClick={() => {
                 setSelectedClassId(null);
                 setSelectedAttendanceSubject(sub.id);
               }}
@@ -1615,8 +1166,8 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               {/* Back Button and Subject Info */}
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 p-5 sm:p-8 lg:p-10 bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[56px] border border-slate-100 dark:border-slate-800 shadow-premium">
                 <div className="flex items-center gap-4 sm:gap-6 lg:gap-8 min-w-0">
-                  <button 
-                    onClick={() => {
+                  <button aria-label="Action" 
+                    type="button" onClick={() => {
                       if (activeClassId) {
                         if (classAttendancePage) {
                           onExitClassAttendancePage?.();
@@ -1636,7 +1187,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                       Class: {activeClassId ? `${selectedClass?.name} (${selectedClass?.class_code || ''})` : subjects.find(s => s.id === selectedAttendanceSubject)?.name}
                     </h4>
                     <button
-                      onClick={() => setIsAttendanceViewOpen(prev => !prev)}
+                      type="button" onClick={() => setIsAttendanceViewOpen(prev => !prev)}
                       title={isAttendanceViewOpen ? 'Click to collapse attendance view' : 'Click to expand attendance view'}
                       className="mt-2 inline-flex items-center gap-3 px-3 py-2 rounded-xl border border-brand-200 dark:border-brand-800 bg-brand-50/80 dark:bg-brand-900/20 text-xs sm:text-sm font-black uppercase tracking-[0.18em] text-slate-700 hover:text-brand-500 dark:text-slate-200 dark:hover:text-brand-300 cursor-pointer"
                     >
@@ -1656,7 +1207,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800 px-4 py-3 border border-slate-100 dark:border-slate-700">
                     <i className="fas fa-calendar text-slate-400"></i>
-                    <input
+                    <input aria-label="Action"
                       type="date"
                       value={attendanceDate}
                       onChange={(e) => setAttendanceDate(e.target.value)}
@@ -1664,7 +1215,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                     />
                   </div>
                   <div className="flex items-center gap-2 rounded-2xl bg-slate-50 dark:bg-slate-800 px-3 py-3 border border-slate-100 dark:border-slate-700">
-                    <input
+                    <input aria-label="Action"
                       type="month"
                       value={exportMonth}
                       onChange={(e) => setExportMonth(e.target.value)}
@@ -1672,7 +1223,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                       title="Select export month"
                     />
                     <button
-                      onClick={() => {
+                      type="button" onClick={() => {
                         if (activeClassId) {
                           void exportMonthlyAttendancePdf(
                             'class',
@@ -1719,8 +1270,8 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                             <p className="text-lg font-black tracking-tight">{s.name} <span className="text-xs text-slate-400">({s.id})</span></p>
                           </div>
                           {activeClassId && (
-                            <button
-                              onClick={() => removeStudentFromClass(activeClassId, String(s.id), courseAttendanceOnly && focusCourse?.id ? String(focusCourse.id) : undefined)}
+                            <button aria-label="Action"
+                              type="button" onClick={() => removeStudentFromClass(activeClassId, String(s.id), courseAttendanceOnly && focusCourse?.id ? String(focusCourse.id) : undefined)}
                               className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500 flex items-center justify-center"
                               title="Delete student"
                             >
@@ -1734,7 +1285,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                           {['P', 'A', 'L'].map((btn) => (
                             <button 
                               key={btn} 
-                              onClick={() => {
+                              type="button" onClick={() => {
                                 if (activeClassId) {
                                   void updateSubjectAttendance('class', activeClassId, attendanceDate, String(s.id), btn as 'P' | 'A' | 'L', selectedClass?.name);
                                 } else if (selectedAttendanceSubject) {
@@ -1763,60 +1314,15 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
               {courseAttendanceOnly && focusCourse && (
                 <>
-                  <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
-                    <button
-                      onClick={() => setIsCourseCalendarOpen(prev => !prev)}
-                      title={isCourseCalendarOpen ? 'Click to collapse course timetable calendar' : 'Click to expand course timetable calendar'}
-                      className="inline-flex items-center gap-3 px-3 py-2 rounded-xl border border-brand-200 dark:border-brand-800 bg-white dark:bg-slate-900 text-xs sm:text-sm font-black uppercase tracking-[0.18em] text-slate-700 hover:text-brand-500 dark:text-slate-200 dark:hover:text-brand-300 cursor-pointer"
-                    >
-                      <span className={`w-8 h-8 rounded-full flex items-center justify-center border ${isCourseCalendarOpen ? 'bg-brand-500 border-brand-400 text-white shadow-lg shadow-brand-500/40' : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-200'}`}>
-                        <i className={`fas ${isCourseCalendarOpen ? 'fa-chevron-down' : 'fa-chevron-right'} text-sm`}></i>
-                      </span>
-                      <span className={`${isCourseCalendarOpen ? 'text-brand-500 dark:text-brand-400' : ''}`}>Course Timetable Calendar</span>
-                      <span className="text-[10px] sm:text-xs font-bold tracking-normal normal-case text-brand-600 dark:text-brand-300">
-                        {focusCourse.name}
-                      </span>
-                    </button>
-
-                    {isCourseCalendarOpen && (
-                      <div className="mt-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Live Calendar Timetable</p>
-                          <span className="bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-widest text-slate-500">
-                            {attendanceDate}
-                          </span>
-                        </div>
-
-                        {isCourseCalendarLoading && (
-                          <p className="text-xs font-semibold text-slate-500">Loading timetable entries...</p>
-                        )}
-
-                        {!isCourseCalendarLoading && courseCalendarEvents.length === 0 && (
-                          <p className="text-xs font-semibold text-slate-500">No timetable entries found for this course on this date.</p>
-                        )}
-
-                        {!isCourseCalendarLoading && courseCalendarEvents.length > 0 && (
-                          <div className="space-y-3">
-                            {courseCalendarEvents.map((event, index) => (
-                              <div
-                                key={event.id}
-                                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3"
-                              >
-                                <p className="text-xs font-black text-brand-500 uppercase tracking-widest">Period {index + 1}</p>
-                                <p className="text-sm font-black text-slate-700 dark:text-slate-200 mt-1">{event.title}</p>
-                                <p className="text-[11px] font-semibold text-slate-500 mt-1">
-                                  {event.start_time} - {event.end_time}
-                                </p>
-                                {event.notes && (
-                                  <p className="text-[11px] text-slate-500 mt-1">{event.notes}</p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <CalendarPanel
+                    activeClassId={activeClassId || ''}
+                    focusCourse={focusCourse}
+                    attendanceDate={attendanceDate}
+                    schoolId={schoolId}
+                    supabase={supabase}
+                    notify={notify}
+                    selectedClassName={selectedClass?.name}
+                  />
 
                   <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
                     <div className="flex items-center justify-between gap-3 mb-3">
@@ -1864,131 +1370,13 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                     )}
                   </div>
 
-                  <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
-                    <button
-                      onClick={() => setIsCourseResourcesOpen(prev => !prev)}
-                      className="w-full flex flex-wrap items-center justify-between gap-3 mb-3 group"
-                    >
-                      <div className="flex items-center gap-2">
-                        <i className={`fas fa-chevron-right text-[10px] transition-transform ${isCourseResourcesOpen ? 'rotate-90 text-brand-500' : 'text-slate-400'}`}></i>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-brand-500 transition-colors">Course Folders</p>
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-brand-500">{courseFolders.length} Folders</span>
-                    </button>
-
-                    {isCourseResourcesOpen && (
-                      <>
-                        <div className="flex flex-wrap items-center gap-2 mb-4">
-                          <input
-                            value={newCourseFolderName}
-                            onChange={event => setNewCourseFolderName(event.target.value)}
-                            placeholder="Folder name"
-                            className="flex-1 min-w-[200px] bg-slate-50 dark:bg-slate-800 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold"
-                          />
-                          <button
-                            onClick={() => void createCourseFolder()}
-                            disabled={isCourseFolderCreating}
-                            className="px-3 py-2 rounded-xl bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-60"
-                          >
-                            {isCourseFolderCreating ? 'Creating...' : 'Create Folder'}
-                          </button>
-                        </div>
-
-                        {isCourseFoldersLoading ? (
-                          <p className="text-xs font-semibold text-slate-500">Loading course folders...</p>
-                        ) : courseFolders.length === 0 ? (
-                          <p className="text-xs font-semibold text-slate-500">No folders created yet for this course.</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {courseFolders.map(folder => {
-                              const isOpen = Boolean(openCourseFolders[folder.name]);
-                              const files = courseFolderFiles[folder.name] || [];
-                              const inputId = `course-folder-upload-${folder.name}`;
-
-                              return (
-                                <div key={folder.name} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 overflow-hidden">
-                                  <div className="flex items-center justify-between gap-2 p-3">
-                                    <button
-                                      onClick={() => void toggleCourseFolderOpen(folder.name)}
-                                      className="min-w-0 flex items-center gap-2 text-left"
-                                    >
-                                      <i className={`fas fa-chevron-right text-[10px] transition-transform ${isOpen ? 'rotate-90 text-brand-500' : 'text-slate-400'}`}></i>
-                                      <i className="fas fa-folder text-amber-500 text-xs"></i>
-                                      <span className="text-xs font-black truncate">{folder.name}</span>
-                                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{folder.filesCount}</span>
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); void deleteCourseFolder(folder.name); }}
-                                      className="mx-2 px-2 py-1 rounded-md bg-rose-50 text-rose-500 hover:bg-rose-100 text-[10px] font-black uppercase tracking-widest transition-colors"
-                                    >
-                                      Del
-                                    </button>
-
-                                    <button
-                                      onClick={() => courseFolderUploadRefs.current[inputId]?.click()}
-                                      disabled={uploadingCourseFolderName === folder.name}
-                                      className="px-2.5 py-1.5 rounded-lg bg-brand-500 text-white text-[10px] font-black uppercase tracking-widest disabled:opacity-60"
-                                    >
-                                      {uploadingCourseFolderName === folder.name ? 'Uploading...' : 'Add File'}
-                                    </button>
-
-                                    <input
-                                      id={inputId}
-                                      ref={node => {
-                                        courseFolderUploadRefs.current[inputId] = node;
-                                      }}
-                                      type="file"
-                                      accept={FOLDER_FILE_ACCEPT}
-                                      multiple
-                                      className="hidden"
-                                      onChange={event => {
-                                        void uploadFilesToCourseFolder(folder.name, event.target.files);
-                                        event.target.value = '';
-                                      }}
-                                    />
-                                  </div>
-
-                                  {isOpen && (
-                                    <div className="px-3 pb-3 border-t border-slate-200 dark:border-slate-700 pt-2 space-y-2">
-                                      {files.length === 0 ? (
-                                        <p className="text-[11px] font-semibold text-slate-500">No files yet.</p>
-                                      ) : (
-                                        files.map(file => (
-                                          <div
-                                            key={file.path}
-                                            className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 group"
-                                          >
-                                            <button
-                                              type="button"
-                                              onClick={() => void downloadFileDirectly(file.url, file.name)}
-                                              className="flex-1 text-left min-w-0 flex items-center gap-2"
-                                            >
-                                              <span className="text-[11px] font-black text-brand-500 truncate hover:underline">{file.name}</span>
-                                            </button>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                                {file.size > 0 ? `${Math.max(1, Math.round(file.size / 1024))}KB` : 'File'}
-                                              </span>
-                                              <button
-                                                onClick={(e) => { e.stopPropagation(); void deleteCourseFile(folder.name, file); }}
-                                                className="px-2 py-1 rounded-md bg-rose-50 text-rose-500 hover:bg-rose-100 text-[10px] font-black uppercase transition-colors opacity-0 group-hover:opacity-100"
-                                              >
-                                                Del
-                                              </button>
-                                            </div>
-                                          </div>
-                                        ))
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  <ResourcesPanel
+                    activeClassId={activeClassId || ''}
+                    focusCourse={focusCourse}
+                    schoolId={schoolId}
+                    supabase={supabase}
+                    notify={notify}
+                  />
                 </>
               )}
             </>
@@ -1996,73 +1384,11 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
           {activeClassId && !courseAttendanceOnly && (
             <>
-              <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
-                <button
-                  onClick={() => setIsTimetableViewOpen(prev => !prev)}
-                  title={isTimetableViewOpen ? 'Click to collapse timetable folder' : 'Click to expand timetable folder'}
-                  className="inline-flex items-center gap-3 px-3 py-2 rounded-xl border border-brand-200 dark:border-brand-800 bg-white dark:bg-slate-900 text-xs sm:text-sm font-black uppercase tracking-[0.18em] text-slate-700 hover:text-brand-500 dark:text-slate-200 dark:hover:text-brand-300 cursor-pointer"
-                >
-                  <span className={`w-8 h-8 rounded-full flex items-center justify-center border ${isTimetableViewOpen ? 'bg-brand-500 border-brand-400 text-white shadow-lg shadow-brand-500/40' : 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-200'}`}>
-                    <i className={`fas ${isTimetableViewOpen ? 'fa-chevron-down' : 'fa-chevron-right'} text-sm`}></i>
-                  </span>
-                  <span className={`${isTimetableViewOpen ? 'text-brand-500 dark:text-brand-400' : ''}`}>Timetable Folder</span>
-                  <span className="text-[10px] sm:text-xs font-bold tracking-normal normal-case text-brand-600 dark:text-brand-300">
-                    {isTimetableViewOpen ? 'Click arrow to collapse' : 'Click arrow to expand'}
-                  </span>
-                </button>
-
-                {isTimetableViewOpen && (
-                  <div className="mt-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 space-y-3">
-                    <button
-                      onClick={() => timetableInputRef.current?.click()}
-                      disabled={isTimetableUploading}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-white ${isTimetableUploading ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
-                    >
-                      {isTimetableUploading ? 'Uploading PDF...' : 'Upload PDF File'}
-                    </button>
-                    <input
-                      ref={timetableInputRef}
-                      type="file"
-                      accept="application/pdf,.pdf"
-                      onChange={uploadTimetablePdf}
-                      className="hidden"
-                    />
-
-                    <div className="flex flex-wrap gap-2">
-                      {isTimetableLoading && (
-                        <span className="text-xs font-semibold text-slate-500">Loading timetable files...</span>
-                      )}
-
-                      {!isTimetableLoading && timetableFiles.length === 0 && (
-                        <span className="text-xs font-semibold text-slate-500">No PDF uploaded yet.</span>
-                      )}
-
-                      {!isTimetableLoading && timetableFiles.map(file => (
-                        <div
-                          key={file.path}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => void downloadFileDirectly(file.url, file.name)}
-                            className="text-xs font-black uppercase tracking-widest text-brand-500 hover:text-brand-600"
-                            title={file.name}
-                          >
-                            {file.name.length > 24 ? `${file.name.slice(0, 24)}...` : file.name}
-                          </button>
-                          <button
-                            onClick={() => void deleteTimetablePdf(file.path)}
-                            className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-rose-500 flex items-center justify-center"
-                            title="Delete PDF"
-                          >
-                            <i className="fas fa-trash text-xs"></i>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <TimetablePanel
+                activeClassId={activeClassId}
+                supabase={supabase}
+                notify={notify}
+              />
 
               <div className="bg-white dark:bg-slate-900 rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
                 <div className="flex items-center justify-between gap-3 mb-4">
@@ -2072,7 +1398,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   <button
-                    onClick={() => {
+                    type="button" onClick={() => {
                       if (isClassCourseCreating) return;
                       setIsCreateCourseModalOpen(true);
                       setNewCourseName('');
@@ -2098,8 +1424,8 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                       className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-left hover:-translate-y-0.5 transition-all relative"
                     >
                       <div className="absolute top-2 right-2 flex gap-2">
-                        <button
-                          onClick={(e) => {
+                        <button aria-label="Action"
+                          type="button" onClick={(e) => {
                             e.stopPropagation();
                             openEditCourseModal(course);
                           }}
@@ -2108,8 +1434,8 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                         >
                           <i className="fas fa-pen text-xs"></i>
                         </button>
-                        <button
-                          onClick={(e) => {
+                        <button aria-label="Action"
+                          type="button" onClick={(e) => {
                             e.stopPropagation();
                             void deleteClassCourse(course);
                           }}
@@ -2121,7 +1447,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                         </button>
                       </div>
                       <button
-                        onClick={() => {
+                        type="button" onClick={() => {
                           if (openClassCoursePage) {
                             openClassCoursePage({
                               id: course.id,
@@ -2164,8 +1490,8 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
                 <div className="flex items-center justify-between gap-4">
                   <h3 className="text-xl font-black tracking-tight">Create Course</h3>
-                  <button
-                    onClick={() => {
+                  <button aria-label="Action"
+                    type="button" onClick={() => {
                       if (isClassCourseCreating) return;
                       setIsCreateCourseModalOpen(false);
                       setNewCourseName('');
@@ -2180,7 +1506,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Course Name</label>
-                  <input
+                  <input aria-label="Action"
                     type="text"
                     value={newCourseName}
                     onChange={(e) => {
@@ -2219,7 +1545,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                     >
                       Add Image
                     </button>
-                    <input
+                    <input aria-label="Action"
                       ref={newCourseImageInputRef}
                       type="file"
                       accept="image/*"
@@ -2233,7 +1559,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                     {newCourseImage && (
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <p className="text-[11px] text-slate-500 truncate">Selected: {newCourseImage.name}</p>
-                        <button
+                        <button aria-label="Action"
                           type="button"
                           onClick={() => {
                             setNewCourseImage(null);
@@ -2253,7 +1579,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
                 <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
                   <button
-                    onClick={() => {
+                    type="button" onClick={() => {
                       if (isClassCourseCreating) return;
                       setIsCreateCourseModalOpen(false);
                       setNewCourseName('');
@@ -2265,7 +1591,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                     Cancel
                   </button>
                   <button
-                    onClick={() => void createClassCourse()}
+                    type="button" onClick={() => void createClassCourse()}
                     disabled={isClassCourseCreating}
                     className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-widest ${isClassCourseCreating ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
                   >
@@ -2281,17 +1607,17 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
               <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
                 <div className="flex items-center justify-between gap-4">
                   <h3 className="text-xl font-black tracking-tight">Edit Course</h3>
-                  <button
+                  <button aria-label="Action"
                     onClick={closeEditCourseModal}
                     className="w-10 h-10 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400"
-                  >
+                   type="button">
                     <i className="fas fa-times"></i>
                   </button>
                 </div>
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Course Name</label>
-                  <input
+                  <input aria-label="Action"
                     type="text"
                     value={editCourseName}
                     onChange={(e) => {
@@ -2353,7 +1679,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                       </button>
                     </div>
 
-                    <input
+                    <input aria-label="Action"
                       ref={editCourseImageInputRef}
                       type="file"
                       accept="image/*"
@@ -2375,11 +1701,11 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                   <button
                     onClick={closeEditCourseModal}
                     className="px-6 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-black uppercase tracking-widest"
-                  >
+                   type="button">
                     Cancel
                   </button>
                   <button
-                    onClick={() => void updateClassCourse()}
+                    type="button" onClick={() => void updateClassCourse()}
                     disabled={isClassCourseUpdating}
                     className={`px-6 py-3 rounded-2xl text-white text-xs font-black uppercase tracking-widest ${isClassCourseUpdating ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
                   >
@@ -2400,7 +1726,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retype Course Name</label>
-                  <input
+                  <input aria-label="Action"
                     type="text"
                     value={courseDeleteNameInput}
                     onChange={(e) => setCourseDeleteNameInput(e.target.value)}
@@ -2411,7 +1737,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
-                  <input
+                  <input aria-label="Action"
                     type="password"
                     value={courseDeleteAdminPassword}
                     onChange={(e) => setCourseDeleteAdminPassword(e.target.value)}
@@ -2426,7 +1752,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
                 <div className="flex justify-end gap-3">
                   <button
-                    onClick={() => {
+                    type="button" onClick={() => {
                       if (isCourseDeleteSubmitting) return;
                       setCourseDeleteDialog(null);
                       setCourseDeleteNameInput('');
@@ -2438,7 +1764,7 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
                     Cancel
                   </button>
                   <button
-                    onClick={() => void handleSecureCourseDelete()}
+                    type="button" onClick={() => void handleSecureCourseDelete()}
                     disabled={isCourseDeleteSubmitting}
                     className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isCourseDeleteSubmitting ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
                   >
@@ -2462,14 +1788,14 @@ const AttendanceProtocol: React.FC<AttendanceProtocolProps> = ({
 
             <div className="mt-5 flex items-center justify-end gap-3">
               <button
-                onClick={() => setConfirmDialog(null)}
+                type="button" onClick={() => setConfirmDialog(null)}
                 disabled={isConfirmActionSubmitting}
                 className="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-100 text-xs font-black uppercase tracking-widest disabled:opacity-60"
               >
                 Cancel
               </button>
               <button
-                onClick={() => void confirmDialog.onConfirm()}
+                type="button" onClick={() => void confirmDialog.onConfirm()}
                 disabled={isConfirmActionSubmitting}
                 className="px-4 py-2.5 rounded-xl bg-rose-500 text-white text-xs font-black uppercase tracking-widest disabled:opacity-60 transition-colors hover:bg-rose-600"
               >

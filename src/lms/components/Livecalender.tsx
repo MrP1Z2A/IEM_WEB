@@ -188,8 +188,8 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
             <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-slate-400 mt-2">View-only class and course timeline</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+            <button aria-label="Action"
+              type="button" onClick={() => setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
               className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-brand-500"
               title="Previous month"
             >
@@ -198,8 +198,8 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
             <div className="px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-widest text-slate-500 min-w-[180px] text-center">
               {monthLabel}
             </div>
-            <button
-              onClick={() => setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+            <button aria-label="Action"
+              type="button" onClick={() => setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
               className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-brand-500"
               title="Next month"
             >
@@ -227,7 +227,7 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
                 return (
                   <button
                     key={`${day.iso}-${day.inMonth ? 'in' : 'out'}`}
-                    onClick={() => {
+                    type="button" onClick={() => {
                       setSelectedDate(day.iso);
                     }}
                     className={`min-h-24 rounded-xl border p-2 text-left transition-all ${isSelected ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'} ${!day.inMonth ? 'opacity-45' : ''}`}
@@ -279,7 +279,7 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ schoolId }) => {
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    {event.isInstitutional && <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-slate-900 uppercase tracking-widest">Institutional Event</span>}
+                    {event.isInstitutional && <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white uppercase tracking-widest">Institutional Event</span>}
                     <p className={`text-sm font-black truncate ${event.isInstitutional ? 'text-emerald-700 dark:text-emerald-300' : 'text-brand-700 dark:text-brand-300'}`}>{event.title}</p>
                   </div>
                   <p className={`text-[11px] font-semibold truncate ${event.isInstitutional ? 'text-emerald-600 dark:text-emerald-400' : 'text-brand-600 dark:text-brand-400'}`}>

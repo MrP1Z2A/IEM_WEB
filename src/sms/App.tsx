@@ -430,7 +430,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   // Attendance State (Subject-specific)
   const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
-  const [attendanceDate, setAttendanceDate] = useState(getLocalIsoDate());
+  const [attendanceDate, setAttendanceDate] = useState(() => getLocalIsoDate());
   // Mapping: subjectId -> date -> studentId -> status
   const [subjectAttendanceStore, setSubjectAttendanceStore] = useState<Record<string, Record<string, Record<string, 'P' | 'A' | 'L'>>>>({});
   const [isAttendanceContextNameSupported, setIsAttendanceContextNameSupported] = useState(true);
@@ -438,16 +438,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
-  const [enrollData, setEnrollData] = useState(getInitialEnrollData());
+  const [enrollData, setEnrollData] = useState(() => getInitialEnrollData());
   const [enrollClassCourses, setEnrollClassCourses] = useState<Array<{ id: string; name: string; class_id: string }>>([]);
   const [isEnrollClassCoursesLoading, setIsEnrollClassCoursesLoading] = useState(false);
   const [isBatchRegistering, setIsBatchRegistering] = useState(false);
   const [isTeacherEnrollModalOpen, setIsTeacherEnrollModalOpen] = useState(false);
-  const [teacherEnrollData, setTeacherEnrollData] = useState(getInitialTeacherEnrollData());
+  const [teacherEnrollData, setTeacherEnrollData] = useState(() => getInitialTeacherEnrollData());
   const [isBatchTeacherRegistering, setIsBatchTeacherRegistering] = useState(false);
   const [studentServiceStaff, setStudentServiceStaff] = useState<Student[]>([]);
   const [isStudentServiceEnrollModalOpen, setIsStudentServiceEnrollModalOpen] = useState(false);
-  const [studentServiceEnrollData, setStudentServiceEnrollData] = useState(getInitialTeacherEnrollData());
+  const [studentServiceEnrollData, setStudentServiceEnrollData] = useState(() => getInitialTeacherEnrollData());
   const [isBatchStudentServiceRegistering, setIsBatchStudentServiceRegistering] = useState(false);
   const [studentProfileImage, setStudentProfileImage] = useState<File | null>(null);
   const enrollAbortCounterRef = useRef(0);
@@ -1735,9 +1735,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         setAllStudents(prev => prev.filter((student: any) => !deletedIdSet.has(String(student.id))));
         setAttendanceStudents(prev => prev.filter(student => !deletedIdSet.has(String(student.id))));
         setClasses(prev => prev.map(classItem => {
-          const nextStudentIds = (classItem.student_ids || [])
-            .map((id: any) => String(id))
-            .filter((id: string) => !deletedIdSet.has(id));
+          const nextStudentIds = (classItem.student_ids || []).reduce((acc: string[], id: any) => {
+            const strId = String(id);
+            if (!deletedIdSet.has(strId)) acc.push(strId);
+            return acc;
+          }, []);
 
           if (nextStudentIds.length === (classItem.student_ids || []).length) {
             return classItem;
@@ -4114,7 +4116,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={async () => {
+                type="button" onClick={async () => {
                   await navigator.clipboard.writeText(`Email: ${newStudentCredentials.email}\nPassword: ${newStudentCredentials.password}`);
                   notify('Credentials copied.');
                 }}
@@ -4123,7 +4125,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 Copy
               </button>
               <button
-                onClick={() => setNewStudentCredentials(null)}
+                type="button" onClick={() => setNewStudentCredentials(null)}
                 className="px-4 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs uppercase tracking-widest"
               >
                 Done
@@ -4147,7 +4149,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <form onSubmit={handleDeveloperAuthSubmit} className="space-y-4">
               <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
-                <input
+                <input aria-label="Action"
                   type="password"
                   value={developerAuthPassword}
                   onChange={(e) => setDeveloperAuthPassword(e.target.value)}
@@ -4206,7 +4208,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <form onSubmit={handleDeveloperSchoolPasswordSubmit} className="space-y-4">
               <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">New School Login Password</label>
-                <input
+                <input aria-label="Action"
                   type="password"
                   value={developerSchoolPassword}
                   onChange={(e) => setDeveloperSchoolPassword(e.target.value)}
@@ -4218,7 +4220,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
               <div className="space-y-3">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Confirm Password</label>
-                <input
+                <input aria-label="Action"
                   type="password"
                   value={developerSchoolPasswordConfirm}
                   onChange={(e) => setDeveloperSchoolPasswordConfirm(e.target.value)}
@@ -4264,7 +4266,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <p className="text-sm text-slate-600 dark:text-slate-300">{confirmDialog.message}</p>
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setConfirmDialog(null)}
+                type="button" onClick={() => setConfirmDialog(null)}
                 className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
               >
                 Cancel
@@ -4272,7 +4274,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <button
                 onClick={handleConfirmDialog}
                 className="px-4 py-2.5 rounded-xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest"
-              >
+               type="button">
                 Delete
               </button>
             </div>
@@ -4290,7 +4292,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retype Student Name</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 value={studentDeleteNameInput}
                 onChange={(e) => setStudentDeleteNameInput(e.target.value)}
@@ -4301,7 +4303,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
-              <input
+              <input aria-label="Action"
                 type="password"
                 value={adminDeletePassword}
                 onChange={(e) => setAdminDeletePassword(e.target.value)}
@@ -4316,7 +4318,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
+                type="button" onClick={() => {
                   if (isStudentDeleteSubmitting) return;
                   setStudentDeleteDialog(null);
                   setStudentDeleteNameInput('');
@@ -4331,7 +4333,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 onClick={handleSecureStudentDelete}
                 disabled={isStudentDeleteSubmitting}
                 className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isStudentDeleteSubmitting ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
-              >
+               type="button">
                 {isStudentDeleteSubmitting ? 'Verifying...' : 'Delete'}
               </button>
             </div>
@@ -4347,7 +4349,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
-              <input
+              <input aria-label="Action"
                 type="password"
                 value={studentEditAuthPassword}
                 onChange={(e) => setStudentEditAuthPassword(e.target.value)}
@@ -4362,7 +4364,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
+                type="button" onClick={() => {
                   if (isStudentEditAuthSubmitting) return;
                   setStudentEditAuthDialog(null);
                   setStudentEditAuthPassword('');
@@ -4376,7 +4378,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 onClick={handleStudentEditAuthConfirm}
                 disabled={isStudentEditAuthSubmitting}
                 className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isStudentEditAuthSubmitting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
-              >
+               type="button">
                 {isStudentEditAuthSubmitting ? 'Verifying...' : 'Continue'}
               </button>
             </div>
@@ -4394,7 +4396,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retype Class Name</label>
-              <input
+              <input aria-label="Action"
                 type="text"
                 value={classDeleteNameInput}
                 onChange={(e) => setClassDeleteNameInput(e.target.value)}
@@ -4405,7 +4407,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="space-y-3">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
-              <input
+              <input aria-label="Action"
                 type="password"
                 value={classAdminDeletePassword}
                 onChange={(e) => setClassAdminDeletePassword(e.target.value)}
@@ -4420,7 +4422,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => {
+                type="button" onClick={() => {
                   if (isClassDeleteSubmitting) return;
                   setClassDeleteDialog(null);
                   setClassDeleteNameInput('');
@@ -4435,7 +4437,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 onClick={handleSecureClassDelete}
                 disabled={isClassDeleteSubmitting}
                 className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isClassDeleteSubmitting ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
-              >
+               type="button">
                 {isClassDeleteSubmitting ? 'Verifying...' : 'Delete'}
               </button>
             </div>
@@ -4510,17 +4512,17 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       <main className={`flex-1 transition-all duration-300 flex flex-col min-w-0`}>
         <header className="h-20 bg-white/60 dark:bg-slate-900/40 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-40 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-4 sm:gap-8">
-            <button className="lg:hidden p-3 text-slate-500 hover:text-brand-500 transition-all" onClick={() => setIsMobileMenuOpen(true)}><i className="fas fa-bars-staggered"></i></button>
+            <button aria-label="Action" className="lg:hidden p-3 text-slate-500 hover:text-brand-500 transition-all" type="button" onClick={() => setIsMobileMenuOpen(true)}><i className="fas fa-bars-staggered"></i></button>
             <div className="hidden sm:flex flex-col"><span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400"></span><span className="text-xs font-bold text-brand-500"></span></div>
           </div>
           <div className="flex items-center gap-3 sm:gap-6">
             <button
-              onClick={() => void handleLogout()}
+              type="button" onClick={() => void handleLogout()}
               className="px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-900 font-black text-xs uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-all"
             >
               Log Out
             </button>
-            <button onClick={() => setIsDarkMode(!isDarkMode)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-brand-500 rounded-xl active:scale-75 transition-all"><i className={`fas ${isDarkMode ? 'fa-sun' : 'fa-moon'}`}></i></button>
+            <button aria-label="Action" type="button" onClick={() => setIsDarkMode(!isDarkMode)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-brand-500 rounded-xl active:scale-75 transition-all"><i className={`fas ${isDarkMode ? 'fa-sun' : 'fa-moon'}`}></i></button>
             <button
               type="button"
               onClick={handleDeveloperTriggerClick}
@@ -4703,8 +4705,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <div className="space-y-10 animate-in fade-in duration-500 pb-20">
               <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[56px] p-6 sm:p-8 lg:p-10 border border-slate-100 dark:border-slate-800 shadow-premium">
                 <div className="flex items-center gap-4 sm:gap-6 lg:gap-8 min-w-0">
-                  <button
-                    onClick={() => setCurrentPage('class-attendance')}
+                  <button aria-label="Action"
+                    type="button" onClick={() => setCurrentPage('class-attendance')}
                     className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 transition-all"
                   >
                     <i className="fas fa-arrow-left"></i>
@@ -4846,8 +4848,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 {subjects.map(sub => (
                   <div key={sub.id} className="bg-white dark:bg-slate-900 p-10 rounded-[56px] shadow-premium border border-slate-100 dark:border-slate-800 group hover:-translate-y-4 transition-all duration-500 relative">
                     <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => openEditModal('subject', sub)} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 shadow-sm"><i className="fas fa-edit text-sm"></i></button>
-                      <button onClick={() => deleteEntity(sub.id, 'subject')} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 shadow-sm"><i className="fas fa-trash text-sm"></i></button>
+                      <button type="button" onClick={() => openEditModal('subject', sub)} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 shadow-sm"><i className="fas fa-edit text-sm"></i></button>
+                      <button type="button" onClick={() => deleteEntity(sub.id, 'subject')} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 shadow-sm"><i className="fas fa-trash text-sm"></i></button>
                     </div>
                     <div className="flex justify-between items-start mb-12">
                       <div className={`w-20 h-20 ${sub.bg} ${sub.color} rounded-[32px] flex items-center justify-center text-4xl shadow-inner group-hover:rotate-6 transition-transform`}><i className={`fas ${sub.icon}`}></i></div>
@@ -4911,8 +4913,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 {programs.map((prog) => (
                   <div key={prog.id} className="bg-white dark:bg-slate-900 rounded-[80px] p-16 shadow-premium border border-slate-100 dark:border-slate-800 group hover:shadow-2xl transition-all duration-500 flex flex-col md:flex-row gap-12 relative overflow-hidden">
                     <div className="absolute top-12 right-12 flex gap-4 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => openEditModal('program', prog)} className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 shadow-sm"><i className="fas fa-gear"></i></button>
-                      <button onClick={() => deleteEntity(prog.id, 'program')} className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 shadow-sm"><i className="fas fa-trash-can"></i></button>
+                      <button type="button" onClick={() => openEditModal('program', prog)} className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 shadow-sm"><i className="fas fa-gear"></i></button>
+                      <button type="button" onClick={() => deleteEntity(prog.id, 'program')} className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 shadow-sm"><i className="fas fa-trash-can"></i></button>
                     </div>
                     <div className={`w-32 h-32 md:w-48 md:h-48 rounded-[64px] bg-gradient-to-tr ${prog.color} flex items-center justify-center text-white text-5xl md:text-7xl shadow-xl group-hover:scale-110 group-hover:-rotate-3 transition-transform flex-shrink-0`}><i className={`fas ${prog.icon}`}></i></div>
                     <div className="flex-1 flex flex-col justify-center">
@@ -4999,7 +5001,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <i className="fas fa-calendar-plus text-5xl text-brand-500/30 mb-6 block"></i>
                   <p className="text-slate-500 font-semibold">No events scheduled yet. Create an event to share with the school community.</p>
                   <button 
-                    onClick={() => setIsGlobalCreateModalOpen('events')}
+                    type="button" onClick={() => setIsGlobalCreateModalOpen('events')}
                     className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
                   >
                     Create Event
@@ -5007,14 +5009,18 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
-                  <div 
+                  <button type="button"
                     onClick={() => setIsGlobalCreateModalOpen('events')}
-                    className="group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:border-brand-500 hover:bg-brand-500/5 transition-all cursor-pointer min-h-[280px]"
+                    className="w-full text-left block group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:border-brand-500 hover:bg-brand-500/5 transition-all min-h-[280px]"
                   >
-                    <div className="w-16 h-16 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform"><i className="fas fa-plus"></i></div>
-                    <h4 className="mt-6 text-xl font-black tracking-tight">Post New Event</h4>
-                    <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-400">Share with community</p>
-                  </div>
+                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all group-hover:scale-110 mb-4">
+                      <i className="fas fa-plus text-xl"></i>
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Create New Event</h3>
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 max-w-[200px] mx-auto">
+                      Schedule a new school-wide or class-specific event
+                    </p>
+                  </button>
                   {events.map((event: any) => (
                     <div key={event.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 shadow-premium group hover:-translate-y-1 transition-all overflow-hidden relative">
                       {event.image_url && (
@@ -5028,8 +5034,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">{new Date(event.event_date).toLocaleDateString()}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                           <button onClick={(e) => { e.stopPropagation(); openGlobalEdit('events', event); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-brand-500 transition-all flex items-center justify-center text-xs shadow-sm"><i className="fas fa-pencil"></i></button>
-                           <button onClick={(e) => { e.stopPropagation(); deleteEntity(event.id, 'events'); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-all flex items-center justify-center text-xs shadow-sm"><i className="fas fa-trash-can"></i></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); openGlobalEdit('events', event); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-brand-500 transition-all flex items-center justify-center text-xs shadow-sm"><i className="fas fa-pencil"></i></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); deleteEntity(event.id, 'events'); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-all flex items-center justify-center text-xs shadow-sm"><i className="fas fa-trash-can"></i></button>
                         </div>
                       </div>
                       <h4 className="text-xl font-black tracking-tight mb-2 line-clamp-1 relative z-10">{event.title}</h4>
@@ -5069,7 +5075,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <i className="fas fa-users text-5xl text-brand-500/30 mb-6 block"></i>
                   <p className="text-slate-500 font-semibold">No activities posted yet. Add activities for students to explore and join.</p>
                   <button 
-                    onClick={() => setIsGlobalCreateModalOpen('student-activities')}
+                    type="button" onClick={() => setIsGlobalCreateModalOpen('student-activities')}
                     className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
                   >
                     Add Activity
@@ -5077,14 +5083,18 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
-                  <div 
+                  <button type="button"
                     onClick={() => setIsGlobalCreateModalOpen('student-activities')}
-                    className="group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:border-brand-500 hover:bg-brand-500/5 transition-all cursor-pointer min-h-[250px]"
+                    className="w-full text-left block group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:border-brand-500 hover:bg-brand-500/5 transition-all min-h-[250px]"
                   >
-                    <div className="w-16 h-16 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform"><i className="fas fa-plus"></i></div>
-                    <h4 className="mt-6 text-xl font-black tracking-tight">Add New Activity</h4>
-                    <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-400">Expand campus life</p>
-                  </div>
+                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all group-hover:scale-110 mb-4">
+                      <i className="fas fa-plus text-xl"></i>
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Create New Activity</h3>
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 max-w-[200px] mx-auto">
+                      Set up extracurriculars, clubs, and student activities
+                    </p>
+                  </button>
                   {studentActivities.map((act: any) => (
                     <div key={act.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 shadow-premium group hover:-translate-y-1 transition-all">
                       <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 text-brand-500 rounded-2xl flex items-center justify-center text-xl mb-6 group-hover:bg-brand-500 group-hover:text-white transition-all">
@@ -5093,8 +5103,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="text-xl font-black tracking-tight line-clamp-1">{act.name}</h4>
                         <div className="flex items-center gap-2">
-                           <button onClick={(e) => { e.stopPropagation(); openGlobalEdit('student-activities', act); }} className="text-slate-400 hover:text-brand-500 transition-colors text-xs p-1"><i className="fas fa-pencil"></i></button>
-                           <button onClick={(e) => { e.stopPropagation(); deleteEntity(act.id, 'student-activities'); }} className="text-slate-400 hover:text-rose-500 transition-colors text-xs p-1"><i className="fas fa-trash-can"></i></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); openGlobalEdit('student-activities', act); }} className="text-slate-400 hover:text-brand-500 transition-colors text-xs p-1"><i className="fas fa-pencil"></i></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); deleteEntity(act.id, 'student-activities'); }} className="text-slate-400 hover:text-rose-500 transition-colors text-xs p-1"><i className="fas fa-trash-can"></i></button>
                         </div>
                       </div>
                       <div className="flex gap-4 items-center mb-6">
@@ -5129,7 +5139,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <i className="fas fa-envelope-open-text text-5xl text-brand-500/30 mb-6 block"></i>
                   <p className="text-slate-500 font-semibold">No parent announcements published yet. Create one to notify parents instantly.</p>
                   <button 
-                    onClick={() => setIsGlobalCreateModalOpen('announcements-parent')}
+                    type="button" onClick={() => setIsGlobalCreateModalOpen('announcements-parent')}
                     className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
                   >
                     Create Announcement
@@ -5137,16 +5147,20 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
-                  <div 
+                  <button type="button"
                     onClick={() => setIsGlobalCreateModalOpen('announcements-parent')}
-                    className="group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex items-center gap-6 hover:border-brand-500 hover:bg-brand-500/5 transition-all cursor-pointer"
+                    className="w-full text-left block group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex items-center gap-6 hover:border-brand-500 hover:bg-brand-500/5 transition-all"
                   >
-                    <div className="w-14 h-14 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform"><i className="fas fa-plus"></i></div>
-                    <div className="text-left">
-                      <h4 className="text-lg font-black tracking-tight">New Parent Update</h4>
-                      <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Push to portal</p>
+                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all group-hover:scale-110 shrink-0">
+                      <i className="fas fa-plus text-xl"></i>
                     </div>
-                  </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 dark:text-white mb-1">Create Announcement</h3>
+                      <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                        Draft and send a new announcement to parents
+                      </p>
+                    </div>
+                  </button>
                   {parentAnnouncements.map((pa: any) => (
                     <div key={pa.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-8 shadow-premium group">
                       <div className="flex justify-between items-start mb-6">
@@ -5158,8 +5172,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                           {pa.importance}
                         </div>
                         <div className="flex items-center gap-3">
-                           <button onClick={() => openGlobalEdit('announcements-parent', pa)} className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-brand-500 transition-all flex items-center justify-center shadow-sm"><i className="fas fa-edit text-xs"></i></button>
-                           <button onClick={() => deleteEntity(pa.id, 'announcements-parent')} className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-all flex items-center justify-center shadow-sm"><i className="fas fa-trash text-xs"></i></button>
+                           <button type="button" onClick={() => openGlobalEdit('announcements-parent', pa)} className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-brand-500 transition-all flex items-center justify-center shadow-sm"><i className="fas fa-edit text-xs"></i></button>
+                           <button type="button" onClick={() => deleteEntity(pa.id, 'announcements-parent')} className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-all flex items-center justify-center shadow-sm"><i className="fas fa-trash text-xs"></i></button>
                         </div>
                       </div>
                       <h4 className="text-2xl font-black tracking-tight mb-4">{pa.title}</h4>
@@ -5197,7 +5211,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-black uppercase tracking-widest mb-4"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Live Feed Active</span>
                   <p className="text-slate-500 font-semibold">Real-time intelligence data will appear here as events occur across the institution.</p>
                   <button 
-                    onClick={() => setIsGlobalCreateModalOpen('live-intel')}
+                    type="button" onClick={() => setIsGlobalCreateModalOpen('live-intel')}
                     className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
                   >
                     Post Intel
@@ -5205,16 +5219,21 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 </div>
               ) : (
                 <div className="space-y-4 pb-20">
-                  <div 
+                  <button type="button"
                     onClick={() => setIsGlobalCreateModalOpen('live-intel')}
-                    className="group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex items-center justify-between hover:border-brand-500 hover:bg-brand-500/5 transition-all cursor-pointer"
+                    className="w-full text-left block group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex items-center justify-between hover:border-brand-500 hover:bg-brand-500/5 transition-all"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-brand-500/10 text-brand-500 rounded-xl flex items-center justify-center text-lg group-hover:scale-110 transition-transform"><i className="fas fa-satellite"></i></div>
-                      <h4 className="text-lg font-black tracking-tight">Manual Intel Dispatch</h4>
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all">
+                        <i className="fas fa-plus"></i>
+                      </div>
+                      <div>
+                        <h4 className="text-base font-black text-slate-900 dark:text-white">Create Intel Task</h4>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Set up a new monitoring job</p>
+                      </div>
                     </div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Broadcast updates</span>
-                  </div>
+                    <i className="fas fa-arrow-right text-slate-300 group-hover:text-brand-500 transition-colors"></i>
+                  </button>
                   {liveIntelData.map((intel: any) => (
                     <div key={intel.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 shadow-sm flex items-center gap-6">
                       <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
@@ -5255,8 +5274,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <button onClick={() => openGlobalEdit('live-intel', intel)} className="p-2 text-slate-400 hover:text-brand-500 transition-colors"><i className="fas fa-pen-to-square text-xs"></i></button>
-                        <button onClick={() => deleteEntity(intel.id, 'live-intel')} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><i className="fas fa-trash text-xs"></i></button>
+                        <button type="button" onClick={() => openGlobalEdit('live-intel', intel)} className="p-2 text-slate-400 hover:text-brand-500 transition-colors"><i className="fas fa-pen-to-square text-xs"></i></button>
+                        <button type="button" onClick={() => deleteEntity(intel.id, 'live-intel')} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><i className="fas fa-trash text-xs"></i></button>
                         <div className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${
                           intel.severity === 'Critical' ? 'text-rose-500' :
                           intel.severity === 'Warning' ? 'text-amber-500' :
@@ -5286,7 +5305,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
               <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
               <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>
-              <button onClick={() => setCurrentPage('dashboard')} className="mt-8 sm:mt-12 lg:mt-16 px-8 sm:px-14 lg:px-24 py-4 sm:py-6 lg:py-8 bg-brand-500 text-white font-black rounded-[24px] sm:rounded-[40px] lg:rounded-[64px] text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.2em] sm:tracking-[0.35em] lg:tracking-[0.5em] shadow-2xl active:scale-95 transition-all">Registeration</button>
+              <button type="button" onClick={() => setCurrentPage('dashboard')} className="mt-8 sm:mt-12 lg:mt-16 px-8 sm:px-14 lg:px-24 py-4 sm:py-6 lg:py-8 bg-brand-500 text-white font-black rounded-[24px] sm:rounded-[40px] lg:rounded-[64px] text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.2em] sm:tracking-[0.35em] lg:tracking-[0.5em] shadow-2xl active:scale-95 transition-all">Registeration</button>
             </div>
           )}
 
@@ -5310,7 +5329,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Institutional Communication Hub</p>
                       </div>
                     </div>
-                    <button onClick={() => {
+                    <button aria-label="Action" type="button" onClick={() => {
                       setIsGlobalCreateModalOpen(null);
                       setGlobalCreateData({});
                       setGlobalCreateFile(null);
@@ -5327,7 +5346,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
                           {isGlobalCreateModalOpen === 'student-activities' ? 'Activity Name' : 'Title / Subject'}
                         </span>
-                        <input
+                        <input aria-label="Action"
                           required
                           type="text"
                           value={
@@ -5351,7 +5370,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         <>
                           <div className="space-y-2">
                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Event Date</span>
-                            <input
+                            <input aria-label="Action"
                               required
                               type="date"
                               value={globalCreateData.event_date || ''}
@@ -5411,7 +5430,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         <>
                           <div className="space-y-2">
                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Intel Category</span>
-                            <input
+                            <input aria-label="Action"
                               required
                               type="text"
                               value={globalCreateData.event_type || ''}
@@ -5441,7 +5460,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
                         {isGlobalCreateModalOpen === 'live-intel' ? 'System Details' : 'Detailed Message / Description'}
                       </span>
-                      <textarea
+                      <textarea aria-label="Action"
                         required
                         value={
                           (isGlobalCreateModalOpen === 'events' || isGlobalCreateModalOpen === 'student-activities') ? (globalCreateData.description || '') :
@@ -5477,7 +5496,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                             {globalCreateFile ? globalCreateFile.name : 'Choose/Drop File'}
                           </label>
                           {globalCreateFile && (
-                            <button 
+                            <button aria-label="Action" 
                               type="button"
                               onClick={() => setGlobalCreateFile(null)}
                               className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all"

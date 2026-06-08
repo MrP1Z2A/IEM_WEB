@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { AccessToken, TrackSource } from 'livekit-server-sdk';
@@ -52,8 +52,10 @@ export default defineConfig({
             const roomId = (query.roomId as string) || 'dev-room';
             const isTeacher = query.isTeacher === 'true';
 
-            const apiKey = process.env.LIVEKIT_API_KEY || 'devkey';
-            const apiSecret = process.env.LIVEKIT_API_SECRET || 'secret';
+            // Load env vars properly using Vite's loadEnv to get keys from .env
+            const env = loadEnv('', process.cwd(), '');
+            const apiKey = env.LIVEKIT_API_KEY || process.env.LIVEKIT_API_KEY || 'devkey';
+            const apiSecret = env.LIVEKIT_API_SECRET || process.env.LIVEKIT_API_SECRET || 'secret';
 
             try {
               const at = new AccessToken(apiKey, apiSecret, {

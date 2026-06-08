@@ -84,13 +84,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     <>
       {isOpen && (
         <div
+          role="presentation"
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] md:hidden transition-opacity"
           onClick={onToggle}
         />
       )}
       <aside className={`fixed left-0 top-0 h-screen bg-[#0f2624] border-r border-[#1f4e4a] text-white flex flex-col z-[60] overflow-y-auto custom-scrollbar transition-all duration-300 ${isOpen ? 'translate-x-0 w-72' : '-translate-x-full md:translate-x-0'} ${isCollapsed ? 'md:w-20' : 'md:w-72'}`}>
         <div className={`p-8 flex items-center shrink-0 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-          <div 
+          <button type="button" 
             onClick={handleLogoClick}
             className="flex items-center gap-4 cursor-pointer active:scale-95 transition-transform"
           >
@@ -98,18 +99,18 @@ const Sidebar: React.FC<SidebarProps> = ({
               <img src={logoIem} alt="IEM Logo" className="w-full h-full object-contain" />
             </div>
             {!isCollapsed && <h1 className="text-xl font-black tracking-tighter text-white uppercase truncate max-w-[180px]">{schoolName || 'IEM'}</h1>}
-          </div>
-          <button onClick={onToggle} className="md:hidden text-slate-400 hover:text-white">
+          </button>
+          <button aria-label="Action" onClick={onToggle} className="md:hidden text-slate-400 hover:text-white" type="button">
             <i className="fa-solid fa-xmark text-xl"></i>
           </button>
         </div>
 
         <div className="hidden md:flex justify-end px-4 mb-2">
-          <button
+          <button aria-label="Action"
             onClick={onCollapse}
             className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] transition-all hover:scale-110"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          >
+           type="button">
             <i className="fa-solid fa-bars text-[10px]"></i>
           </button>
         </div>
@@ -120,7 +121,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             return (
               <button
                 key={item.id}
-                onClick={() => handleNavClick(item.id as View)}
+                type="button" onClick={() => handleNavClick(item.id as View)}
                 className={`w-full flex items-center ${isCollapsed ? 'justify-center px-0' : 'gap-4 px-5'} py-3 rounded-2xl transition-all duration-300 group ${isActive
                     ? 'bg-[#4ea59d] text-white shadow-[0_8px_16px_-4px_rgba(78,165,157,0.5)] scale-[1.02]'
                     : 'text-slate-300 hover:bg-[#1f4e4a] hover:text-[#4ea59d]'
@@ -178,7 +179,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onSwitch}
             className={`w-full flex items-center justify-center ${isCollapsed ? 'px-0' : 'gap-3 px-5'} py-3 rounded-2xl bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] hover:bg-[#4ea59d] hover:text-white transition-all duration-300 group`}
-          >
+           type="button">
             <i className="fa-solid fa-rotate text-xs group-hover:rotate-180 transition-transform duration-500"></i>
             {!isCollapsed && <span className="font-black text-[10px] uppercase tracking-[0.2em]">Switch Environment</span>}
           </button>
@@ -186,7 +187,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onLogout}
             className={`w-full flex items-center justify-center ${isCollapsed ? 'px-0' : 'gap-3 px-5'} py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all duration-300 group`}
-          >
+           type="button">
             <i className="fa-solid fa-right-from-bracket text-xs group-hover:-translate-x-1 transition-transform"></i>
             {!isCollapsed && <span className="font-black text-[10px] uppercase tracking-[0.2em]">Logout</span>}
           </button>

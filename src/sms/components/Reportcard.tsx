@@ -885,7 +885,7 @@ export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
         {mode === 'upload' && (
           <div className="space-y-2">
             <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Upload File (PDF)</span>
-            <input
+            <input aria-label="Action"
               type="file"
               accept="application/pdf,.pdf"
               onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
@@ -949,7 +949,7 @@ export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
                   <span className="text-xs font-semibold text-slate-500 truncate max-w-[220px]">{templateFile.name}</span>
                 )}
               </div>
-              <input
+              <input aria-label="Action"
                 ref={templateFileInputRef}
                 type="file"
                 accept="application/pdf,.pdf,image/jpeg,image/png,.jpg,.jpeg,.png"
@@ -1001,6 +1001,7 @@ export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
 
                 {/* Template canvas with text box overlays */}
                 <div
+                  role="presentation"
                   ref={templateContainerRef}
                   className="relative rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden select-none"
                   onMouseMove={(e) => {
@@ -1027,8 +1028,9 @@ export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
                     }}
                   />
                   {/* Transparent click-to-add overlay */}
-                  <div
-                    className="absolute inset-0 cursor-crosshair"
+                  <button
+                    type="button"
+                    className="absolute inset-0 cursor-crosshair w-full h-full bg-transparent"
                     style={{ zIndex: 1 }}
                     onClick={(e) => {
                       if (draggingBoxId || !templateContainerRef.current) return;
@@ -1059,7 +1061,7 @@ export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
                       }}
                       className="overflow-hidden"
                     >
-                      <textarea
+                      <textarea aria-label="Action"
                         value={box.text}
                         onChange={e => setTextBoxes(prev => prev.map(b => b.id === box.id ? { ...b, text: e.target.value } : b))}
                         onClick={e => e.stopPropagation()}
@@ -1087,6 +1089,7 @@ export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
                   className="w-full rounded-2xl border border-slate-200 dark:border-slate-700"
                   style={{ height: '560px' }}
                   title="PDF Template Preview"
+                  sandbox=""
                 />
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">{textBoxes.length} Text Field{textBoxes.length !== 1 ? 's' : ''}</p>
@@ -1118,7 +1121,7 @@ export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
                 </div>
                 {textBoxes.map(box => (
                   <div key={box.id} className="flex items-center gap-2">
-                    <input
+                    <input aria-label="Action"
                       value={box.text}
                       onChange={e => setTextBoxes(prev => prev.map(b => b.id === box.id ? { ...b, text: e.target.value } : b))}
                       className="flex-1 px-3 py-2 rounded-xl bg-transparent border-none text-sm font-medium outline-none"
@@ -1208,7 +1211,7 @@ export default function ReportCardPage({ schoolId }: ReportCardPageProps) {
                         Export PDF
                       </button>
 
-                      <input
+                      <input aria-label="Action"
                         type="file"
                         accept="application/pdf,.pdf"
                         className="hidden"

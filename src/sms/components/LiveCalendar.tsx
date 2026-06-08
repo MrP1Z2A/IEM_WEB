@@ -8,7 +8,7 @@ const getLocalIsoDate = (date: Date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-interface LiveCalendarEvent {
+export interface LiveCalendarEvent {
   id: string;
   title: string;
   event_date: string;
@@ -40,6 +40,283 @@ const toMonthRange = (cursor: Date) => {
 
 const toTimeInputValue = (value: string) => (value || '').slice(0, 5);
 
+// ---------------------------------------------------------
+// Subcomponents
+// ---------------------------------------------------------
+
+const CalendarHeader: React.FC<{
+  monthCursor: Date;
+  setMonthCursor: React.Dispatch<React.SetStateAction<Date>>;
+}> = ({ monthCursor, setMonthCursor }) => {
+  const monthLabel = monthCursor.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[56px] p-6 sm:p-8 lg:p-10 border border-slate-100 dark:border-slate-800 shadow-premium">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight">Live Timetable Calendar</h2>
+          <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-slate-400 mt-2">Admin schedule control for class and course timeline</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button aria-label="Action"
+            type="button" onClick={() => setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+            className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-brand-500"
+            title="Previous month"
+          >
+            <i className="fas fa-chevron-left"></i>
+          </button>
+          <div className="px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-widest text-slate-500 min-w-[180px] text-center">
+            {monthLabel}
+          </div>
+          <button aria-label="Action"
+            type="button" onClick={() => setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+            className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-brand-500"
+            title="Next month"
+          >
+            <i className="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CalendarGrid: React.FC<{
+  isLoading: boolean;
+  calendarDays: Array<{ date: Date; iso: string; inMonth: boolean }>;
+  eventsByDate: Record<string, LiveCalendarEvent[]>;
+  selectedDate: string;
+  onSelectDate: (iso: string) => void;
+}> = ({ isLoading, calendarDays, eventsByDate, selectedDate, onSelectDate }) => {
+  return (
+    <div className="xl:col-span-2 bg-white dark:bg-slate-900 rounded-[28px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
+      <div className="grid grid-cols-7 gap-2 mb-3">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <div key={day} className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 py-1">{day}</div>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="h-64 flex items-center justify-center text-sm font-semibold text-slate-500">Loading calendar...</div>
+      ) : (
+        <div className="grid grid-cols-7 gap-2">
+          {calendarDays.map(day => {
+            const dayEvents = eventsByDate[day.iso] || [];
+            const isSelected = day.iso === selectedDate;
+            return (
+              <button
+                key={`${day.iso}-${day.inMonth ? 'in' : 'out'}`}
+                type="button" onClick={() => onSelectDate(day.iso)}
+                className={`min-h-24 rounded-xl border p-2 text-left transition-all ${isSelected ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'} ${!day.inMonth ? 'opacity-45' : ''}`}
+              >
+                <p className="text-xs font-black text-slate-500">{day.date.getDate()}</p>
+                <div className="mt-1 space-y-1">
+                  {dayEvents.slice(0, 2).map(event => (
+                    <div key={event.id} className="px-1.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-600 truncate">
+                      {toTimeInputValue(event.start_time)} {event.title}
+                    </div>
+                  ))}
+                  {dayEvents.length > 2 && (
+                    <p className="text-[10px] font-black text-brand-500">+{dayEvents.length - 2} more</p>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EventForm: React.FC<{
+  formData: any;
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  classes: any[];
+  classCourses: any[];
+  isCoursesLoading: boolean;
+  isSubmitting: boolean;
+  editingEventId: string | null;
+  handleSubmit: () => void;
+  resetForm: () => void;
+  setSelectedDate: (date: string) => void;
+}> = ({ formData, setFormData, classes, classCourses, isCoursesLoading, isSubmitting, editingEventId, handleSubmit, resetForm, setSelectedDate }) => {
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-[28px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium space-y-4">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{editingEventId ? 'Edit Timetable Event' : 'Create Timetable Event'}</p>
+
+      <input aria-label="Action"
+        type="text"
+        value={formData.title}
+        onChange={(e) => setFormData((prev: any) => ({ ...prev, title: e.target.value }))}
+        placeholder="Timetable title"
+        className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
+      />
+
+      <input aria-label="Action"
+        type="date"
+        value={formData.event_date}
+        onChange={(e) => {
+          setFormData((prev: any) => ({ ...prev, event_date: e.target.value }));
+          setSelectedDate(e.target.value);
+        }}
+        className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
+      />
+
+      <select
+        value={formData.class_id}
+        onChange={(e) => setFormData((prev: any) => ({ ...prev, class_id: e.target.value, course_id: '' }))}
+        className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
+      >
+        <option value="">Choose class</option>
+        {classes.map(classItem => (
+          <option key={classItem.id} value={classItem.id}>
+            {classItem.name} ({classItem.class_code || classItem.id})
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={formData.course_id}
+        onChange={(e) => setFormData((prev: any) => ({ ...prev, course_id: e.target.value }))}
+        disabled={!formData.class_id || isCoursesLoading}
+        className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm disabled:opacity-60"
+      >
+        <option value="">{!formData.class_id ? 'Choose class first' : isCoursesLoading ? 'Loading courses...' : 'Choose course (optional)'}</option>
+        {classCourses.map(course => (
+          <option key={course.id} value={course.id}>{course.name}</option>
+        ))}
+      </select>
+
+      <div className="grid grid-cols-2 gap-3">
+        <input aria-label="Action"
+          type="time"
+          value={formData.start_time}
+          onChange={(e) => setFormData((prev: any) => ({ ...prev, start_time: e.target.value }))}
+          className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
+        />
+        <input aria-label="Action"
+          type="time"
+          value={formData.end_time}
+          onChange={(e) => setFormData((prev: any) => ({ ...prev, end_time: e.target.value }))}
+          className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
+        />
+      </div>
+
+      <textarea aria-label="Action"
+        value={formData.notes}
+        onChange={(e) => setFormData((prev: any) => ({ ...prev, notes: e.target.value }))}
+        placeholder="Notes (optional)"
+        rows={3}
+        className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm resize-none"
+      />
+
+      <div className="flex gap-2">
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white ${isSubmitting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
+         type="button">
+          {isSubmitting ? 'Saving...' : editingEventId ? 'Update Event' : 'Create Event'}
+        </button>
+        {editingEventId && (
+          <button
+            onClick={resetForm}
+            className="px-4 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-200"
+           type="button">
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const DailyEventsList: React.FC<{
+  selectedDate: string;
+  selectedDayEvents: LiveCalendarEvent[];
+  startEditEvent: (event: LiveCalendarEvent) => void;
+  requestDeleteEvent: (event: LiveCalendarEvent) => void;
+}> = ({ selectedDate, selectedDayEvents, startEditEvent, requestDeleteEvent }) => {
+  return (
+    <div className="bg-white dark:bg-slate-900 rounded-[28px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Events on {selectedDate}</p>
+        <span className="text-[10px] font-black uppercase tracking-widest text-brand-500">{selectedDayEvents.length} Entries</span>
+      </div>
+
+      {selectedDayEvents.length === 0 ? (
+        <p className="text-sm font-semibold text-slate-500">No timetable entries for this date.</p>
+      ) : (
+        <div className="space-y-2">
+          {selectedDayEvents.map(event => (
+            <div key={event.id} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-black truncate">{event.title}</p>
+                <p className="text-[11px] font-semibold text-slate-500 truncate">
+                  {toTimeInputValue(event.start_time)} - {toTimeInputValue(event.end_time)} • {event.class_name}{event.course_name ? ` • ${event.course_name}` : ''}
+                </p>
+                {event.notes && <p className="text-[11px] text-slate-500 mt-1 truncate">{event.notes}</p>}
+              </div>
+              <div className="flex items-center gap-2">
+                <button aria-label="Action"
+                  type="button" onClick={() => startEditEvent(event)}
+                  className="w-9 h-9 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-brand-500"
+                  title="Edit event"
+                >
+                  <i className="fas fa-pen"></i>
+                </button>
+                <button aria-label="Action"
+                  type="button" onClick={() => requestDeleteEvent(event)}
+                  className="w-9 h-9 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-500"
+                  title="Delete event"
+                >
+                  <i className="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DeleteEventModal: React.FC<{
+  pendingDeleteEvent: LiveCalendarEvent | null;
+  setPendingDeleteEvent: (val: LiveCalendarEvent | null) => void;
+  confirmDeleteEvent: () => void;
+}> = ({ pendingDeleteEvent, setPendingDeleteEvent, confirmDeleteEvent }) => {
+  if (!pendingDeleteEvent) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-premium">
+        <p className="text-sm font-black text-slate-900 dark:text-slate-100">Delete timetable event?</p>
+        <p className="mt-2 text-xs font-semibold text-slate-500">
+          Are you sure you want to delete "{pendingDeleteEvent.title}" on {pendingDeleteEvent.event_date}?
+        </p>
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button" onClick={() => setPendingDeleteEvent(null)}
+            className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="button" onClick={() => void confirmDeleteEvent()}
+            className="px-4 py-2 rounded-xl bg-rose-500 text-[11px] font-black uppercase tracking-widest text-white"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------
+
 const LiveCalendar: React.FC<LiveCalendarProps> = ({ classes, notify, schoolId }) => {
   const [monthCursor, setMonthCursor] = React.useState(() => {
     const now = new Date();
@@ -63,8 +340,6 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ classes, notify, schoolId }
     end_time: '09:00',
     notes: '',
   });
-
-  const monthLabel = monthCursor.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   const loadMonthEvents = React.useCallback(async (targetMonth: Date) => {
     if (!schoolId) return;
@@ -314,230 +589,46 @@ const LiveCalendar: React.FC<LiveCalendarProps> = ({ classes, notify, schoolId }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[56px] p-6 sm:p-8 lg:p-10 border border-slate-100 dark:border-slate-800 shadow-premium">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight">Live Timetable Calendar</h2>
-            <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-slate-400 mt-2">Admin schedule control for class and course timeline</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-              className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-brand-500"
-              title="Previous month"
-            >
-              <i className="fas fa-chevron-left"></i>
-            </button>
-            <div className="px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-black uppercase tracking-widest text-slate-500 min-w-[180px] text-center">
-              {monthLabel}
-            </div>
-            <button
-              onClick={() => setMonthCursor(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
-              className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-brand-500"
-              title="Next month"
-            >
-              <i className="fas fa-chevron-right"></i>
-            </button>
-          </div>
-        </div>
-      </div>
+      <CalendarHeader monthCursor={monthCursor} setMonthCursor={setMonthCursor} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 bg-white dark:bg-slate-900 rounded-[28px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium">
-          <div className="grid grid-cols-7 gap-2 mb-3">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 py-1">{day}</div>
-            ))}
-          </div>
+        <CalendarGrid
+          isLoading={isLoading}
+          calendarDays={calendarDays}
+          eventsByDate={eventsByDate}
+          selectedDate={selectedDate}
+          onSelectDate={(iso) => {
+            setSelectedDate(iso);
+            setFormData((prev: any) => ({ ...prev, event_date: iso }));
+          }}
+        />
 
-          {isLoading ? (
-            <div className="h-64 flex items-center justify-center text-sm font-semibold text-slate-500">Loading calendar...</div>
-          ) : (
-            <div className="grid grid-cols-7 gap-2">
-              {calendarDays.map(day => {
-                const dayEvents = eventsByDate[day.iso] || [];
-                const isSelected = day.iso === selectedDate;
-                return (
-                  <button
-                    key={`${day.iso}-${day.inMonth ? 'in' : 'out'}`}
-                    onClick={() => {
-                      setSelectedDate(day.iso);
-                      setFormData(prev => ({ ...prev, event_date: day.iso }));
-                    }}
-                    className={`min-h-24 rounded-xl border p-2 text-left transition-all ${isSelected ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'} ${!day.inMonth ? 'opacity-45' : ''}`}
-                  >
-                    <p className="text-xs font-black text-slate-500">{day.date.getDate()}</p>
-                    <div className="mt-1 space-y-1">
-                      {dayEvents.slice(0, 2).map(event => (
-                        <div key={event.id} className="px-1.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-600 truncate">
-                          {toTimeInputValue(event.start_time)} {event.title}
-                        </div>
-                      ))}
-                      {dayEvents.length > 2 && (
-                        <p className="text-[10px] font-black text-brand-500">+{dayEvents.length - 2} more</p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 rounded-[28px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium space-y-4">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{editingEventId ? 'Edit Timetable Event' : 'Create Timetable Event'}</p>
-
-          <input
-            type="text"
-            value={formData.title}
-            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            placeholder="Timetable title"
-            className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
-          />
-
-          <input
-            type="date"
-            value={formData.event_date}
-            onChange={(e) => {
-              setFormData(prev => ({ ...prev, event_date: e.target.value }));
-              setSelectedDate(e.target.value);
-            }}
-            className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
-          />
-
-          <select
-            value={formData.class_id}
-            onChange={(e) => setFormData(prev => ({ ...prev, class_id: e.target.value, course_id: '' }))}
-            className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
-          >
-            <option value="">Choose class</option>
-            {classes.map(classItem => (
-              <option key={classItem.id} value={classItem.id}>
-                {classItem.name} ({classItem.class_code || classItem.id})
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={formData.course_id}
-            onChange={(e) => setFormData(prev => ({ ...prev, course_id: e.target.value }))}
-            disabled={!formData.class_id || isCoursesLoading}
-            className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm disabled:opacity-60"
-          >
-            <option value="">{!formData.class_id ? 'Choose class first' : isCoursesLoading ? 'Loading courses...' : 'Choose course (optional)'}</option>
-            {classCourses.map(course => (
-              <option key={course.id} value={course.id}>{course.name}</option>
-            ))}
-          </select>
-
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="time"
-              value={formData.start_time}
-              onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-              className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
-            />
-            <input
-              type="time"
-              value={formData.end_time}
-              onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-              className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm"
-            />
-          </div>
-
-          <textarea
-            value={formData.notes}
-            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            placeholder="Notes (optional)"
-            rows={3}
-            className="w-full bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 outline-none font-semibold text-sm resize-none"
-          />
-
-          <div className="flex gap-2">
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white ${isSubmitting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
-            >
-              {isSubmitting ? 'Saving...' : editingEventId ? 'Update Event' : 'Create Event'}
-            </button>
-            {editingEventId && (
-              <button
-                onClick={resetForm}
-                className="px-4 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-200"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
+        <EventForm
+          formData={formData}
+          setFormData={setFormData}
+          classes={classes}
+          classCourses={classCourses}
+          isCoursesLoading={isCoursesLoading}
+          isSubmitting={isSubmitting}
+          editingEventId={editingEventId}
+          handleSubmit={handleSubmit}
+          resetForm={resetForm}
+          setSelectedDate={setSelectedDate}
+        />
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-[28px] p-4 sm:p-6 border border-slate-100 dark:border-slate-800 shadow-premium space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Events on {selectedDate}</p>
-          <span className="text-[10px] font-black uppercase tracking-widest text-brand-500">{selectedDayEvents.length} Entries</span>
-        </div>
+      <DailyEventsList
+        selectedDate={selectedDate}
+        selectedDayEvents={selectedDayEvents}
+        startEditEvent={startEditEvent}
+        requestDeleteEvent={requestDeleteEvent}
+      />
 
-        {selectedDayEvents.length === 0 ? (
-          <p className="text-sm font-semibold text-slate-500">No timetable entries for this date.</p>
-        ) : (
-          <div className="space-y-2">
-            {selectedDayEvents.map(event => (
-              <div key={event.id} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-black truncate">{event.title}</p>
-                  <p className="text-[11px] font-semibold text-slate-500 truncate">
-                    {toTimeInputValue(event.start_time)} - {toTimeInputValue(event.end_time)} • {event.class_name}{event.course_name ? ` • ${event.course_name}` : ''}
-                  </p>
-                  {event.notes && <p className="text-[11px] text-slate-500 mt-1 truncate">{event.notes}</p>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => startEditEvent(event)}
-                    className="w-9 h-9 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-brand-500"
-                    title="Edit event"
-                  >
-                    <i className="fas fa-pen"></i>
-                  </button>
-                  <button
-                    onClick={() => requestDeleteEvent(event)}
-                    className="w-9 h-9 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-500"
-                    title="Delete event"
-                  >
-                    <i className="fas fa-trash"></i>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {pendingDeleteEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-premium">
-            <p className="text-sm font-black text-slate-900 dark:text-slate-100">Delete timetable event?</p>
-            <p className="mt-2 text-xs font-semibold text-slate-500">
-              Are you sure you want to delete "{pendingDeleteEvent.title}" on {pendingDeleteEvent.event_date}?
-            </p>
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setPendingDeleteEvent(null)}
-                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => void confirmDeleteEvent()}
-                className="px-4 py-2 rounded-xl bg-rose-500 text-[11px] font-black uppercase tracking-widest text-white"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteEventModal
+        pendingDeleteEvent={pendingDeleteEvent}
+        setPendingDeleteEvent={setPendingDeleteEvent}
+        confirmDeleteEvent={confirmDeleteEvent}
+      />
     </div>
   );
 };

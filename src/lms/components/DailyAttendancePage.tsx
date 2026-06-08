@@ -77,28 +77,21 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
   const activeContextList = contextType === 'class' ? classes : subjects;
 
-  React.useEffect(() => {
-    if (!activeContextList.length) {
-      setSelectedContextId('');
-      return;
-    }
-
-    const exists = activeContextList.some(item => String(item.id) === String(selectedContextId));
-    if (!exists) {
-      setSelectedContextId(String(activeContextList[0].id));
-    }
-  }, [activeContextList, selectedContextId]);
+  const isSelectedValid = activeContextList.some(item => String(item.id) === String(selectedContextId));
+  const resolvedContextId = isSelectedValid 
+    ? selectedContextId 
+    : (activeContextList.length > 0 ? String(activeContextList[0].id) : '');
 
   const refreshRoster = React.useCallback(async () => {
-    if (!supabase || !schoolId || contextType !== 'subject' || !selectedContextId) return;
+    if (!supabase || !schoolId || contextType !== 'subject' || !resolvedContextId) return;
 
     setIsRosterLoading(true);
     try {
-      console.log(`[Attendance Registry] Dynamic Roster Fetch Init | Context: ${selectedContextId} | School: ${schoolId}`);
+      console.log(`[Attendance Registry] Dynamic Roster Fetch Init | Context: ${resolvedContextId} | School: ${schoolId}`);
       const { data, error } = await supabase
         .from('class_course_students')
         .select('student_id, student_name, students(id, name, email)')
-        .eq('class_course_id', selectedContextId)
+        .eq('class_course_id', resolvedContextId)
         .eq('school_id', schoolId);
 
       if (error) throw error;
@@ -119,19 +112,19 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
     } finally {
       setIsRosterLoading(false);
     }
-  }, [schoolId, contextType, selectedContextId]);
+  }, [schoolId, contextType, resolvedContextId]);
 
   React.useEffect(() => {
-    if (contextType === 'subject' && selectedContextId) {
+    if (contextType === 'subject' && resolvedContextId) {
       void refreshRoster();
     } else {
       setInternalStudents([]);
     }
-  }, [selectedContextId, contextType, refreshRoster]);
+  }, [resolvedContextId, contextType, refreshRoster]);
 
   const activeStudents = React.useMemo(() => {
     // If no context is selected, we can't show a roster
-    if (!selectedContextId) return [] as Student[];
+    if (!resolvedContextId) return [] as Student[];
 
     // Priority 1: Internal fetched students (for curated course contexts)
     if (internalStudents.length > 0) return internalStudents;
@@ -143,17 +136,17 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
     // Priority 3: Class context (filter from allStudents)
     if (contextType === 'class') {
-      const selectedClass = classes.find(classItem => String(classItem.id) === String(selectedContextId));
+      const selectedClass = classes.find(classItem => String(classItem.id) === String(resolvedContextId));
       const ids = (selectedClass?.student_ids || []).map(id => String(id));
       const source = allStudents && allStudents.length > 0 ? allStudents : students;
       return source.filter(student => ids.includes(String(student.id)));
     }
 
     return students;
-  }, [contextType, selectedContextId, classes, allStudents, students, internalStudents]);
+  }, [contextType, resolvedContextId, classes, allStudents, students, internalStudents]);
 
   const loadAttendance = React.useCallback(async () => {
-    if (!selectedContextId || !attendanceDate) return;
+    if (!resolvedContextId || !attendanceDate) return;
 
     setIsLoading(true);
     if (!supabase) {
@@ -166,7 +159,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
       .from('attendance_records')
       .select('student_id, status')
       .in('context_type', contextCandidates)
-      .eq('context_id', selectedContextId)
+      .eq('context_id', resolvedContextId)
       .eq('attendance_date', attendanceDate)
       .eq('school_id', schoolId);
 
@@ -184,19 +177,19 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
     setAttendanceMap(nextMap);
     setIsLoading(false);
-  }, [selectedContextId, attendanceDate, contextType, notify, schoolId]);
+  }, [resolvedContextId, attendanceDate, contextType, notify, schoolId]);
 
   React.useEffect(() => {
     void loadAttendance();
   }, [loadAttendance]);
 
   const saveSingle = async (studentId: string, status: AttendanceStatus) => {
-    if (!selectedContextId || !attendanceDate || !supabase) return;
+    if (!resolvedContextId || !attendanceDate || !supabase) return;
 
     setIsSaving(true);
     const payload = {
       context_type: contextType,
-      context_id: selectedContextId,
+      context_id: resolvedContextId,
       attendance_date: attendanceDate,
       student_id: String(studentId),
       status,
@@ -218,7 +211,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
   };
 
   const markAllPresent = async () => {
-    if (!selectedContextId || !attendanceDate || activeStudents.length === 0 || !supabase) {
+    if (!resolvedContextId || !attendanceDate || activeStudents.length === 0 || !supabase) {
       notify?.('No active formation records to monitor.');
       return;
     }
@@ -226,7 +219,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
     setIsSaving(true);
     const payload = activeStudents.map(student => ({
       context_type: contextType,
-      context_id: selectedContextId,
+      context_id: resolvedContextId,
       attendance_date: attendanceDate,
       student_id: String(student.id),
       status: 'P' as const,
@@ -257,8 +250,9 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4 w-full md:w-auto">
             <div className="flex items-center gap-3 bg-[#0a1a19] px-6 py-3 rounded-2xl border border-white/10">
-              <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em] whitespace-nowrap">Log Date:</label>
+              <label htmlFor="logDateInput" className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em] whitespace-nowrap">Log Date:</label>
               <input
+                id="logDateInput"
                 type="date"
                 value={attendanceDate}
                 onChange={(e) => setAttendanceDate(e.target.value)}
@@ -268,7 +262,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
             </div>
             
             <button
-              onClick={() => void loadAttendance()}
+              type="button" onClick={() => void loadAttendance()}
               disabled={isLoading || isSaving}
               className="p-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-slate-100 transition-all flex items-center justify-center"
               title="Reload Records"
@@ -279,7 +273,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
           <div className="flex items-center gap-4 w-full md:w-auto">
             <button
-              onClick={() => void markAllPresent()}
+              type="button" onClick={() => void markAllPresent()}
               disabled={isLoading || isSaving || activeStudents.length === 0}
               className="flex-1 md:flex-none px-8 py-4 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-30 flex items-center justify-center gap-3"
             >
@@ -292,9 +286,9 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
       {/* Student List Grid */}
       <div className="bg-[#0a1a19] rounded-[48px] border border-white/5 overflow-hidden shadow-3xl">
-         <header 
+         <button type="button"
             onClick={() => setIsRosterCollapsed(!isRosterCollapsed)}
-            className="px-10 py-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between cursor-pointer hover:bg-white/[0.04] transition-all group"
+            className="w-full text-left px-10 py-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between cursor-pointer hover:bg-white/[0.04] transition-all group"
           >
             <div className="flex items-center gap-4">
                <div className={`w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-[#4ea59d] transition-transform duration-300 ${isRosterCollapsed ? '-rotate-90' : ''}`}>
@@ -316,14 +310,13 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-rose-500"></div> Absent</span>
                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Leave</span>
             </div>
-         </header>
-
-         {!isRosterCollapsed && (
-          <div className="max-h-[600px] overflow-y-auto custom-scrollbar divide-y divide-white/5">
-               {activeStudents.map(student => {
-                  const currentStatus = attendanceMap[String(student.id)] || '-';
-                  return (
-                    <div key={student.id} className="px-10 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6 hover:bg-white/[0.01] transition-colors">
+         </button>
+         {!isRosterCollapsed && activeStudents.length > 0 && (
+             <div className="divide-y divide-white/5">
+                {activeStudents.map(student => {
+                   const currentStatus = attendanceMap[String(student.id)];
+                   return (
+                    <div key={student.id} className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-10 py-8 hover:bg-white/[0.02] transition-colors">
                       <div className="flex items-center gap-5">
                          <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-[#4ea59d] font-black border border-white/10 text-sm">
                             {student.name.charAt(0)}
@@ -333,7 +326,6 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">{student.email || 'Independent ID'}</p>
                          </div>
                       </div>
-
                       <div className="flex items-center gap-4">
                         {(['P', 'A', 'L'] as AttendanceStatus[]).map(status => {
                           const active = currentStatus === status;
@@ -344,7 +336,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                           return (
                             <button
                               key={status}
-                              onClick={() => void saveSingle(String(student.id), status)}
+                              type="button" onClick={() => void saveSingle(String(student.id), status)}
                               disabled={isSaving}
                               className={`w-12 h-12 rounded-2xl text-[10px] font-black transition-all ${active ? activeClass : 'bg-white/5 text-slate-300 hover:text-slate-100 border border-white/5'}`}
                             >
