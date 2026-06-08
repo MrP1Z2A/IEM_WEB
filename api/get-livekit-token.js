@@ -24,12 +24,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing userId or roomId' });
   }
 
-  // Load from Vercel environment variables, fallback to your LiveKit Cloud keys
-  const API_KEY = process.env.LIVEKIT_API_KEY || 'APIhuKo3YqiNuKu';
-  const API_SECRET = process.env.LIVEKIT_API_SECRET || 'lJfbOjfOKFzLkiyzxdAZ9CnpSCWbuiPk5GyPhO0PcKd';
+  // Load from Vercel environment variables
+  const API_KEY = process.env.LIVEKIT_API_KEY;
+  const API_SECRET = process.env.LIVEKIT_API_SECRET;
   
   // Dynamically convert wss:// to https:// for RoomServiceClient connection
-  let livekitUrl = process.env.LIVEKIT_URL || 'https://iemsms-wynofg38.livekit.cloud';
+  let livekitUrl = process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_WS_URL;
   if (livekitUrl.startsWith('wss://')) {
     livekitUrl = livekitUrl.replace('wss://', 'https://');
   } else if (livekitUrl.startsWith('ws://')) {

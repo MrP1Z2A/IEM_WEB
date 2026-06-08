@@ -31,12 +31,12 @@ export async function handler(event, context) {
     };
   }
 
-  // Load from Netlify environment variables, fallback to your Contabo keys
-  const API_KEY = process.env.LIVEKIT_API_KEY || 'API5hBaiUqUpxax';
-  const API_SECRET = process.env.LIVEKIT_API_SECRET || '54zPSnSf0PW4bqsmnWS34SlfAUYOCIhoQ6AxDOlyuBt';
+  // Load from Netlify environment variables
+  const API_KEY = process.env.LIVEKIT_API_KEY;
+  const API_SECRET = process.env.LIVEKIT_API_SECRET;
   
   // Dynamically convert wss:// to https:// for RoomServiceClient connection
-  let livekitUrl = process.env.VITE_LIVEKIT_WS_URL || process.env.LIVEKIT_URL || 'ws://84.247.149.188:7880';
+  let livekitUrl = process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_WS_URL;
   if (livekitUrl.startsWith('wss://')) {
     livekitUrl = livekitUrl.replace('wss://', 'https://');
   } else if (livekitUrl.startsWith('ws://')) {
