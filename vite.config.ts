@@ -58,7 +58,7 @@ export default defineConfig({
             const env = loadEnv('', process.cwd(), '');
             const apiKey = env.LIVEKIT_API_KEY || process.env.LIVEKIT_API_KEY || 'devkey';
             const apiSecret = env.LIVEKIT_API_SECRET || process.env.LIVEKIT_API_SECRET || 'secret';
-            const livekitUrl = env.LIVEKIT_URL || process.env.LIVEKIT_URL || 'ws://localhost:7880';
+            const livekitUrl = env.LIVEKIT_URL || process.env.LIVEKIT_URL || env.VITE_LIVEKIT_WS_URL || process.env.VITE_LIVEKIT_WS_URL || 'ws://localhost:7880';
 
             const generateToken = () => {
               try {
