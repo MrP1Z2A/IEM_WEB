@@ -364,7 +364,7 @@ export default function Portal() {
               ) : (
                 <>
                   <LogIn className="w-5 h-5" />
-                  Access Platform
+                  Login
                 </>
               )}
             </button>
