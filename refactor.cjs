@@ -658,7 +658,7 @@ export default function HomeworkManager({ schoolId }: { schoolId: string | undef
 }
 `;
 
-const finalCode = logicFinal + '\\n' + c_Header + '\\n' + c_Alerts + '\\n' + c_Classes + '\\n' + c_Courses + '\\n' + c_ComposerAndList + '\\n' + c_Modals + '\\n' + c_MainView;
+const finalCode = logicFinal + '\n' + c_Header + '\n' + c_Alerts + '\n' + c_Classes + '\n' + c_Courses + '\n' + c_ComposerAndList + '\n' + c_Modals + '\n' + c_MainView;
 
 fs.writeFileSync(path, finalCode, 'utf8');
 console.log('Refactoring complete.');
