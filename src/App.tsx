@@ -187,7 +187,7 @@ export default function Portal() {
         if (student) {
           const newUser = {
             id: student.id,
-            role: 'student',
+            role: 'STUDENT',
             email: student.email || student.name,
             name: student.name,
             schoolId: student.school_id,
@@ -218,7 +218,7 @@ export default function Portal() {
         if (teacher) {
           const newUser = {
             id: teacher.id,
-            role: 'teacher',
+            role: 'TEACHER',
             email: teacher.email || teacher.name,
             name: teacher.name,
             schoolId: teacher.school_id,
