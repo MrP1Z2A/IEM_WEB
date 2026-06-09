@@ -292,15 +292,9 @@ export default function Portal() {
         
         {/* Brand block */}
         <div className="flex flex-col items-center mb-8 text-center">
-          <div className="w-20 h-20 bg-white rounded-[24px] flex items-center justify-center p-2 shadow-2xl mb-4 overflow-hidden transform hover:rotate-3 transition-transform">
+          <div className="w-20 h-20 bg-white rounded-[24px] flex items-center justify-center p-2 shadow-2xl mb-2 overflow-hidden transform hover:rotate-3 transition-transform">
             <img src={logoIem} alt="IEM Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-4xl font-black tracking-tighter bg-gradient-to-r from-emerald-400 via-sky-400 to-indigo-400 bg-clip-text text-transparent uppercase">
-            IEM Unified Portal
-          </h1>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.25em] mt-2">
-            Multi-Role Gateway
-          </p>
         </div>
 
         {/* Auth Card */}
@@ -388,10 +382,6 @@ export default function Portal() {
             🏫 Go to SMS Admin Login
           </button>
         </div>
-      </div>
-
-      <div className="absolute bottom-8 text-[10px] text-slate-600 font-black uppercase tracking-[0.4em] z-10">
-        Unified Ecosystem v2.5 • Decentralized Intelligence
       </div>
     </div>
   );
