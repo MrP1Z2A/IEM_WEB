@@ -4,6 +4,8 @@ import path from 'path';
 import { AccessToken, TrackSource } from 'livekit-server-sdk';
 import url from 'url';
 
+// Force server restart to reload .env
+
 // Simple in-memory rate limiting map
 // Maps IP addresses to an object containing the request count and the reset timestamp
 const rateLimit = new Map<string, { count: number; resetTime: number }>();
