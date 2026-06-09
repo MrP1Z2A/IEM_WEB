@@ -4,7 +4,7 @@ import path from 'path';
 import { AccessToken, TrackSource } from 'livekit-server-sdk';
 import url from 'url';
 
-// Force server restart to reload .env
+// Force server restart to reload .env again
 
 // Simple in-memory rate limiting map
 // Maps IP addresses to an object containing the request count and the reset timestamp
@@ -58,37 +58,82 @@ export default defineConfig({
             const env = loadEnv('', process.cwd(), '');
             const apiKey = env.LIVEKIT_API_KEY || process.env.LIVEKIT_API_KEY || 'devkey';
             const apiSecret = env.LIVEKIT_API_SECRET || process.env.LIVEKIT_API_SECRET || 'secret';
+            const livekitUrl = env.LIVEKIT_URL || process.env.LIVEKIT_URL || 'ws://localhost:7880';
 
-            try {
-              const at = new AccessToken(apiKey, apiSecret, {
-                identity: userId,
-                name: userName,
-                ttl: 60 * 60,
-              });
+            const generateToken = () => {
+              try {
+                const at = new AccessToken(apiKey, apiSecret, {
+                  identity: userId,
+                  name: userName,
+                  ttl: 60 * 60,
+                });
 
-              const grants: any = {
-                roomJoin: true,
-                room: roomId,
-                canSubscribe: true,
-                canPublishData: true,
-                canPublish: true,
-              };
+                const grants: any = {
+                  roomJoin: true,
+                  room: roomId,
+                  canSubscribe: true,
+                  canPublishData: true,
+                  canPublish: true,
+                };
 
-              // Allow all users to screen share
-              grants.canPublishSources = [TrackSource.CAMERA, TrackSource.MICROPHONE, TrackSource.SCREEN_SHARE];
+                // Student should only have camera & microphone, Teacher can screen share
+                grants.canPublishSources = isTeacher 
+                  ? [TrackSource.CAMERA, TrackSource.MICROPHONE, TrackSource.SCREEN_SHARE]
+                  : [TrackSource.CAMERA, TrackSource.MICROPHONE];
 
-              at.addGrant(grants);
-              
-              at.toJwt().then((token) => {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ token }));
-              }).catch((err) => {
+                at.addGrant(grants);
+                
+                at.toJwt().then((token) => {
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ token }));
+                }).catch((err) => {
+                  res.writeHead(500, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ error: err.message }));
+                });
+              } catch (err: any) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: err.message }));
+              }
+            };
+
+            if (!isTeacher) {
+              const livekitHttpUrl = livekitUrl.replace('wss://', 'https://').replace('ws://', 'http://');
+              
+              const adminToken = new AccessToken(apiKey, apiSecret, {
+                identity: 'api-admin',
+                ttl: 60,
               });
-            } catch (err: any) {
-              res.writeHead(500, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: err.message }));
+              adminToken.addGrant({ roomList: true });
+
+              adminToken.toJwt().then((jwtToken) => {
+                fetch(`${livekitHttpUrl}/twirp/livekit.RoomService/ListRooms`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${jwtToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({})
+                })
+                .then(r => {
+                  if (!r.ok) throw new Error(`ListRooms responded with ${r.status}`);
+                  return r.json();
+                })
+                .then(data => {
+                  const roomExists = data.rooms && data.rooms.some((r: any) => r.name === roomId);
+                  if (!roomExists) {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'The teacher has not started this meeting yet. Please wait for them to begin.' }));
+                  } else {
+                    generateToken();
+                  }
+                })
+                .catch(err => {
+                  res.writeHead(500, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ error: `Failed to verify room existence: ${err.message}` }));
+                });
+              });
+            } else {
+              generateToken();
             }
           } else {
             next();
