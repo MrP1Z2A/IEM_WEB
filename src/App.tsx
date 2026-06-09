@@ -382,7 +382,7 @@ export default function Portal() {
             onClick={() => setAppMode('sms')}
             className="w-full py-3.5 bg-white/5 hover:bg-white/10 text-white font-black uppercase rounded-2xl border border-white/10 transition-all text-xs tracking-wider transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
           >
-            🏫 Go to SMS Admin Login
+            Go to SMS Admin Login
           </button>
         </div>
       </div>
