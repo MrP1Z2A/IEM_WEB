@@ -295,6 +295,9 @@ export default function Portal() {
           <div className="w-20 h-20 bg-white rounded-[24px] flex items-center justify-center p-2 shadow-2xl mb-2 overflow-hidden transform hover:rotate-3 transition-transform">
             <img src={logoIem} alt="IEM Logo" className="w-full h-full object-contain" />
           </div>
+          <h2 className="text-3xl font-black text-white tracking-widest uppercase mt-3">
+            IEM
+          </h2>
         </div>
 
         {/* Auth Card */}
