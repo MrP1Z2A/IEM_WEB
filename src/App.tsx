@@ -328,10 +328,7 @@ export default function Portal() {
 
             {/* Password Input */}
             <div className="space-y-2">
-              <div className="flex justify-between items-center ml-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Password</label>
-                <span className="text-[9px] text-[#4ea59d] font-black uppercase tracking-wider">Blank for Parents</span>
-              </div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
                 <input 
