@@ -3647,9 +3647,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               role: user.role
             }}
             schoolId={schoolId}
-            courses={courses.map(c => ({
+            courses={(user.role === UserRole.TEACHER ? assignedCoursesList : courses).map(c => ({
               id: c.id,
-              title: c.title,
+              title: c.title || c.name || 'Unnamed Course',
               category: c.category,
               description: c.description,
               subTeacherName: c.subTeacherName,
