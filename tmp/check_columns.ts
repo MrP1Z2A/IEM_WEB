@@ -1,8 +1,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://lzlhsmtkkcpomabqaqdu.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6bGhzbXRra2Nwb21hYnFhcWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTc0ODksImV4cCI6MjA4NTY5MzQ4OX0.Tmday5nk3oElp1UMZCjeTfLBefw4oOLBOIfcAb__DYE';
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function checkColumns() {

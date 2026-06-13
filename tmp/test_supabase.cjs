@@ -20,17 +20,16 @@ envContent.split('\n').forEach(line => {
 const url = env.VITE_SUPABASE_URL || 'https://sb.iemsms.com';
 const key = env.VITE_SUPABASE_ANON_KEY;
 
-console.log('Testing signInAnonymously on:', url);
-
+console.log('Testing query on:', url);
 const supabase = createClient(url, key);
 
 async function run() {
   try {
-    const { data, error } = await supabase.auth.signInAnonymously();
+    const { data, error } = await supabase.from('schools').select('*').limit(1);
     if (error) {
-      console.error('Error signing in anonymously:', error.message);
+      console.error('Database query error:', error);
     } else {
-      console.log('Success! Signed in anonymously. User ID:', data.user.id);
+      console.log('Success! Fetched data:', data);
     }
   } catch (err) {
     console.error('Thrown error:', err);

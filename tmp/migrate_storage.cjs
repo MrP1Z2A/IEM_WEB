@@ -1,10 +1,10 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const sourceUrl = 'https://lzlhsmtkkcpomabqaqdu.supabase.co';
-const sourceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6bGhzbXRra2Nwb21hYnFhcWR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMTc0ODksImV4cCI6MjA4NTY5MzQ4OX0.Tmday5nk3oElp1UMZCjeTfLBefw4oOLBOIfcAb__DYE';
+const sourceUrl = process.env.SOURCE_SUPABASE_URL || 'https://lzlhsmtkkcpomabqaqdu.supabase.co';
+const sourceKey = process.env.SOURCE_SUPABASE_ANON_KEY || 'PLACEHOLDER_SOURCE_KEY';
 
-const destUrl = 'https://sb.iemsms.com';
-const destKey = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc4MTI4MTgwMCwiZXhwIjo0OTM2OTU1NDAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.rgTTYz1PcNqwkBpM5_jRRvYOOz_iBgc4URoSdKrxPXM';
+const destUrl = process.env.DEST_SUPABASE_URL || 'https://sb.iemsms.com';
+const destKey = process.env.DEST_SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER_DEST_SERVICE_ROLE_KEY';
 
 const sourceSupabase = createClient(sourceUrl, sourceKey);
 const destSupabase = createClient(destUrl, destKey);
