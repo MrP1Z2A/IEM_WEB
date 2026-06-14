@@ -30,6 +30,7 @@ export type ClassRow = {
   color?: string | null;
   outer_color?: string | null;
   class_code?: string | null;
+  zoom_url?: string | null;
   student_count?: number;
 };
 
@@ -66,6 +67,7 @@ interface State {
   className: string;
   classImage: File | null;
   classOuterColor: string;
+  classZoomUrl: string;
   isClassFormOpen: boolean;
   editingClassId: string | null;
   classCourses: CourseRow[];
@@ -98,6 +100,7 @@ const initialState: State = {
   className: '',
   classImage: null,
   classOuterColor: '#f8fafc',
+  classZoomUrl: '',
   isClassFormOpen: false,
   editingClassId: null,
   classCourses: [],
@@ -130,6 +133,7 @@ type Action =
   | { type: 'SET_CLASS_NAME'; payload: string }
   | { type: 'SET_CLASS_IMAGE'; payload: File | null }
   | { type: 'SET_CLASS_OUTER_COLOR'; payload: string }
+  | { type: 'SET_CLASS_ZOOM_URL'; payload: string }
   | { type: 'SET_CLASS_FORM_OPEN'; payload: boolean }
   | { type: 'SET_EDITING_CLASS_ID'; payload: string | null }
   | { type: 'SET_CLASS_COURSES'; payload: CourseRow[] }
@@ -171,6 +175,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, classImage: action.payload };
     case 'SET_CLASS_OUTER_COLOR':
       return { ...state, classOuterColor: action.payload };
+    case 'SET_CLASS_ZOOM_URL':
+      return { ...state, classZoomUrl: action.payload };
     case 'SET_CLASS_FORM_OPEN':
       return { ...state, isClassFormOpen: action.payload };
     case 'SET_EDITING_CLASS_ID':
@@ -223,6 +229,7 @@ function reducer(state: State, action: Action): State {
         className: '',
         classImage: null,
         classOuterColor: '#f8fafc',
+        classZoomUrl: '',
         editingClassId: null,
       };
     case 'RESET_NEW_COURSE_FORM':
@@ -371,6 +378,7 @@ export function useClassAndCoursesManager({
           name: state.className.trim(),
           outer_color: state.classOuterColor,
           color: state.classOuterColor,
+          zoom_url: state.classZoomUrl.trim() || null,
         }, schoolId);
         if (imageUrl) payload.image_url = imageUrl;
 
@@ -383,6 +391,7 @@ export function useClassAndCoursesManager({
           name: state.className.trim(),
           outer_color: state.classOuterColor,
           color: state.classOuterColor,
+          zoom_url: state.classZoomUrl.trim() || null,
         }, schoolId);
         if (imageUrl) payload.image_url = imageUrl;
 
@@ -404,6 +413,7 @@ export function useClassAndCoursesManager({
     dispatch({ type: 'SET_EDITING_CLASS_ID', payload: String(classItem.id) });
     dispatch({ type: 'SET_CLASS_NAME', payload: String(classItem.name || '') });
     dispatch({ type: 'SET_CLASS_OUTER_COLOR', payload: String(classItem.outer_color || classItem.color || '#f8fafc') });
+    dispatch({ type: 'SET_CLASS_ZOOM_URL', payload: String(classItem.zoom_url || '') });
     dispatch({ type: 'SET_CLASS_IMAGE', payload: null });
     if (classImageInputRef.current) classImageInputRef.current.value = '';
     dispatch({ type: 'SET_CLASS_FORM_OPEN', payload: true });
@@ -567,6 +577,7 @@ export function useClassAndCoursesManager({
 
   const setClassName = useCallback((payload: string) => dispatch({ type: 'SET_CLASS_NAME', payload }), []);
   const setClassOuterColor = useCallback((payload: string) => dispatch({ type: 'SET_CLASS_OUTER_COLOR', payload }), []);
+  const setClassZoomUrl = useCallback((payload: string) => dispatch({ type: 'SET_CLASS_ZOOM_URL', payload }), []);
   const setClassFormOpen = useCallback((payload: boolean) => dispatch({ type: 'SET_CLASS_FORM_OPEN', payload }), []);
   const setClassSearchQuery = useCallback((payload: string) => dispatch({ type: 'SET_CLASS_SEARCH_QUERY', payload }), []);
   const setSelectedClassId = useCallback((payload: string | null) => dispatch({ type: 'SET_SELECTED_CLASS_ID', payload }), []);
@@ -614,6 +625,7 @@ export function useClassAndCoursesManager({
     deleteClassCourse,
     setClassName,
     setClassOuterColor,
+    setClassZoomUrl,
     setClassFormOpen,
     setClassSearchQuery,
     setSelectedClassId,

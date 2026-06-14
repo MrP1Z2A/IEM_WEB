@@ -132,6 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
         <SidebarMenuItem id="dashboard" icon="fa-house" label="Dashboard" activePage={currentPage} />
         <SidebarMenuItem id="live-calendar" icon="fa-calendar-days" label="Live Calendar" activePage={currentPage} />
+        <SidebarMenuItem id="data-archive" icon="fa-box-archive" label="Data Archive" activePage={currentPage} />
 
         {/* Academic Section */}
         <div className="px-8 mt-3 mb-1 text-[11px] text-slate-400 font-black uppercase tracking-wider">Academic</div>

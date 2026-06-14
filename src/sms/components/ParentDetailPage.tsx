@@ -91,10 +91,7 @@ const ParentDetailPage: React.FC<ParentDetailPageProps> = ({ parentId, students,
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Date of Birth</p>
                     <p className="mt-1 font-semibold text-slate-700 dark:text-slate-200">{formatStudentDate(student.date_of_birth)}</p>
                   </div>
-                  <div className="rounded-2xl bg-white dark:bg-slate-900 px-4 py-3 border border-slate-200 dark:border-slate-700">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Status</p>
-                    <p className="mt-1 font-semibold text-slate-700 dark:text-slate-200">{student.status}</p>
-                  </div>
+
                   <div className="rounded-2xl bg-white dark:bg-slate-900 px-4 py-3 border border-slate-200 dark:border-slate-700">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Student Type</p>
                     <p className="mt-1 font-semibold text-slate-700 dark:text-slate-200">{student.type || '—'}</p>

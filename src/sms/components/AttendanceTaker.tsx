@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../src/supabaseClient';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface AttendanceTakerProps {
   schoolId: string;
@@ -162,9 +164,10 @@ const RollCallList: React.FC<{
   saveAttendance: () => void;
   isSaving: boolean;
   stats: any;
+  downloadAttendancePDF: () => void;
 }> = ({
   students, selectedClass, selectedCourse, selectedClassId, selectedCourseId, isLoadingStudents,
-  markAll, unmarkAll, setStatus, saveAttendance, isSaving, stats
+  markAll, unmarkAll, setStatus, saveAttendance, isSaving, stats, downloadAttendancePDF
 }) => (
   <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-premium overflow-hidden">
     <div className="flex items-center justify-between p-6 sm:p-8 border-b border-slate-100 dark:border-slate-800">
@@ -178,6 +181,10 @@ const RollCallList: React.FC<{
       </div>
       {students.length > 0 && (
         <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={downloadAttendancePDF}
+            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm shadow-emerald-500/20">
+            <i className="fas fa-file-pdf"></i> Export PDF
+          </button>
           <button type="button" onClick={() => markAll('P')}
             className="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm shadow-brand-500/20">
             <i className="fas fa-check-double"></i> Mark All Present
@@ -428,6 +435,146 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
   const isToday = (d: Date) => fmtDate(d) === fmtDate(new Date());
   const isSelected = (d: Date) => fmtDate(d) === fmtDate(selectedDate);
 
+  const downloadAttendancePDF = async () => {
+    if (students.length === 0) return;
+
+    try {
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('name')
+        .eq('id', schoolId)
+        .single();
+      const schoolName = schoolData?.name || 'School Management System';
+
+      const doc = new jsPDF();
+
+      // Premium Indigo Header Banner
+      doc.setFillColor(79, 70, 229);
+      doc.rect(0, 0, 210, 38, 'F');
+
+      doc.setFontSize(22);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text(schoolName.toUpperCase(), 14, 20);
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(224, 231, 255);
+      doc.text('CLASS / COURSE ATTENDANCE REPORT', 14, 28);
+
+      // Metadata Section
+      let y = 48;
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Report Details', 14, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Class: ${selectedClass?.name || 'N/A'}`, 14, y + 6);
+      doc.text(`Course: ${selectedCourse?.name || 'N/A'}`, 14, y + 12);
+      doc.text(`Date: ${fmtDate(selectedDate)}`, 14, y + 18);
+
+      const timestamp = new Date().toLocaleString();
+      doc.text(`Generated: ${timestamp}`, 135, y + 6);
+      doc.text(`Total Students: ${students.length}`, 135, y + 12);
+
+      // Statistics Card/Bar
+      y += 24;
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(248, 250, 252);
+      doc.rect(14, y, 182, 16, 'F');
+      doc.rect(14, y, 182, 16, 'S');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      
+      doc.setTextColor(16, 185, 129); // emerald-600
+      doc.text(`Present: ${stats.present} (${students.length ? Math.round((stats.present / students.length) * 100) : 0}%)`, 20, y + 10);
+
+      doc.setTextColor(239, 68, 68); // rose-600
+      doc.text(`Absent: ${stats.absent} (${students.length ? Math.round((stats.absent / students.length) * 100) : 0}%)`, 65, y + 10);
+
+      doc.setTextColor(245, 158, 11); // amber-600
+      doc.text(`Late: ${stats.late} (${students.length ? Math.round((stats.late / students.length) * 100) : 0}%)`, 110, y + 10);
+
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text(`Unmarked: ${stats.unmarked}`, 155, y + 10);
+
+      // Render Attendance Table
+      const tableRows = students.map((s, idx) => {
+        let statusText = 'Unmarked';
+        if (s.status === 'P') statusText = 'Present';
+        else if (s.status === 'A') statusText = 'Absent';
+        else if (s.status === 'L') statusText = 'Late';
+
+        return [
+          (idx + 1).toString(),
+          s.name || 'N/A',
+          statusText
+        ];
+      });
+
+      autoTable(doc, {
+        startY: y + 24,
+        head: [['No.', 'Student Name', 'Status']],
+        body: tableRows,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [79, 70, 229],
+          textColor: [255, 255, 255],
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'left'
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 5,
+          textColor: [15, 23, 42]
+        },
+        columnStyles: {
+          0: { cellWidth: 15, halign: 'center' },
+          1: { cellWidth: 125 },
+          2: { cellWidth: 42, fontStyle: 'bold' }
+        },
+        didParseCell: function (data) {
+          if (data.column.index === 2 && data.section === 'body') {
+            const statusVal = data.cell.text[0];
+            if (statusVal === 'Present') {
+              data.cell.styles.textColor = [16, 185, 129];
+            } else if (statusVal === 'Absent') {
+              data.cell.styles.textColor = [239, 68, 68];
+            } else if (statusVal === 'Late') {
+              data.cell.styles.textColor = [245, 158, 11];
+            } else {
+              data.cell.styles.textColor = [100, 116, 139];
+            }
+          }
+        }
+      });
+
+      // Footer
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(14, 280, 196, 280);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text('This is an official document generated by the IEM SMS Portal.', 105, 286, { align: 'center' });
+      }
+
+      const fileClassName = (selectedClass?.name || 'class').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      const fileCourseName = (selectedCourse?.name || 'course').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      doc.save(`attendance_${fileClassName}_${fileCourseName}_${fmtDate(selectedDate)}.pdf`);
+      showToast('Attendance PDF downloaded.', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast(`Failed to generate PDF: ${err.message || err}`, 'error');
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       {notification && (
@@ -445,11 +592,18 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
           <p className="text-slate-400 text-sm mt-1">Take roll call for classes and courses</p>
         </div>
         {students.length > 0 && (
-          <button type="button" onClick={() => void saveAttendance()} disabled={isSaving}
-            className="flex items-center gap-2 px-5 py-3 bg-brand-500 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/25 disabled:opacity-50">
-            <i className={`fas ${isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`}></i>
-            {isSaving ? 'Saving…' : 'Save Attendance'}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={() => void downloadAttendancePDF()} disabled={isLoadingStudents || isSaving}
+              className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/25 disabled:opacity-50">
+              <i className="fas fa-file-pdf"></i>
+              Export PDF
+            </button>
+            <button type="button" onClick={() => void saveAttendance()} disabled={isSaving}
+              className="flex items-center gap-2 px-5 py-3 bg-brand-500 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/25 disabled:opacity-50">
+              <i className={`fas ${isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`}></i>
+              {isSaving ? 'Saving…' : 'Save Attendance'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -486,6 +640,7 @@ const AttendanceTaker: React.FC<AttendanceTakerProps> = ({ schoolId }) => {
         saveAttendance={saveAttendance}
         isSaving={isSaving}
         stats={stats}
+        downloadAttendancePDF={downloadAttendancePDF}
       />
     </div>
   );

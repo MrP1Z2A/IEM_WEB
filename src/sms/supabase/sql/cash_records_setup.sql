@@ -78,30 +78,30 @@ drop policy if exists "cash_records_select_authenticated" on public.cash_records
 create policy "cash_records_select_authenticated"
   on public.cash_records
   for select
-  to anon, authenticated
-  using (true);
+  to authenticated
+  using (school_id = public.current_school_id()::text);
 
 drop policy if exists "cash_records_insert_authenticated" on public.cash_records;
 create policy "cash_records_insert_authenticated"
   on public.cash_records
   for insert
-  to anon, authenticated
-  with check (true);
+  to authenticated
+  with check (school_id = public.current_school_id()::text);
 
 drop policy if exists "cash_records_update_authenticated" on public.cash_records;
 create policy "cash_records_update_authenticated"
   on public.cash_records
   for update
-  to anon, authenticated
-  using (true)
-  with check (true);
+  to authenticated
+  using (school_id = public.current_school_id()::text)
+  with check (school_id = public.current_school_id()::text);
 
 drop policy if exists "cash_records_delete_authenticated" on public.cash_records;
 create policy "cash_records_delete_authenticated"
   on public.cash_records
   for delete
-  to anon, authenticated
-  using (true);
+  to authenticated
+  using (school_id = public.current_school_id()::text);
 
 do $$
 begin

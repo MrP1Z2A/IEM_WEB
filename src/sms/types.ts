@@ -78,6 +78,7 @@ export interface Student {
 
 export type PageId = 
   | 'dashboard' 
+  | 'data-archive'
   | 'students' 
   | 'parents'
   | 'parent-detail'

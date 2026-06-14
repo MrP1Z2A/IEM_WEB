@@ -38,6 +38,7 @@ import ClassGroupManagement from './components/ClassGroupManagement';
 import AttendanceTaker from './components/AttendanceTaker';
 import TeacherAttendance from './components/TeacherAttendance';
 import { VideoConference } from '../shared/components/VideoConference';
+import DataArchive from './components/DataArchive';
 
 import EnrollmentModal from './components/Modals/EnrollmentModal';
 import TeacherEnrollmentModal from './components/Modals/TeacherEnrollmentModal';
@@ -4539,6 +4540,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           {/* DASHBOARD */}
           {currentPage === 'dashboard' && <Dashboard stats={stats} schoolId={schoolId} />}
 
+          {/* DATA ARCHIVE */}
+          {currentPage === 'data-archive' && (
+            <DataArchive schoolId={schoolId} />
+          )}
+
           {currentPage === 'live-calendar' && (
             <LiveCalendar
               classes={classes}
@@ -4837,6 +4843,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               }))}
               isTeacher={true}
               supabase={supabase}
+              classes={classes}
             />
           )}
 
@@ -5300,14 +5307,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
 
 
-          {/* FALLBACK HUB */}
-          {!['dashboard', 'live-calendar', 'students', 'parents', 'parent-detail', 'student-attendance', 'class-attendance', 'class-course', 'student-register', 'teacher-register', 'teachers', 'student-service', 'student-service-batch', 'library', 'homework', 'report-card', 'about-school', 'payment', 'payment-assign', 'payment-history', 'student-finance-status', 'cash-records', 'programs', 'exam', 'security', 'subject', 'notice', 'notice-detail', 'events', 'student-activities', 'announcements-parent', 'live-intel', 'class-announcements', 'messages', 'class-group-management', 'sms-attendance', 'teacher-attendance', 'student-achievements'].includes(currentPage) && (
-            <div className="bg-white dark:bg-slate-900 p-6 sm:p-10 md:p-16 lg:p-24 rounded-[40px] sm:rounded-[72px] lg:rounded-[120px] text-center shadow-premium animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
-              <div className="w-24 h-24 sm:w-36 sm:h-36 lg:w-48 lg:h-48 bg-brand-500/10 text-brand-500 rounded-[32px] sm:rounded-[56px] lg:rounded-[80px] flex items-center justify-center mx-auto mb-8 sm:mb-12 lg:mb-16 text-4xl sm:text-6xl lg:text-8xl shadow-inner group-hover:rotate-12 transition-all"><i className="fas fa-microchip"></i></div>
-              <h3 className="text-2xl sm:text-4xl lg:text-6xl font-black tracking-tighter capitalize">{currentPage.replace('-', ' ')} Hub</h3>
-              <button type="button" onClick={() => setCurrentPage('dashboard')} className="mt-8 sm:mt-12 lg:mt-16 px-8 sm:px-14 lg:px-24 py-4 sm:py-6 lg:py-8 bg-brand-500 text-white font-black rounded-[24px] sm:rounded-[40px] lg:rounded-[64px] text-[10px] sm:text-xs lg:text-sm uppercase tracking-[0.2em] sm:tracking-[0.35em] lg:tracking-[0.5em] shadow-2xl active:scale-95 transition-all">Registeration</button>
-            </div>
-          )}
 
           {/* GLOBAL CREATE MODAL */}
           {isGlobalCreateModalOpen && (

@@ -55,14 +55,6 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
   notify,
   schoolId,
 }) => {
-  if (!supabase) {
-    return (
-      <div className="p-10 bg-white/5 rounded-[40px] border border-white/10 text-center">
-        <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Supabase Engine Offline</p>
-      </div>
-    );
-  }
-
   const [contextType, setContextType] = React.useState<AttendanceContextType>(
     (classes && classes.length > 0) ? 'class' : 'subject'
   );
@@ -242,6 +234,14 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
     setAttendanceMap(nextMap);
     notify?.('Roster marked as Present.');
   };
+
+  if (!supabase) {
+    return (
+      <div className="p-10 bg-white/5 rounded-[40px] border border-white/10 text-center">
+        <p className="text-slate-400 font-black uppercase text-[10px] tracking-widest">Supabase Engine Offline</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

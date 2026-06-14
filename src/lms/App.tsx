@@ -2263,7 +2263,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const renderInstruction = () => (
     <div className="space-y-12 animate-fadeIn text-slate-800 pb-20">
       <section className="relative h-72 rounded-[40px] overflow-hidden group">
-        <img src="https://images.unsplash.com/photo-1541339907198-e08759dfc3f0?auto=format&fit=crop&w=1200" className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-1000" />
+        <img src="https://images.unsplash.com/photo-1541339907198-e08759dfc3f0?auto=format&fit=crop&w=1200" alt="School Building" className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-1000" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a19] to-transparent"></div>
         <div className="absolute bottom-10 left-10">
           <p className="text-[#4ea59d] font-black uppercase tracking-[0.4em] mb-2">About School</p>
@@ -2332,7 +2332,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             {dynamicSchoolEvents.length > 0 ? dynamicSchoolEvents.map(ev => (
               <div key={ev.id} className="relative h-48 rounded-[32px] overflow-hidden group cursor-pointer shadow-xl shrink-0">
-                <img src={ev.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                <img src={ev.image} alt={ev.title || 'Event Image'} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                 <div className="absolute bottom-6 left-6">
                   <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-1">{ev.type}</p>
@@ -2891,6 +2891,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     <div className="relative aspect-video overflow-hidden bg-slate-50">
                       <img
                         src={crs.image_url || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800'}
+                        alt={crs.name || 'Course Image'}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                       />
                       <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-transparent"></div>
@@ -3669,7 +3670,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start relative z-10">
                 <div className="flex flex-col items-center gap-4">
                   <div className="relative group">
-                    <img src={user.avatar} className="w-32 h-32 md:w-40 md:h-40 rounded-[24px] md:rounded-[40px] border-4 border-[#4ea59d] p-1 shadow-2xl object-cover" />
+                    <img src={user.avatar} alt="User Avatar" className="w-32 h-32 md:w-40 md:h-40 rounded-[24px] md:rounded-[40px] border-4 border-[#4ea59d] p-1 shadow-2xl object-cover" />
                     <button
                       type="button" onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingAvatar}

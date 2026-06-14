@@ -6,6 +6,8 @@ interface ClassFormProps {
   setClassName: (name: string) => void;
   classOuterColor: string;
   setClassOuterColor: (color: string) => void;
+  classZoomUrl: string;
+  setClassZoomUrl: (url: string) => void;
   isClassFormOpen: boolean;
   setIsClassFormOpen: (open: boolean) => void;
   editingClassId: string | null;
@@ -21,6 +23,8 @@ export const ClassForm: React.FC<ClassFormProps> = ({
   setClassName,
   classOuterColor,
   setClassOuterColor,
+  classZoomUrl,
+  setClassZoomUrl,
   isClassFormOpen,
   setIsClassFormOpen,
   editingClassId,
@@ -87,6 +91,17 @@ export const ClassForm: React.FC<ClassFormProps> = ({
               />
               <span className="text-xs font-black uppercase tracking-widest text-slate-500">{classOuterColor}</span>
             </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Persistent Zoom Link (Optional)</label>
+            <input aria-label="Zoom URL"
+              type="text"
+              placeholder="https://zoom.us/j/123456789"
+              value={classZoomUrl}
+              onChange={(e) => setClassZoomUrl(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border-2 border-transparent focus:border-brand-500 outline-none font-bold text-sm"
+            />
           </div>
 
           <div className="flex gap-2 justify-end">

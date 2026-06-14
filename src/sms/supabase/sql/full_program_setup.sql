@@ -267,6 +267,7 @@ create table if not exists public.classes (
   color text,
   outer_color text,
   class_code text,
+  zoom_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -275,6 +276,7 @@ alter table public.classes add column if not exists image_url text;
 alter table public.classes add column if not exists color text;
 alter table public.classes add column if not exists outer_color text;
 alter table public.classes add column if not exists class_code text;
+alter table public.classes add column if not exists zoom_url text;
 alter table public.classes add column if not exists created_at timestamptz default now();
 alter table public.classes add column if not exists updated_at timestamptz default now();
 

@@ -447,7 +447,6 @@ const SecurityPermission: React.FC<SecurityPermissionProps> = ({ role = 'super_a
               <tr className="bg-slate-50 dark:bg-slate-800 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] shadow-sm">
                 <th className="px-6 py-4">User</th>
                 <th className="px-6 py-4">Role</th>
-                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Created At</th>
                 <th className="px-6 py-4 text-right">Action</th>
               </tr>
@@ -495,12 +494,7 @@ const SecurityPermission: React.FC<SecurityPermissionProps> = ({ role = 'super_a
                       {entry.role}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.15em] ${entry.status.toLowerCase() === 'active' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                      <span className={`w-2 h-2 rounded-full ${entry.status.toLowerCase() === 'active' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                      {entry.status}
-                    </span>
-                  </td>
+
                   <td className="px-6 py-4 text-sm font-semibold text-slate-500 dark:text-slate-300">{formatCreatedDate(entry.createdAt)}</td>
                   <td className="px-6 py-4 text-right">
                     <button

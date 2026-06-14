@@ -103,6 +103,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     'securityStatus',
     'securitystatus',
     'type',
+    'status',
   ]);
 
   const filteredStudents = students.filter(student => {
@@ -468,7 +469,6 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
         'ID': displayId,
         'Role': student.role,
         'Gender': student.gender || '—',
-        'Status': student.status,
         'Email': student.email || '—',
         'Phone': student.phone || '—',
         'Address': student.address || '—',
@@ -777,10 +777,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                   <i className="fas fa-venus-mars w-3 text-slate-300"></i>
                   <span>{s.gender || '—'}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <i className="fas fa-circle-dot w-3 text-slate-300"></i>
-                  <span className={s.status === 'Active' ? 'text-emerald-500' : s.status === 'Inactive' ? 'text-rose-400' : 'text-amber-500'}>{s.status}</span>
-                </div>
+
               </div>
               <div className="flex items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
                 <button

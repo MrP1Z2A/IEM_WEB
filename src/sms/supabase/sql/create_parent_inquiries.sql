@@ -24,20 +24,26 @@ create index if not exists idx_parent_inquiries_school
 -- Enable Row-Level Security
 alter table public.parent_inquiries enable row level security;
 
--- Policy: anyone can INSERT (parents don't have auth users)
+-- Policy: anyone can INSERT (parents don't have auth users) after checking school_id validity
+drop policy if exists "Parents can submit inquiries" on public.parent_inquiries;
 create policy "Parents can submit inquiries"
   on public.parent_inquiries
   for insert
-  with check (true);
+  with check (exists (select 1 from public.schools where id::text = school_id));
 
 -- Policy: authenticated users (admins/staff) can SELECT their school's inquiries
+drop policy if exists "Authenticated users can view inquiries for their school" on public.parent_inquiries;
 create policy "Authenticated users can view inquiries for their school"
   on public.parent_inquiries
   for select
-  using (true);
+  to authenticated
+  using (school_id = public.current_school_id()::text);
 
 -- Policy: authenticated users can update status (mark as read/resolved)
+drop policy if exists "Authenticated users can update inquiry status" on public.parent_inquiries;
 create policy "Authenticated users can update inquiry status"
   on public.parent_inquiries
   for update
-  using (true);
+  to authenticated
+  using (school_id = public.current_school_id()::text)
+  with check (school_id = public.current_school_id()::text);

@@ -138,7 +138,8 @@ const EditModal: React.FC<EditModalProps> = ({
               key === 'temp_password_created_at' ||
               typeof value === 'object'
             ) return null;
-            if (editTarget.type === 'student' && (key === 'attendanceRate' || key === 'status' || key === 'type')) return null;
+            if (key === 'status') return null;
+            if (editTarget.type === 'student' && (key === 'attendanceRate' || key === 'type')) return null;
 
             // Standard text/number input
             return (

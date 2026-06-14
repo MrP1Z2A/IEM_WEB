@@ -20,7 +20,7 @@ interface ClassAndCoursesManagerProps {
 
 const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = (props) => {
   const hub = useClassAndCoursesManager(props);
-  const { state, dispatch, classImageInputRef, newCourseImageInputRef, editCourseImageInputRef, safeNotify, uploadImage, handleFileChange, onCropComplete, loadClasses, filteredClasses, selectedClass, resetClassForm, createOrUpdateClass, startEditClass, deleteClass, loadClassCourses, createClassCourse, openEditCourseModal, closeEditCourseModal, saveCourseEdits, deleteClassCourse, setClassName, setClassOuterColor, setClassFormOpen, setClassSearchQuery, setSelectedClassId, setCreateCourseModalOpen, setEditCourseModalOpen, setNewCourseName, setNewCourseImage, setNewCourseError, setEditCourseName, setEditCourseCurrentImageUrl, setEditCourseImage, setEditCourseError, setContextType, setSelectedAttendanceContextId, setAttendanceDate } = hub;
+  const { state, dispatch, classImageInputRef, newCourseImageInputRef, editCourseImageInputRef, safeNotify, uploadImage, handleFileChange, onCropComplete, loadClasses, filteredClasses, selectedClass, resetClassForm, createOrUpdateClass, startEditClass, deleteClass, loadClassCourses, createClassCourse, openEditCourseModal, closeEditCourseModal, saveCourseEdits, deleteClassCourse, setClassName, setClassOuterColor, setClassZoomUrl, setClassFormOpen, setClassSearchQuery, setSelectedClassId, setCreateCourseModalOpen, setEditCourseModalOpen, setNewCourseName, setNewCourseImage, setNewCourseError, setEditCourseName, setEditCourseCurrentImageUrl, setEditCourseImage, setEditCourseError, setContextType, setSelectedAttendanceContextId, setAttendanceDate } = hub;
   const { onOpenCoursePage, students = [], allStudents = [], subjects = [] } = props;
 
   return (
@@ -30,6 +30,8 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = (props) =>
         setClassName={setClassName}
         classOuterColor={state.classOuterColor}
         setClassOuterColor={setClassOuterColor}
+        classZoomUrl={state.classZoomUrl}
+        setClassZoomUrl={setClassZoomUrl}
         isClassFormOpen={state.isClassFormOpen}
         setIsClassFormOpen={setClassFormOpen}
         editingClassId={state.editingClassId}

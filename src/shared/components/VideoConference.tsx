@@ -22,6 +22,7 @@ interface VideoConferenceProps {
   isTeacher: boolean;
   assignedCourseIds?: string[];
   supabase?: any;
+  classes?: any[];
 }
 
 export const VideoConference: React.FC<VideoConferenceProps> = ({
@@ -30,7 +31,8 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
   courses,
   isTeacher,
   assignedCourseIds = [],
-  supabase
+  supabase,
+  classes = []
 }) => {
   const [activeMeetings, setActiveMeetings] = useState<any[]>([]);
   const [loadingMeetings, setLoadingMeetings] = useState(false);
@@ -146,8 +148,8 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
     setError(null);
     setSuccess(null);
 
-    const selectedCourseObj = courses.find(c => c.id === selectedCourseId);
-    const courseName = selectedCourseObj ? selectedCourseObj.title : 'Unknown Course';
+    const selectedCourseObj = courses.find(c => c.id === selectedCourseId) || classes.find(c => c.id === selectedCourseId);
+    const courseName = selectedCourseObj ? (selectedCourseObj.title || selectedCourseObj.name) : 'Unknown Class';
 
     try {
       const { data, error: dbError } = await supabase
@@ -368,20 +370,38 @@ export const VideoConference: React.FC<VideoConferenceProps> = ({
                   {/* Select Course */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-                      Select Course / Subject
+                      Select Class / Course
                     </label>
                     <select
                       value={selectedCourseId}
-                      onChange={(e) => setSelectedCourseId(e.target.value)}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setSelectedCourseId(id);
+                        const selectedClass = classes.find((c: any) => c.id === id);
+                        if (selectedClass && selectedClass.zoom_url) {
+                          setZoomUrl(selectedClass.zoom_url);
+                        }
+                      }}
                       className="w-full bg-white/70 border border-slate-200/50 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:border-[#4ea59d] transition-all"
                       required
                     >
-                      <option value="">-- Choose Course --</option>
-                      {courses.map(course => (
-                        <option key={course.id} value={course.id}>
-                          {course.title}
-                        </option>
-                      ))}
+                      <option value="">-- Choose Class/Course --</option>
+                      {classes.length > 0 ? (
+                        <optgroup label="Classes">
+                          {classes.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ) : null}
+                      <optgroup label="Courses/Subjects">
+                        {courses.map(course => (
+                          <option key={course.id} value={course.id}>
+                            {course.title}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                   </div>
 

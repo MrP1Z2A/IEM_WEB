@@ -77,30 +77,30 @@ drop policy if exists "exams_select_authenticated" on public.exams;
 create policy "exams_select_authenticated"
   on public.exams
   for select
-  to anon, authenticated
-  using (true);
+  to authenticated
+  using (school_id = public.current_school_id());
 
 drop policy if exists "exams_insert_authenticated" on public.exams;
 create policy "exams_insert_authenticated"
   on public.exams
   for insert
-  to anon, authenticated
-  with check (true);
+  to authenticated
+  with check (school_id = public.current_school_id());
 
 drop policy if exists "exams_update_authenticated" on public.exams;
 create policy "exams_update_authenticated"
   on public.exams
   for update
-  to anon, authenticated
-  using (true)
-  with check (true);
+  to authenticated
+  using (school_id = public.current_school_id())
+  with check (school_id = public.current_school_id());
 
 drop policy if exists "exams_delete_authenticated" on public.exams;
 create policy "exams_delete_authenticated"
   on public.exams
   for delete
-  to anon, authenticated
-  using (true);
+  to authenticated
+  using (school_id = public.current_school_id());
 
 do $$
 begin
@@ -131,14 +131,14 @@ drop policy if exists "exam_files_storage_insert" on storage.objects;
 create policy "exam_files_storage_insert"
   on storage.objects
   for insert
-  to anon, authenticated
+  to authenticated
   with check (bucket_id = 'exam_files');
 
 drop policy if exists "exam_files_storage_update" on storage.objects;
 create policy "exam_files_storage_update"
   on storage.objects
   for update
-  to anon, authenticated
+  to authenticated
   using (bucket_id = 'exam_files')
   with check (bucket_id = 'exam_files');
 
@@ -146,5 +146,5 @@ drop policy if exists "exam_files_storage_delete" on storage.objects;
 create policy "exam_files_storage_delete"
   on storage.objects
   for delete
-  to anon, authenticated
+  to authenticated
   using (bucket_id = 'exam_files');
