@@ -152,10 +152,10 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
         }
       }
 
-      const allIds = allContacts.map(c => c.id);
+      const allIds = new Set(allContacts.map(c => c.id));
       for (const msg of (allMessages || [])) {
         const otherId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
-        if (!otherId || !allIds.includes(otherId)) continue;
+        if (!otherId || !allIds.has(otherId)) continue;
         if (!lastMsgMap[otherId]) lastMsgMap[otherId] = { lastAt: msg.created_at, lastContent: msg.content };
         if (msg.receiver_id === currentUser.id && !msg.read_at) {
           unreadCounts[msg.sender_id] = (unreadCounts[msg.sender_id] || 0) + 1;
@@ -484,7 +484,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
             <input aria-label="Action"
               type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search contacts & groups..."
-              className="w-full bg-[#f6f1e8] border border-[#d7c8b2] rounded-2xl py-2.5 pl-9 pr-8 text-xs text-white focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-white"
+              className="w-full bg-[#f6f1e8] border border-[#d7c8b2] rounded-2xl py-2.5 pl-9 pr-8 text-xs text-slate-900 focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-500"
             />
             {searchQuery && (
               <button aria-label="Action" type="button" onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 transition-colors">
@@ -780,7 +780,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
                 <input aria-label="Action"
                   type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)}
                   placeholder={`Message ${activeChatTitle}...`}
-                  className="flex-1 bg-[#f6f1e8] border border-[#d7c8b2] rounded-2xl py-3.5 px-5 text-sm text-white focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-white"
+                  className="flex-1 bg-[#f6f1e8] border border-[#d7c8b2] rounded-2xl py-3.5 px-5 text-sm text-slate-900 focus:outline-none focus:border-[#4ea59d] transition-all placeholder:text-slate-500"
                 />
                 <button aria-label="Action" type="submit" disabled={!newMessage.trim()}
                   className="w-12 h-12 bg-[#4ea59d] text-white rounded-2xl flex items-center justify-center hover:bg-[#3d8c85] transition-all shadow-lg disabled:opacity-40 group shrink-0">

@@ -237,6 +237,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [isLoading, setIsLoading] = useState(false);
   const [activeQuiz, setActiveQuiz] = useState<Quiz | null>(null);
   const [selectedNotice, setSelectedNotice] = useState<NoticeItem | null>(null);
+  const [highlightItemId, setHighlightItemId] = useState<string | null>(null);
   const [noticeOriginView, setNoticeOriginView] = useState<'notice-board' | 'instruction'>('notice-board');
   const [viewedNoticeIds, setViewedNoticeIds] = useState<string[]>(getStoredViewedNoticeIds);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -738,6 +739,23 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     }
   }, [isLoggedIn, user.role, schoolId, performSmsSync, assignedCourseIds, assignedClassIds]);
 
+  useEffect(() => {
+    if (highlightItemId) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(highlightItemId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        // Auto-clear highlight after 4 seconds to stop the pulse animation
+        const clearTimer = setTimeout(() => {
+          setHighlightItemId(null);
+        }, 4000);
+        return () => clearTimeout(clearTimer);
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [currentView, highlightItemId]);
+
   const loadUserProfile = useCallback(async () => {
     if (!isLoggedIn || !supabase || !isSupabaseConfigured) return;
 
@@ -943,16 +961,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     const idsToMark = dynamicAnnouncements.map(notice => notice.id);
     setViewedNoticeIds(prev => Array.from(new Set([...prev, ...idsToMark])));
   }, [currentView, dynamicAnnouncements]);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    const refreshInterval = window.setInterval(() => {
-      void performSmsSync(true);
-      void loadUserProfile();
-    }, 10000);
-
-    return () => window.clearInterval(refreshInterval);
-  }, [isLoggedIn, performSmsSync, loadUserProfile]);
 
   useEffect(() => {
     if (!isLoggedIn || !supabase || !user.id) return;
@@ -2046,7 +2054,26 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 bg: 'bg-purple-500/10'
               })),
             ].map((notif) => (
-              <div key={notif.id} className="p-5 bg-[#f6f1e8] rounded-3xl border border-[#e2d6c2] flex items-center gap-6 hover:border-[#4ea59d]/60 transition-all cursor-pointer group shadow-[0_12px_28px_rgba(95,79,53,0.08)]">
+              <div 
+                key={notif.id} 
+                onClick={() => {
+                  if (notif.title === 'Exam Assigned') {
+                    if (user.role === UserRole.TEACHER) {
+                      setCurrentView('exams');
+                    } else {
+                      setCurrentView('activity');
+                    }
+                  } else if (notif.title === 'Grade Released') {
+                    setCurrentView('studies');
+                  } else if (notif.title === 'Homework Assigned') {
+                    setCurrentView('homework');
+                  } else if (notif.title === 'Campus Event' || notif.title === 'New Activity') {
+                    setCurrentView('instruction');
+                  }
+                  setHighlightItemId(notif.id);
+                }}
+                className="p-5 bg-[#f6f1e8] rounded-3xl border border-[#e2d6c2] flex items-center gap-6 hover:border-[#4ea59d]/60 transition-all cursor-pointer group shadow-[0_12px_28px_rgba(95,79,53,0.08)]"
+              >
                 <div className={`w-12 h-12 rounded-2xl ${notif.bg} ${notif.color} flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform`}>
                   <i className={`fa-solid ${notif.icon}`}></i>
                 </div>
@@ -2310,7 +2337,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {dynamicStudentActivities.length > 0 ? dynamicStudentActivities.map((act, i) => (
-                <div key={i} className="p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[40px] border border-white/20 group hover:bg-[#4ea59d]/5 transition-all">
+                <div 
+                  key={i} 
+                  id={`act-${act.id}`}
+                  className={`p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[40px] border border-white/20 group hover:bg-[#4ea59d]/5 transition-all ${highlightItemId === `act-${act.id}` ? 'highlight-pulse-effect' : ''}`}
+                >
                   <div className="w-14 h-14 bg-[#4ea59d]/10 rounded-2xl flex items-center justify-center text-[#4ea59d] text-2xl mb-6 group-hover:scale-110 transition-transform">
                     <i className={`fa-solid ${act.icon}`}></i>
                   </div>
@@ -2331,7 +2362,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8">Upcoming Events</h3>
           <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             {dynamicSchoolEvents.length > 0 ? dynamicSchoolEvents.map(ev => (
-              <div key={ev.id} className="relative h-48 rounded-[32px] overflow-hidden group cursor-pointer shadow-xl shrink-0">
+              <div 
+                key={ev.id} 
+                id={`ev-${ev.id}`}
+                className={`relative h-48 rounded-[32px] overflow-hidden group cursor-pointer shadow-xl shrink-0 ${highlightItemId === `ev-${ev.id}` ? 'highlight-pulse-effect font-bold border-2 border-[#4ea59d]' : ''}`}
+              >
                 <img src={ev.image} alt={ev.title || 'Event Image'} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
                 <div className="absolute bottom-6 left-6">
@@ -2393,7 +2428,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 </div>
               ) : (
                 dynamicAssignments.map((ass) => (
-                  <div key={ass.id} className="bg-white/10 backdrop-blur-2xl shadow-xl p-8 rounded-[40px] border border-white/20 group hover:border-[#4ea59d]/50 transition-all flex flex-col h-full min-h-[300px]">
+                  <div 
+                    key={ass.id} 
+                    id={`ass-${ass.id}`}
+                    className={`bg-white/10 backdrop-blur-2xl shadow-xl p-8 rounded-[40px] border border-white/20 group hover:border-[#4ea59d]/50 transition-all flex flex-col h-full min-h-[300px] ${highlightItemId === `ass-${ass.id}` ? 'highlight-pulse-effect' : ''}`}
+                  >
                     <div className="flex justify-between items-start mb-6">
                       <div className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${ass.status === 'Active' || ass.status === 'Submitted' ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400'}`}>
                         {ass.status}
@@ -2669,7 +2708,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8">Exam Schedule</h3>
           <div className="space-y-6 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
             {dynamicExams.map((ex, i) => (
-              <div key={i} className="relative pl-6 border-l-2 border-[#1f4e4a] group">
+              <div 
+                key={i} 
+                id={`ex-${ex.id}`}
+                className={`relative pl-6 border-l-2 border-[#1f4e4a] group rounded-xl ${highlightItemId === `ex-${ex.id}` ? 'highlight-pulse-effect' : ''}`}
+              >
                 <div className="absolute left-[-5px] top-0 w-2 h-2 rounded-full bg-[#4ea59d] shadow-[0_0_10px_#4ea59d] group-hover:scale-150 transition-transform"></div>
                 <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest">{ex.date} @ {ex.time}</p>
                 <h4 className="text-sm font-bold text-slate-900 my-1">{ex.subject}</h4>
@@ -2939,7 +2982,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8">Exam Results</h3>
           <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
             {examResultsData.map((ex, i) => (
-                <div key={i} className="p-6 bg-[#efe7da] rounded-3xl border border-[#e2d6c2] flex justify-between items-center shadow-[0_10px_24px_rgba(95,79,53,0.07)]">
+                <div 
+                  key={i} 
+                  id={`res-${ex.courseName}`}
+                  className={`p-6 bg-[#efe7da] rounded-3xl border border-[#e2d6c2] flex justify-between items-center shadow-[0_10px_24px_rgba(95,79,53,0.07)] ${highlightItemId === `res-${ex.courseName}` ? 'highlight-pulse-effect' : ''}`}
+                >
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">{ex.assignment || ex.courseName}</h4>
                   <p className="text-[9px] font-black text-slate-400 uppercase">{ex.className} • {ex.courseName}</p>
@@ -2961,7 +3008,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
             {examResultsData.length > 0 ? (
               examResultsData.map((g, i) => (
-                <div key={i} className="p-6 bg-[#efe7da] rounded-3xl border border-[#e2d6c2] flex justify-between items-center group relative overflow-hidden shadow-[0_10px_24px_rgba(95,79,53,0.07)]">
+                <div 
+                  key={i} 
+                  id={`res-${g.courseName}`}
+                  className={`p-6 bg-[#efe7da] rounded-3xl border border-[#e2d6c2] flex justify-between items-center group relative overflow-hidden shadow-[0_10px_24px_rgba(95,79,53,0.07)] ${highlightItemId === `res-${g.courseName}` ? 'highlight-pulse-effect' : ''}`}
+                >
                   <div className="flex-1">
                     <h4 className="text-sm font-bold text-slate-900">{g.assignment}</h4>
                     <p className="text-[9px] text-[#4ea59d] font-black uppercase mt-1">Feedback: {g.feedback}</p>
@@ -3578,6 +3629,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         supabase={supabase}
         schoolId={schoolId || ''}
         assignedCourses={assignedCoursesList}
+        highlightExamId={highlightItemId}
       />
     </div>
   );
@@ -3588,6 +3640,28 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   return (
     <div className="flex flex-col md:flex-row bg-[#f3f0e8] min-h-screen text-white relative">
+      <style>{`
+        @keyframes highlightPulse {
+          0% {
+            outline: 4px solid transparent;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 rgba(78, 165, 157, 0);
+          }
+          50% {
+            outline: 4px solid #4ea59d;
+            outline-offset: 2px;
+            box-shadow: 0 0 25px rgba(78, 165, 157, 0.85);
+          }
+          100% {
+            outline: 4px solid transparent;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 rgba(78, 165, 157, 0);
+          }
+        }
+        .highlight-pulse-effect {
+          animation: highlightPulse 2s infinite ease-in-out;
+        }
+      `}</style>
       {/* Background Ambient Orbs for Glass Effect */}
       <div className="fixed top-[-10%] left-[-5%] w-[500px] h-[500px] bg-[#4ea59d]/20 rounded-full blur-[120px] pointer-events-none z-[0]"></div>
       <div className="fixed bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#1f4e4a]/40 rounded-full blur-[150px] pointer-events-none z-0"></div>

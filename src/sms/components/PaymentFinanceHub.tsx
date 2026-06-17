@@ -157,7 +157,7 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
   const [cashSearchQuery, setCashSearchQuery] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [assignAmountMmk, setAssignAmountMmk] = useState('');
-  const [assignDueDate, setAssignDueDate] = useState(getTodayIso());
+  const [assignDueDate, setAssignDueDate] = useState(() => getTodayIso());
   const [assignNote, setAssignNote] = useState('');
   const [assignClassFilter, setAssignClassFilter] = useState('');
   const [assignCourseFilter, setAssignCourseFilter] = useState('');

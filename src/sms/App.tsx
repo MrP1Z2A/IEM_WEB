@@ -380,7 +380,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [isCloudSyncRunning, setIsCloudSyncRunning] = useState(false);
   const isCloudSyncRunningRef = useRef(false);
   const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | undefined>(undefined);
-  const [currentSchoolName, setCurrentSchoolName] = useState<string | undefined>(schoolName);
   const developerTapCountRef = useRef(0);
   const developerTapResetTimeoutRef = useRef<number | null>(null);
   const [isDeveloperAuthModalOpen, setIsDeveloperAuthModalOpen] = useState(false);
@@ -690,7 +689,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
     if (Object.prototype.hasOwnProperty.call(profile, 'name')) {
       const nextSchoolName = profile.name || undefined;
-      setCurrentSchoolName(nextSchoolName);
 
       if (onSchoolIdChange && schoolId) {
         onSchoolIdChange(schoolId, nextSchoolName);
@@ -719,9 +717,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   // Check onboarding status on mount
   useEffect(() => {
+    let active = true;
+    let timerId: any = null;
+
     const checkOnboarding = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
+        if (!active) return;
         if (!user) {
           // If we have a school context in Student Service mode, require staff login
           if (isStudentService && schoolId) {
@@ -763,6 +765,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             throw permissionsQueryError;
           }
 
+          if (!active) return;
+
           if (resolvedStaffData) {
             const normalizedPages = normalizeStaffAllowedPages(resolvedStaffData.permissions);
             setAllowedPages(
@@ -783,6 +787,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         const maxAttempts = 3;
 
         while (attempts < maxAttempts) {
+          if (!active) return;
           const { data, error } = await supabase
             .from('profiles')
             .select('school_id')
@@ -800,10 +805,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           }
 
           attempts++;
-          if (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 800 * attempts)); // Exponential backoff
+          if (attempts < maxAttempts && active) {
+            await new Promise(resolve => {
+              timerId = setTimeout(resolve, 800 * attempts);
+            });
           }
         }
+
+        if (!active) return;
 
         if (profileError || !profile?.school_id) {
           setOnboardingStatus('needs-school');
@@ -811,11 +820,17 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           setOnboardingStatus('ready');
         }
       } catch (err) {
+        if (!active) return;
         console.error('Onboarding check failed:', err);
         setOnboardingStatus('needs-school');
       }
     };
     void checkOnboarding();
+
+    return () => {
+      active = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [authStateVersion, isStudentService, schoolId]);
 
   useEffect(() => {
@@ -823,9 +838,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  useEffect(() => {
-    setCurrentSchoolName(schoolName);
-  }, [schoolName]);
+
 
   useEffect(() => {
     let isActive = true;
@@ -849,8 +862,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         if (!isActive) return;
 
         setSchoolLogoUrl(data?.logo_url ? String(data.logo_url) : undefined);
-        if (data?.name) {
-          setCurrentSchoolName(String(data.name));
+        if (data?.name && onSchoolIdChange) {
+          onSchoolIdChange(schoolId, String(data.name));
         }
       } catch (err) {
         console.error('Failed to load school branding:', err);
@@ -4077,7 +4090,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   if (onboardingStatus === 'needs-auth') {
     return (
       <StaffLogin 
-        schoolName={currentSchoolName || schoolName}
+        schoolName={schoolName}
         onLoginSuccess={() => setOnboardingStatus('loading')}
         onBackToSchoolSelect={() => {
           if (onSchoolIdChange) onSchoolIdChange(undefined);
@@ -4198,7 +4211,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="bg-slate-50 dark:bg-slate-800/70 rounded-2xl p-4 border border-slate-200 dark:border-slate-700">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">School</p>
-                <p className="mt-2 text-sm font-black text-slate-900 dark:text-slate-100">{currentSchoolName || schoolName || 'Current School'}</p>
+                <p className="mt-2 text-sm font-black text-slate-900 dark:text-slate-100">{schoolName || 'Current School'}</p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-800/70 rounded-2xl p-4 border border-slate-200 dark:border-slate-700">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Minimum Length</p>
@@ -4505,7 +4518,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         isCollapsed={isSidebarCollapsed}
         onCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onSwitch={onSwitch}
-        schoolName={currentSchoolName || schoolName}
+        schoolName={schoolName}
         schoolLogoUrl={schoolLogoUrl}
         allowedPages={allowedPages}
       />
@@ -4530,7 +4543,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden border-2 border-slate-200 dark:border-slate-800 hover:border-brand-300 transition-all active:scale-95"
               aria-label="Developer mode access"
             >
-              <img src={DEFAULT_AVATAR} className="w-full h-full object-cover" />
+              <img src={DEFAULT_AVATAR} alt="Developer mode user avatar" className="w-full h-full object-cover" />
             </button>
           </div>
         </header>
@@ -4810,7 +4823,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           )}
 
           {currentPage === 'messages' && schoolId && (
-            <MessagesOversight schoolId={schoolId} schoolName={currentSchoolName || schoolName} />
+            <MessagesOversight schoolId={schoolId} schoolName={schoolName} />
           )}
 
           {currentPage === 'class-group-management' && schoolId && (

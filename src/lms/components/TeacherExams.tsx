@@ -31,9 +31,10 @@ interface TeacherExamsProps {
     className: string;
     name: string;
   }>;
+  highlightExamId?: string | null;
 }
 
-export default function TeacherExams({ supabase, schoolId, assignedCourses }: TeacherExamsProps) {
+export default function TeacherExams({ supabase, schoolId, assignedCourses, highlightExamId }: TeacherExamsProps) {
   const [exams, setExams] = useState<ExamItem[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -412,7 +413,11 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses }: Te
             </div>
           ) : (
             filteredExams.map(exam => (
-              <div key={exam.id} className="group bg-white/5 hover:bg-white/10 backdrop-blur-2xl rounded-[40px] border border-white/10 hover:border-[#4ea59d]/50 p-8 transition-all flex flex-col h-full relative overflow-hidden">
+              <div 
+                key={exam.id} 
+                id={`ex-${exam.id}`}
+                className={`group bg-white/5 hover:bg-white/10 backdrop-blur-2xl rounded-[40px] border border-white/10 hover:border-[#4ea59d]/50 p-8 transition-all flex flex-col h-full relative overflow-hidden ${highlightExamId === `ex-${exam.id}` ? 'highlight-pulse-effect' : ''}`}
+              >
                 <div className="absolute top-0 right-0 p-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button aria-label="Action" type="button" onClick={() => openEditEditor(exam)} className="w-8 h-8 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center hover:bg-orange-500/40 transition-all"><i className="fa-solid fa-pen-to-square"></i></button>
                   <button type="button" onClick={() => deleteExam(exam.id)} disabled={deletingExamId === exam.id} className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center hover:bg-rose-500/40 transition-all">{deletingExamId === exam.id ? <i className="fa-solid fa-spinner animate-spin"></i> : <i className="fa-solid fa-trash"></i>}</button>

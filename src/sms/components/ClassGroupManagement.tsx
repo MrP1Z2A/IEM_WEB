@@ -44,10 +44,11 @@ const COLOR_OPTIONS = [
   '#f8fafc','#e0f2fe','#dcfce7','#fef3c7','#ede9fe','#fce7f3','#ffedd5','#fee2e2',
 ];
 
-const notify = (msg: string) => {
-  // Flash a simple console notification — can integrate with SMS toast system
-  console.info('[ClassGroupMgmt]', msg);
-};
+const Avatar = ({ name, src, size = 8 }: { name: string; src?: string; size?: number }) => (
+  src
+    ? <img src={src} alt={name} className={`w-${size} h-${size} rounded-lg object-cover shrink-0`} />
+    : <div className={`w-${size} h-${size} rounded-lg bg-brand-500/20 flex items-center justify-center text-brand-500 font-black text-sm shrink-0`}>{name.charAt(0).toUpperCase()}</div>
+);
 
 // ─────────────────────────────────────────────────────
 const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId }) => {
@@ -390,11 +391,7 @@ const ClassGroupManagement: React.FC<ClassGroupManagementProps> = ({ schoolId })
     return students.filter(s => !assigned.has(String(s.id)));
   }, [assignedStudents, students, selectedCourse]);
 
-  const Avatar = ({ name, src, size = 8 }: { name: string; src?: string; size?: number }) => (
-    src
-      ? <img src={src} alt={name} className={`w-${size} h-${size} rounded-lg object-cover shrink-0`} />
-      : <div className={`w-${size} h-${size} rounded-lg bg-brand-500/20 flex items-center justify-center text-brand-500 font-black text-sm shrink-0`}>{name.charAt(0).toUpperCase()}</div>
-  );
+
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">

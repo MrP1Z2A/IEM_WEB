@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { PageId } from '../types';
 import logoIem from '../src/LOGO_IEM.png';
 
@@ -104,6 +104,16 @@ const Sidebar: React.FC<SidebarProps> = ({
     navElement.scrollTop = sidebarScrollTopRef.current;
   }, [currentPage, openDropdowns, isMobileMenuOpen]);
 
+  const contextValue = useMemo(() => ({
+    currentPage,
+    setCurrentPage,
+    setIsMobileMenuOpen,
+    isCollapsed,
+    allowedPages,
+    openDropdowns,
+    setOpenDropdowns
+  }), [currentPage, setCurrentPage, setIsMobileMenuOpen, isCollapsed, allowedPages, openDropdowns, setOpenDropdowns]);
+
   return (
     <aside className={`fixed lg:sticky lg:top-0 lg:h-screen bg-[#0f2624] border-r border-[#1f4e4a] text-white z-50 lg:z-0 flex flex-col transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl w-64' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} ${!isMobileMenuOpen ? 'lg:w-0' : ''}`}>
       <div className={`p-8 pb-10 flex items-center shrink-0 ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
@@ -122,7 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <i className="fas fa-bars text-[10px]"></i>
         </button>
       </div>
-      <SidebarContext.Provider value={{ currentPage, setCurrentPage, setIsMobileMenuOpen, isCollapsed, allowedPages, openDropdowns, setOpenDropdowns }}>
+      <SidebarContext.Provider value={contextValue}>
         <nav
           ref={navRef}
           onScroll={(event) => {

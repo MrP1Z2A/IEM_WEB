@@ -13,7 +13,7 @@
     "@supabase/supabase-js": "^2.97.0",
     "@types/dompurify": "^3.0.5",
     "dompurify": "^3.4.7",
-    "jspdf": "^2.5.2",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "livekit-client": "^2.19.0",
     "livekit-server-sdk": "^2.15.3",

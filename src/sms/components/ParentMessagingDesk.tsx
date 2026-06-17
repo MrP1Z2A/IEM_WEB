@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { supabase } from '../src/supabaseClient';
 import { sanitizeObject } from '../../shared/utils/sanitize';
 import { buildAdminMessagingId, getAdminMessagingName } from '../../shared/messaging/adminMessaging';
@@ -209,8 +209,8 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
     return nextMap;
   }, [allUsers]);
 
-  const getUserName = (userId: string) => userMap[userId]?.name || userId;
-  const getUserAvatar = (userId: string) => getAvatarUrl(getUserName(userId), userMap[userId]?.avatar);
+  const getUserName = useCallback((userId: string) => userMap[userId]?.name || userId, [userMap]);
+  const getUserAvatar = useCallback((userId: string) => getAvatarUrl(getUserName(userId), userMap[userId]?.avatar), [getUserName, userMap]);
 
   const buildConversationMessages = (conversation: ConversationSummary) => {
     if (conversation.kind === 'dm') {
