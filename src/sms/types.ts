@@ -1,0 +1,128 @@
+export type UserRole = 'student' | 'teacher' | 'parent' | 'admin' | 'owner' | 'staff' | 'student_service';
+
+export interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  role: UserRole;
+  school_id?: string | null;
+  avatar_url?: string;
+  updated_at: string;
+}
+
+export enum Status {
+  ACTIVE = 'Active',
+  INACTIVE = 'Inactive',
+  PENDING = 'Pending'
+}
+
+export interface CourseAttendance {
+  course: string;
+  rate: number;
+}
+
+export interface AttendanceRecord {
+  date: string;
+  studentId: string;
+  status: 'P' | 'A' | 'L';
+}
+
+export interface StudentPermissions {
+  neuralSync: boolean;
+  libraryAccess: boolean;
+  examEntry: boolean;
+  apiAccess: boolean;
+}
+
+export interface Student {
+  id: string;
+  school_id?: string | null;
+  created_at?: string;
+  name: string;
+  role: UserRole;
+  gender: 'Male' | 'Female';
+  status: Status;
+  email: string;
+  avatar?: string;
+  attendanceRate: number;
+  courseAttendance: CourseAttendance[];
+  securityStatus: {
+    lastLogin: string;
+    twoFactorEnabled: boolean;
+    trustedDevices: number;
+    riskLevel: 'Low' | 'Medium' | 'High';
+  };
+  permissions?: StudentPermissions;
+  type?: 'New' | 'Old';
+  date_of_birth?: string;
+  age?: number | null;
+  phone?: string;
+  address?: string;
+  nrc?: string | null;
+  marital_status?: string | null;
+  race?: string | null;
+  religion?: string | null;
+  salary?: number | null;
+  job_position?: string | null;
+  educational_background?: string | null;
+  parent_name?: string;
+  parent_number?: string;
+  parent_email?: string;
+  secondary_parent_name?: string;
+  secondary_parent_number?: string;
+  secondary_parent_email?: string;
+  studentschool_id?: string;
+  teacherschool_id?: string;
+  staffschool_id?: string;
+}
+
+export type PageId = 
+  | 'dashboard' 
+  | 'data-archive'
+  | 'students' 
+  | 'parents'
+  | 'parent-detail'
+  | 'student-import'
+  | 'student-register'
+  | 'teacher-register'
+  | 'live-calendar'
+  | 'student-assign'
+  | 'student-attendance'
+  | 'class-attendance'
+  | 'class-course'
+  | 'teachers' 
+  | 'library' 
+  | 'account' 
+  | 'class' 
+  | 'subject' 
+  | 'routine' 
+  | 'attendance' 
+  | 'exam' 
+  | 'notice' 
+  | 'notice-detail'
+  | 'transport' 
+  | 'hostel' 
+  | 'security' 
+  | 'ai-chat'
+  | 'programs'
+  | 'homework'
+  | 'report-card'
+  | 'payment'
+  | 'payment-assign'
+  | 'payment-history'
+  | 'student-finance-status'
+  | 'cash-records'
+  | 'student-service'
+  | 'student-service-batch'
+  | 'events'
+  | 'student-activities'
+  | 'student-achievements'
+  | 'announcements-parent'
+  | 'live-intel'
+  | 'class-announcements'
+  | 'about-school'
+  | 'messages'
+  | 'class-group-management'
+  | 'sms-attendance'
+  | 'teacher-attendance'
+  | 'video-conference';

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "19b289d1-b053-4e2a-a80b-6bc3ec16001a",
+    "exam_id": "626dc281-b275-4803-92d5-c18d24680379",
+    "student_id": "IEM-000078336",
+    "grade": "A+",
+    "note": "",
+    "created_at": "2026-03-22T14:51:11.146732+00:00",
+    "updated_at": "2026-03-25T06:32:28.287135+00:00",
+    "school_id": "f17d2849-bd51-40eb-855d-1cc3a5685c54",
+    "name": "g1",
+    "class_id": null,
+    "course_name": "cti",
+    "percentage": "95"
+  }
+]

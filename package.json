@@ -1,0 +1,37 @@
+{
+  "name": "iem-intelligence-unified",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "doctor": "npx react-doctor@latest"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.97.0",
+    "@types/dompurify": "^3.0.5",
+    "dompurify": "^3.4.7",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
+    "livekit-client": "^2.19.0",
+    "livekit-server-sdk": "^2.15.3",
+    "lucide-react": "^1.6.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-easy-crop": "^5.5.7",
+    "react-router-dom": "^7.13.2",
+    "recharts": "^3.7.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react-doctor": "^0.3.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

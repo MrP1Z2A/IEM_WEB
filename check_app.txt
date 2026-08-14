@@ -1,0 +1,1000 @@
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
+import {
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, AreaChart, Area, Cell, RadarChart, PolarGrid, PolarAngleAxis, Radar
+} from 'recharts';
+import { Status, Student, PageId, StudentPermissions } from './types';
+import { supabase } from './supabaseClient';
+import { authService } from './services/authService';
+import { getCurrentTenantContext, withSchoolId } from './services/tenantService';
+import CreateSchoolPage from './components/CreateSchoolPage';
+import StaffLogin from './components/StaffLogin';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import StudentDirectory from './components/StudentDirectory';
+import ParentDirectory from './components/ParentDirectory';
+import ParentDetailPage from './components/ParentDetailPage';
+import RegistrationHub from './components/RegistrationHub';
+import TeacherRegistrationHub from './components/TeacherRegistrationHub';
+import StudentServiceBatchRegister from './components/StudentServiceBatchRegister';
+import AttendanceProtocol from './components/AttendanceProtocol';
+import LiveCalendar from './components/LiveCalendar';
+import HomeworkManager from './components/HomeworkManager';
+import AboutSchool from './components/AboutSchool';
+import ReportCardPage from './components/Reportcard';
+import StudentAchievements from './components/StudentAchievements';
+import ExamManagementPage from './components/exammangement.tsx';
+import NoticeBoard from './components/NoticeBoard';
+import NoticeDetailPage from './components/NoticeDetailPage';
+import ClassAnnouncements from './components/ClassAnnouncements';
+import PaymentFinanceHub from './components/PaymentFinanceHub';
+import SecurityPermission from './components/Modals/SecurityPermission';
+import MessagesOversight from './components/MessagesOversight';
+import ClassGroupManagement from './components/ClassGroupManagement';
+import AttendanceTaker from './components/AttendanceTaker';
+
+import EnrollmentModal from './components/Modals/EnrollmentModal';
+import TeacherEnrollmentModal from './components/Modals/TeacherEnrollmentModal';
+import EditModal from './components/Modals/EditModal';
+import PermissionsModal from './components/Modals/PermissionsModal';
+import { buildParentEntries } from './components/parentDirectoryUtils';
+import logoIem from './src/LOGO_IEM.png';
+
+const DEFAULT_AVATAR = logoIem;
+
+const INITIAL_PERMISSIONS: StudentPermissions = {
+  neuralSync: true,
+  libraryAccess: true,
+  examEntry: true,
+  apiAccess: false
+};
+
+const INITIAL_STUDENTS: Student[] = [];
+
+const INITIAL_SUBJECTS: any[] = [];
+
+const INITIAL_TEACHERS: Student[] = [];
+
+const INITIAL_LIBRARY: any[] = [];
+
+const INITIAL_EXAMS: any[] = [];
+
+const INITIAL_HOMEWORK: any[] = [];
+
+const INITIAL_PROGRAMS: any[] = [];
+const INITIAL_PARENTS: any[] = [];
+
+type AttendanceContextType = 'class' | 'subject';
+const CLOUD_SYNC_INTERVAL_SECONDS = 10;
+
+const normalizeClassCodeBase = (name: string) => {
+  const sanitized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return sanitized || 'class';
+};
+
+const getLocalIsoDate = (date: Date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const isCourseAssignmentSchemaMissing = (message?: string | null) => {
+  const text = (message || '').toLowerCase();
+  return (
+    /relation|does not exist|column/.test(text)
+    || text.includes('could not find the table')
+    || text.includes('schema cache')
+  );
+};
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\d{6,15}$/;
+
+const isValidEmail = (value: string) => EMAIL_PATTERN.test(value.trim());
+const normalizeDigits = (value: string) => value.replace(/\D/g, '');
+const isValidPhoneDigits = (value: string) => PHONE_PATTERN.test(normalizeDigits(value));
+const toInternationalPhone = (countryCode: string, phoneValue: string) => {
+  const normalizedCountryCode = String(countryCode || '').trim() || '+1';
+  const normalizedPhone = normalizeDigits(phoneValue);
+  return `${normalizedCountryCode}${normalizedPhone}`;
+};
+
+const getInitialEnrollData = (type: 'New' | 'Old' = 'New') => ({
+  name: '',
+  email: '',
+  role: 'student' as const,
+  type,
+  selectedStudentId: '',
+  selectedClassIds: [] as string[],
+  selectedBatchCodes: [] as string[],
+  selectedClassCourseIds: [] as string[],
+  dateOfBirth: '',
+  parentName: '',
+  parentCountryCode: '+1',
+  parentNumber: '',
+  parentEmail: '',
+  secondaryParentName: '',
+  secondaryParentCountryCode: '+1',
+  secondaryParentNumber: '',
+  secondaryParentEmail: '',
+  studentCountryCode: '+1',
+  phone: '',
+  address: '',
+});
+
+const getInitialTeacherEnrollData = () => ({
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  avatarFile: null,
+});
+
+interface AppProps {
+  onSwitch?: () => void;
+  schoolId?: string;
+  schoolName?: string;
+  onSchoolIdChange?: (newId: string | undefined, newName?: string) => void;
+  isStudentService?: boolean;
+}
+
+const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdChange, isStudentService }) => {
+  const [allowedPages, setAllowedPages] = useState<string[] | undefined>(undefined);
+  const [onboardingStatus, setOnboardingStatus] = useState<'loading' | 'needs-school' | 'needs-auth' | 'ready'>('loading');
+  const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
+  const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [selectedClassAttendanceId, setSelectedClassAttendanceId] = useState<string | null>(null);
+  const [selectedClassCourse, setSelectedClassCourse] = useState<{ id: string; name: string; classId: string; className?: string } | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' } | null>(null);
+  const [cloudSyncCountdown, setCloudSyncCountdown] = useState(CLOUD_SYNC_INTERVAL_SECONDS);
+  const [isCloudSyncRunning, setIsCloudSyncRunning] = useState(false);
+  const isCloudSyncRunningRef = useRef(false);
+
+  // Stateful Data
+  const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
+  const [attendanceStudents, setAttendanceStudents] = useState<Student[]>(INITIAL_STUDENTS);
+  const [subjects, setSubjects] = useState(INITIAL_SUBJECTS);
+  const [teachers, setTeachers] = useState<Student[]>(INITIAL_TEACHERS);
+  const [libraryItems, setLibraryItems] = useState(INITIAL_LIBRARY);
+  const [exams, setExams] = useState(INITIAL_EXAMS);
+  const [homeworks, setHomeworks] = useState(INITIAL_HOMEWORK);
+  const [programs, setPrograms] = useState(INITIAL_PROGRAMS);
+  const [parents, setParents] = useState(INITIAL_PARENTS);
+  const [totalEarningMMK, setTotalEarningMMK] = useState(0);
+  const [policies, setPolicies] = useState({
+    mfaRequired: true,
+    ipWhitelist: false,
+    sessionTimeout: true,
+    bruteForceProtection: true,
+    dataEncryption: true
+  });
+
+  // Announcement Sections Data
+  const [events, setEvents] = useState<any[]>([]);
+  const [studentActivities, setStudentActivities] = useState<any[]>([]);
+  const [parentAnnouncements, setParentAnnouncements] = useState<any[]>([]);
+  const [liveIntelData, setLiveIntelData] = useState<any[]>([]);
+
+  // Filters
+  const [selectedDate, setSelectedDate] = useState('');
+  const [classes, setClasses] = useState<any[]>([]);
+  // const [schoolId, setSchoolId] = useState<string>(''); // Removed in favor of prop schoolId
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [className, setClassName] = useState('');
+  const [classImage, setClassImage] = useState<File | null>(null);
+  const [classOuterColor, setClassOuterColor] = useState('#f8fafc');
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [isClassCodeSupported, setIsClassCodeSupported] = useState(true);
+
+  // Attendance State (Subject-specific)
+  const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
+  const [attendanceDate, setAttendanceDate] = useState(getLocalIsoDate());
+  // Mapping: subjectId -> date -> studentId -> status
+  const [subjectAttendanceStore, setSubjectAttendanceStore] = useState<Record<string, Record<string, Record<string, 'P' | 'A' | 'L'>>>>({});
+  const [isAttendanceContextNameSupported, setIsAttendanceContextNameSupported] = useState(true);
+
+  // Modals
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [enrollData, setEnrollData] = useState(getInitialEnrollData());
+  const [enrollClassCourses, setEnrollClassCourses] = useState<Array<{ id: string; name: string; class_id: string }>>([]);
+  const [isEnrollClassCoursesLoading, setIsEnrollClassCoursesLoading] = useState(false);
+  const [isBatchRegistering, setIsBatchRegistering] = useState(false);
+  const [isTeacherEnrollModalOpen, setIsTeacherEnrollModalOpen] = useState(false);
+  const [teacherEnrollData, setTeacherEnrollData] = useState(getInitialTeacherEnrollData());
+  const [isBatchTeacherRegistering, setIsBatchTeacherRegistering] = useState(false);
+  const [studentServiceStaff, setStudentServiceStaff] = useState<Student[]>([]);
+  const [isStudentServiceEnrollModalOpen, setIsStudentServiceEnrollModalOpen] = useState(false);
+  const [studentServiceEnrollData, setStudentServiceEnrollData] = useState(getInitialTeacherEnrollData());
+  const [isBatchStudentServiceRegistering, setIsBatchStudentServiceRegistering] = useState(false);
+  const [studentProfileImage, setStudentProfileImage] = useState<File | null>(null);
+  const enrollAbortCounterRef = useRef(0);
+  const [editTarget, setEditTarget] = useState<{ type: string, data: any } | null>(null);
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
+  const [permTarget, setPermTarget] = useState<Student | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string, onConfirm: () => void | Promise<void> } | null>(null);
+  const [studentDeleteDialog, setStudentDeleteDialog] = useState<{ id: string; name: string; entityType: 'student' | 'teacher' } | null>(null);
+  const [studentDeleteNameInput, setStudentDeleteNameInput] = useState('');
+  const [adminDeletePassword, setAdminDeletePassword] = useState('');
+  const [studentDeleteError, setStudentDeleteError] = useState<string | null>(null);
+  const [isStudentDeleteSubmitting, setIsStudentDeleteSubmitting] = useState(false);
+  const [studentEditAuthDialog, setStudentEditAuthDialog] = useState<Student | null>(null);
+  const [studentEditAuthPassword, setStudentEditAuthPassword] = useState('');
+  const [studentEditAuthError, setStudentEditAuthError] = useState<string | null>(null);
+  const [isStudentEditAuthSubmitting, setIsStudentEditAuthSubmitting] = useState(false);
+  const [classDeleteDialog, setClassDeleteDialog] = useState<{ id: string; name: string; onDeleted?: () => void } | null>(null);
+  const [classDeleteNameInput, setClassDeleteNameInput] = useState('');
+  const [classAdminDeletePassword, setClassAdminDeletePassword] = useState('');
+  const [classDeleteError, setClassDeleteError] = useState<string | null>(null);
+  const [isClassDeleteSubmitting, setIsClassDeleteSubmitting] = useState(false);
+  const [newStudentCredentials, setNewStudentCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [isGlobalCreateModalOpen, setIsGlobalCreateModalOpen] = useState<'events' | 'student-activities' | 'announcements-parent' | 'live-intel' | null>(null);
+  const [isGlobalCreateSubmitting, setIsGlobalCreateSubmitting] = useState(false);
+  const [globalCreateData, setGlobalCreateData] = useState<any>({});
+  const [globalCreateFile, setGlobalCreateFile] = useState<File | null>(null);
+  const [globalEditId, setGlobalEditId] = useState<string | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewPdfTitle, setPreviewPdfTitle] = useState('');
+
+  const handleGlobalSave = async (type: string, payload: any) => {
+    if (!schoolId) return;
+    setIsGlobalCreateSubmitting(true);
+    try {
+      let tableName = '';
+      if (type === 'events') tableName = 'events';
+      else if (type === 'student-activities') tableName = 'student_activities';
+      else if (type === 'announcements-parent') tableName = 'parent_announcements';
+      else if (type === 'live-intel') tableName = 'live_intel';
+
+      if (!tableName) throw new Error('Invalid creation type');
+
+      let attachmentUrl = payload.attachment_url || payload.image_url || null;
+      if (globalCreateFile) {
+        attachmentUrl = await uploadAnnouncementAttachment(globalCreateFile);
+      }
+
+      // Build a clean payload for the specific table to avoid column mismatch errors
+      let cleanPayload: any = { school_id: schoolId };
+      if (type === 'events') {
+        cleanPayload.title = payload.title || '';
+        cleanPayload.description = payload.description || '';
+        cleanPayload.event_date = payload.event_date || new Date().toISOString().split('T')[0];
+        cleanPayload.type = payload.type || 'General';
+        cleanPayload.image_url = attachmentUrl; // Events uses image_url
+        cleanPayload.location = payload.location || '';
+      } else if (type === 'student-activities') {
+        cleanPayload.name = payload.name || '';
+        cleanPayload.description = payload.description || '';
+        cleanPayload.activity_type = payload.activity_type || 'Club';
+        cleanPayload.attachment_url = attachmentUrl;
+      } else if (type === 'announcements-parent') {
+        cleanPayload.title = payload.title || '';
+        cleanPayload.message = payload.message || '';
+        cleanPayload.importance = payload.importance || 'Medium';
+        cleanPayload.attachment_url = attachmentUrl;
+      } else if (type === 'live-intel') {
+        cleanPayload.event_type = payload.event_type || 'System';
+        cleanPayload.severity = payload.severity || 'Info';
+        cleanPayload.details = { log: payload.details_text || (payload.details?.log) || 'Institutional update logged.' };
+        cleanPayload.attachment_url = attachmentUrl;
+      }
+
+      let saveError;
+      if (globalEditId) {
+        const { error } = await supabase
+          .from(tableName)
+          .update(cleanPayload)
+          .eq('id', globalEditId)
+          .eq('school_id', schoolId);
+        saveError = error;
+      } else {
+        const { error } = await supabase
+          .from(tableName)
+          .insert([cleanPayload]);
+        saveError = error;
+      }
+
+      if (saveError) throw saveError;
+
+      notify(`${type.replace('-', ' ').toUpperCase()} successfully ${globalEditId ? 'updated' : 'published'}.`);
+      setIsGlobalCreateModalOpen(null);
+      setGlobalEditId(null);
+      setGlobalCreateFile(null); // Clear file
+      // Refresh current data
+      if (type === 'events') void fetchEvents();
+      else if (type === 'student-activities') void fetchStudentActivities();
+      else if (type === 'announcements-parent') void fetchParentAnnouncements();
+      else if (type === 'live-intel') void fetchLiveIntel();
+    } catch (err: any) {
+      console.error(`[GlobalSave] Error:`, err);
+      notify(`Error: ${err.message || 'Failed to save item'}`);
+    } finally {
+      setIsGlobalCreateSubmitting(false);
+    }
+  };
+
+  const openGlobalEdit = (type: any, item: any) => {
+    setGlobalEditId(item.id);
+    setIsGlobalCreateModalOpen(type);
+    setGlobalCreateData({ ...item, details_text: item.details?.log || '' });
+    setGlobalCreateFile(null);
+  };
+
+  const fetchEvents = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('event_date', { ascending: true });
+
+    if (!error && data) setEvents(data);
+  };
+
+  const fetchStudentActivities = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('student_activities')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setStudentActivities(data);
+  };
+
+  const fetchParentAnnouncements = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('parent_announcements')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setParentAnnouncements(data);
+  };
+
+  const fetchLiveIntel = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('live_intel')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setLiveIntelData(data);
+  };
+
+  const stats = useMemo(() => {
+    const totalStudents = allStudents.length || students.length;
+    const totalTeachers = teachers.length;
+
+    // Calculate parents from student records for dashboard consistency
+    const totalParents = buildParentEntries(allStudents.length > 0 ? allStudents : students).length;
+
+    const totalStudentServices = studentServiceStaff.length;
+    const maleStudents = students.filter(student => student.gender === 'Male').length;
+    const femaleStudents = students.filter(student => student.gender === 'Female').length;
+    const maleTeachers = teachers.filter(teacher => teacher.gender === 'Male').length;
+    const femaleTeachers = teachers.filter(teacher => teacher.gender === 'Female').length;
+
+    return {
+      totalStudents,
+      totalParents,
+      totalEarningMMK,
+      totalTeachers,
+      totalStudentServices,
+      genderBreakdown: {
+        male: maleStudents,
+        female: femaleStudents,
+      },
+      teacherGenderBreakdown: {
+        male: maleTeachers,
+        female: femaleTeachers,
+      },
+    };
+  }, [students, teachers, parents, allStudents, totalEarningMMK, studentServiceStaff]);
+
+  const notify = useCallback((message: string) => {
+    setNotification({ message, type: 'info' });
+    setTimeout(() => setNotification(null), 3000);
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      // 1. CLEAR ALL STATE SYNCHRONOUSLY FIRST
+      setStudents([]);
+      setAllStudents([]);
+      setAttendanceStudents([]);
+      setTeachers([]);
+      setParents([]);
+      setStudentServiceStaff([]);
+      setClasses([]);
+      setTotalEarningMMK(0);
+      setSubjects([]);
+      setLibraryItems([]);
+      setExams([]);
+      setHomeworks([]);
+      setPrograms([]);
+      setSelectedDate('');
+
+      await authService.signOut();
+      
+      // If student service, preserve school context but require re-auth
+      if (isStudentService && schoolId) {
+        setOnboardingStatus('needs-auth');
+      } else {
+        if (onSchoolIdChange) onSchoolIdChange(undefined);
+        setOnboardingStatus('needs-school');
+      }
+
+      notify('Logged out successfully.');
+      notify('Logged out successfully.');
+    } catch (error: any) {
+      notify(error?.message || 'Failed to log out.');
+    }
+  }, [notify, onSchoolIdChange]);
+
+  const requireSchoolId = useCallback(async () => {
+    if (schoolId) return schoolId;
+    const tenant = await getCurrentTenantContext();
+    return tenant.schoolId;
+  }, [schoolId]);
+
+  // Check onboarding status on mount
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          // If we have a school context in Student Service mode, require staff login
+          if (isStudentService && schoolId) {
+            setOnboardingStatus('needs-auth');
+          } else {
+            setOnboardingStatus('needs-school');
+          }
+          return;
+        }
+
+        // Fetch user permissions if Student Service mode
+        if (isStudentService) {
+          const { data: staffData } = await supabase
+            .from('student_services')
+            .select('permissions')
+            .eq('email', user.email)
+            .maybeSingle();
+          
+          if (staffData?.permissions) {
+            setAllowedPages(staffData.permissions);
+          } else {
+            // Default permissions if none set (Dashboard and Student Directory)
+            setAllowedPages(['dashboard', 'students', 'about-school', 'messages']);
+          }
+        } else {
+          setAllowedPages(undefined); // Full access
+        }
+
+        let profile: any = null;
+        let profileError: any = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('school_id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          profile = data;
+          profileError = error;
+
+          if (!error && data) {
+            if (data.school_id && data.school_id !== schoolId && onSchoolIdChange) {
+              onSchoolIdChange(String(data.school_id));
+            }
+            break;
+          }
+
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 800 * attempts)); // Exponential backoff
+          }
+        }
+
+        if (profileError || !profile?.school_id) {
+          setOnboardingStatus('needs-school');
+        } else {
+          setOnboardingStatus('ready');
+        }
+      } catch (err) {
+        console.error('Onboarding check failed:', err);
+        setOnboardingStatus('needs-school');
+      }
+    };
+    void checkOnboarding();
+  }, [isStudentService, schoolId]);
+
+  useEffect(() => {
+    if (isDarkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [isDarkMode]);
+
+  const mapStudentFromDB = (student: any): Student => ({
+    ...(student as Student),
+    role: (student?.role || 'student') as Student['role'],
+    gender: (student?.gender || 'Male') as Student['gender'],
+    status: (student?.status || Status.PENDING) as Status,
+    attendanceRate: typeof student?.attendanceRate === 'number' ? student.attendanceRate : 0,
+    courseAttendance: Array.isArray(student?.courseAttendance) ? student.courseAttendance : [],
+    securityStatus: student?.securityStatus || { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+    studentschool_id: student?.studentschool_id || null,
+    teacherschool_id: student?.teacherschool_id || null,
+    staffschool_id: student?.staffschool_id || null,
+  });
+
+  const fetchStudentsByDate = async (date: string) => {
+    if (!date) return;
+    const schoolId = await requireSchoolId();
+
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    const { data, error } = await supabase
+      .schema('public')
+      .from('students')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setStudents(data.map(mapStudentFromDB));
+    }
+  };
+
+  const fetchAllStudents = async () => {
+    const schoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .schema('public')
+      .from('students')
+      .select('*')
+      .eq('school_id', schoolId);
+
+    if (!error && data) {
+      setAllStudents(data);
+    }
+  };
+
+  const fetchTeachers = async () => {
+    const schoolId = await requireSchoolId();
+    const orderedResult = await supabase
+      .schema('public')
+      .from('teachers')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!orderedResult.error && Array.isArray(orderedResult.data)) {
+      setTeachers(orderedResult.data.map((teacher: any) => mapStudentFromDB({ ...teacher, role: 'teacher' })));
+      return;
+    }
+
+    const fallbackResult = await supabase
+      .schema('public')
+      .from('teachers')
+      .select('*')
+      .eq('school_id', schoolId);
+
+    if (!fallbackResult.error && Array.isArray(fallbackResult.data)) {
+      setTeachers(fallbackResult.data.map((teacher: any) => mapStudentFromDB({ ...teacher, role: 'teacher' })));
+      return;
+    }
+
+    setTeachers([]);
+    const message = orderedResult.error?.message || fallbackResult.error?.message;
+    if (message) {
+      notify(`Failed to fetch teachers from public.teachers: ${message}`);
+    }
+  };
+
+  const fetchParents = async () => {
+    const schoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('parents')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setParents(data);
+      return;
+    }
+
+    if (error && /created_at|column|schema cache|does not exist/i.test(error.message || '')) {
+      const fallbackResult = await supabase
+        .from('parents')
+        .select('*')
+        .eq('school_id', schoolId);
+
+      if (!fallbackResult.error && fallbackResult.data) {
+        setParents(fallbackResult.data);
+      }
+    }
+  };
+
+  const fetchStudentServiceStaff = async () => {
+    const schoolId = await requireSchoolId();
+    const orderedResult = await supabase
+      .schema('public')
+      .from('student_services')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!orderedResult.error && Array.isArray(orderedResult.data)) {
+      setStudentServiceStaff(orderedResult.data.map((staff: any) => mapStudentFromDB({ ...staff, role: 'student_service' })));
+      return;
+    }
+
+    const fallbackResult = await supabase
+      .schema('public')
+      .from('student_services')
+      .select('*')
+      .eq('school_id', schoolId);
+
+    if (!fallbackResult.error && Array.isArray(fallbackResult.data)) {
+      setStudentServiceStaff(fallbackResult.data.map((staff: any) => mapStudentFromDB({ ...staff, role: 'student_service' })));
+      return;
+    }
+
+    setStudentServiceStaff([]);
+  };
+
+  const fetchTotalEarnings = async () => {
+    const schoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('student_payments')
+      .select('amount_mmk, status')
+      .eq('school_id', schoolId);
+
+    if (error) {
+      setTotalEarningMMK(0);
+      return;
+    }
+
+    const total = (data || []).reduce((sum: number, row: any) => {
+      const status = String(row?.status || '').toLowerCase();
+      if (status !== 'paid') return sum;
+      return sum + Number(row?.amount_mmk || 0);
+    }, 0);
+
+    setTotalEarningMMK(Math.round(total));
+  };
+
+  const fetchClasses = async () => {
+    const schoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('classes')
+      .select('*, class_course_students(student_id)')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      const mappedClasses = data.map((classItem: any) => ({
+        ...classItem,
+        class_code: classItem.class_code || null,
+        outer_color: classItem.color || classItem.outer_color || '#f8fafc',
+        student_ids: Array.from(new Set((classItem.class_course_students || []).map((relation: any) => String(relation.student_id)))),
+        student_count: Array.from(new Set((classItem.class_course_students || []).map((relation: any) => String(relation.student_id)))).length,
+      }));
+      setClasses(mappedClasses);
+    }
+  };
+
+  const buildNextClassCode = useCallback((name: string, excludeClassId?: string) => {
+    const base = normalizeClassCodeBase(name);
+    const prefixRegex = new RegExp(`^${base}(\\d+)$`);
+
+    const nextNumber = classes
+      .filter(classItem => (excludeClassId ? String(classItem.id) !== excludeClassId : true))
+      .reduce((max, classItem) => {
+        const existingCode = String(classItem.class_code || '');
+        const matched = existingCode.match(prefixRegex);
+        if (!matched) return max;
+        const parsed = Number(matched[1]);
+        if (!Number.isFinite(parsed)) return max;
+        return Math.max(max, parsed);
+      }, 0) + 1;
+
+    return `${base}${nextNumber}`;
+  }, [classes]);
+
+  const uploadClassImage = async (file: File) => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `class-${Date.now()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from('class_image')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('class_image')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded image URL.');
+    }
+
+    return data.publicUrl;
+  };
+
+  const uploadAnnouncementAttachment = async (file: File) => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `att-${Date.now()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from('announcements')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('announcements')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded file URL.');
+    }
+
+    return data.publicUrl;
+  };
+
+  const uploadStudentProfileImage = async (file: File) => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `profiles/student-${Date.now()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from('student_profile')
+      .upload(filePath, file, {
+        upsert: false,
+        contentType: file.type || 'image/jpeg',
+        cacheControl: '3600',
+      });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('student_profile')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded student profile URL.');
+    }
+
+    return data.publicUrl;
+  };
+
+  const createClassWithStudents = async () => {
+    try {
+      if (!className.trim()) {
+        notify('Please enter a class name.');
+        return;
+      }
+
+      let imageUrl = '';
+
+      if (classImage) {
+        imageUrl = await uploadClassImage(classImage);
+      }
+
+      const nextClassCode = buildNextClassCode(className);
+
+      const schoolId = await requireSchoolId();
+      const insertPayload = isClassCodeSupported
+        ? { name: className, image_url: imageUrl, color: classOuterColor, class_code: nextClassCode, school_id: schoolId }
+        : { name: className, image_url: imageUrl, color: classOuterColor, school_id: schoolId };
+
+      let classData: any = null;
+      let classError: any = null;
+
+      {
+        const result = await supabase
+          .from('classes')
+          .insert([insertPayload])
+          .select()
+          .maybeSingle();
+        classData = result.data;
+        classError = result.error;
+      }
+
+      if (classError && /class_code/i.test(classError.message || '')) {
+        setIsClassCodeSupported(false);
+        const fallbackResult = await supabase
+          .from('classes')
+          .insert([{ name: className, image_url: imageUrl, color: classOuterColor, school_id: schoolId }])
+          .select()
+          .maybeSingle();
+        classData = fallbackResult.data;
+        classError = fallbackResult.error;
+      }
+
+      if (classError) throw classError;
+
+      const createdClass = classData || { ...insertPayload, id: 'temp-' + Date.now() };
+
+      setClasses(prev => [{ ...createdClass, class_code: createdClass.class_code || (isClassCodeSupported ? nextClassCode : null), color: classOuterColor, outer_color: classOuterColor, student_ids: [], student_count: 0 }, ...prev]);
+      notify('Class created successfully!');
+      setClassName('');
+      setClassImage(null);
+      setClassOuterColor('#f8fafc');
+    } catch (err: any) {
+      console.error(err);
+      notify(`Error creating class: ${err?.message || 'Please try again.'}`);
+    }
+  };
+
+  const startEditClass = (classItem: any) => {
+    setEditingClassId(String(classItem.id));
+    setClassName(classItem.name || '');
+    setClassOuterColor(classItem.color || classItem.outer_color || '#f8fafc');
+    setClassImage(null);
+  };
+
+  const cancelEditClass = () => {
+    setEditingClassId(null);
+    setClassName('');
+    setClassImage(null);
+    setClassOuterColor('#f8fafc');
+  };
+
+  const saveClassEdits = async () => {
+    if (!editingClassId) return;
+    if (!className.trim()) {
+      notify('Please enter a class name.');
+      return;
+    }
+
+    try {
+      const targetClass = classes.find(classItem => String(classItem.id) === editingClassId);
+      let imageUrl = targetClass?.image_url || '';
+      const classCode = buildNextClassCode(className, editingClassId);
+
+      if (classImage) {
+        imageUrl = await uploadClassImage(classImage);
+      }
+
+      const schoolId = await requireSchoolId();
+      const updatePayload = isClassCodeSupported
+        ? { name: className, image_url: imageUrl, color: classOuterColor, class_code: classCode, school_id: schoolId }
+        : { name: className, image_url: imageUrl, color: classOuterColor, school_id: schoolId };
+
+      let error: any = null;
+
+      {
+        const result = await supabase
+          .from('classes')
+          .update(updatePayload)
+          .eq('id', editingClassId);
+        error = result.error;
+      }
+
+      if (error && /class_code/i.test(error.message || '')) {
+        setIsClassCodeSupported(false);
+        const fallbackResult = await supabase
+          .from('classes')
+          .update({ name: className, image_url: imageUrl, color: classOuterColor, school_id: schoolId })
+          .eq('id', editingClassId);
+        error = fallbackResult.error;
+      }
+
+      if (error) throw error;
+
+      setClasses(prev => prev.map(classItem => {
+        if (String(classItem.id) !== editingClassId) return classItem;
+        return {
+          ...classItem,
+          name: className,
+          class_code: isClassCodeSupported ? classCode : (classItem.class_code || null),
+          image_url: imageUrl,
+          color: classOuterColor,
+          outer_color: classOuterColor,
+          student_ids: classItem.student_ids || [],
+          student_count: classItem.student_count ?? (classItem.student_ids || []).length,
+        };
+      }));
+
+      notify('Class updated successfully.');
+      cancelEditClass();
+    } catch (error: any) {
+      console.error('Edit class error:', error);
+      notify(`Failed to update class: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const exportMonthlyAttendancePdf = useCallback(async (
+    contextType: AttendanceContextType,
+    contextId: string,
+    month: string,
+    studentList: Array<{ id: string; name: string }>,
+    contextLabel?: string
+  ) => {
+    if (!month) {
+      notify('Please choose a month to export.');
+      return;
+    }
+
+    if (!contextId) {
+      notify('Please choose a class or subject first.');
+      return;
+    }
+
+    const [yearStr, monthStr] = month.split('-');
+    const year = Number(yearStr);
+    const monthNumber = Number(monthStr);
+    if (!Number.isFinite(year) || !Number.isFinite(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+      notify('Invalid month selected.');
+      return;
+    }
+
+    const monthStart = `${month}-01`;
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    const monthEnd = `${month}-${String(lastDay).padStart(2, '0')}`;
+
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('student_id, status, attendance_date')
+      .eq('context_type', contextType)
+      .eq('context_id', contextId)
+      .gte('attendance_date', monthStart)
+      .lte('attendance_date', monthEnd)
+      .order('attendance_date', { ascending: true });
+
+    if (error) {
+      console.error('Attendance export query failed:', error);
+      notify(`Failed to export attendance: ${error.message}`);
+      return;
+    }
+
+    const countsByStudent: Record<string, { present: number; absent: number; late: number; total: number }> = {};
+    (data || []).forEach((row: any) => {
+      const studentId = String(row.student_id);
+      if (!countsByStudent[studentId]) {
+        countsByStudent[studentId] = { present: 0, absent: 0, late: 0, total: 0 };
+      }
+      if (row.status === 'P') countsByStudent[studentId].present += 1;
+      if (row.status === 'A') countsByStudent[studentId].absent += 1;
+      if (row.status === 'L') countsByStudent[studentId].late += 1;
+      countsByStudent[studentId].total += 1;
+    });
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const monthLabel = new Date(year, monthNumber - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const headerTitle = `Attendance Report - ${monthLabel}`;
+    const subTitle = `${contextType.toUpperCase()}: ${contextLabel || contextId}`;
+
+    doc.setFontSize(18);
+    doc.text(headerTitle, 40, 40);
+    doc.setFontSize(11);
+    doc.text(subTitle, 40, 60);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 78);
+
+    let y = 110;
+    const lineHeight = 20;
+    const columns = [
+      { label: 'Student Name', x: 40 },
+      { label: 'Student ID', x: 260 },
+      { label: 'Present', x: 430 },
+      { label: 'Absent', x: 510 },
+      { label: 'Late', x: 580 },
+      { label: 'Marked Days', x: 650 },

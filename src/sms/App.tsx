@@ -1,0 +1,5552 @@
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { jsPDF } from 'jspdf';
+import * as XLSX from 'xlsx';
+import {
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, AreaChart, Area, Cell, RadarChart, PolarGrid, PolarAngleAxis, Radar
+} from 'recharts';
+import { Status, Student, PageId, StudentPermissions } from './types';
+import { supabase } from './supabaseClient';
+import { authService } from './services/authService';
+import { getCurrentTenantContext, withSchoolId } from './services/tenantService';
+import { verifySchoolAdminPassword, updateSchoolLoginPassword } from './services/adminSecurity';
+import { DEFAULT_STAFF_ALLOWED_PAGES, normalizeStaffAllowedPages } from './utils/staffPermissions';
+import CreateSchoolPage from './components/CreateSchoolPage';
+import StaffLogin from './components/StaffLogin';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import StudentDirectory from './components/StudentDirectory';
+import ParentDirectory from './components/ParentDirectory';
+import ParentDetailPage from './components/ParentDetailPage';
+import RegistrationHub from './components/RegistrationHub';
+import TeacherRegistrationHub from './components/TeacherRegistrationHub';
+import StudentServiceBatchRegister from './components/StudentServiceBatchRegister';
+import AttendanceProtocol from './components/AttendanceProtocol';
+import LiveCalendar from './components/LiveCalendar';
+import HomeworkManager from './components/HomeworkManager';
+import AboutSchool from './components/AboutSchool';
+import ReportCardPage from './components/Reportcard';
+import StudentAchievements from './components/StudentAchievements';
+import ExamManagementPage from './components/exammangement.tsx';
+import NoticeBoard from './components/NoticeBoard';
+import NoticeDetailPage from './components/NoticeDetailPage';
+import ClassAnnouncements from './components/ClassAnnouncements';
+import PaymentFinanceHub from './components/PaymentFinanceHub';
+import SecurityPermission from './components/Modals/SecurityPermission';
+import MessagesOversight from './components/MessagesOversight';
+import ClassGroupManagement from './components/ClassGroupManagement';
+import AttendanceTaker from './components/AttendanceTaker';
+import TeacherAttendance from './components/TeacherAttendance';
+import { VideoConference } from '../shared/components/VideoConference';
+import DataArchive from './components/DataArchive';
+
+import EnrollmentModal from './components/Modals/EnrollmentModal';
+import TeacherEnrollmentModal from './components/Modals/TeacherEnrollmentModal';
+import EditModal from './components/Modals/EditModal';
+import PermissionsModal from './components/Modals/PermissionsModal';
+import { buildParentEntries } from './components/parentDirectoryUtils';
+import logoIem from './src/LOGO_IEM.png';
+
+const DEFAULT_AVATAR = logoIem;
+
+const INITIAL_PERMISSIONS: StudentPermissions = {
+  neuralSync: true,
+  libraryAccess: true,
+  examEntry: true,
+  apiAccess: false
+};
+
+const INITIAL_STUDENTS: Student[] = [];
+
+const INITIAL_SUBJECTS: any[] = [];
+
+const INITIAL_TEACHERS: Student[] = [];
+
+const INITIAL_LIBRARY: any[] = [];
+
+const INITIAL_EXAMS: any[] = [];
+
+const INITIAL_HOMEWORK: any[] = [];
+
+const INITIAL_PROGRAMS: any[] = [];
+const INITIAL_PARENTS: any[] = [];
+
+type AttendanceContextType = 'class' | 'subject';
+const CLOUD_SYNC_INTERVAL_SECONDS = 10;
+const DEVELOPER_MODE_TAP_TARGET = 10;
+const DEVELOPER_MODE_TAP_RESET_MS = 12000;
+const DEVELOPER_MODE_PASSWORD = 'admin0000';
+
+const isCashRecordsSchemaMissing = (message?: string | null) => {
+  const text = String(message || '').toLowerCase();
+  return text.includes('cash_records') && (
+    /relation|does not exist|column/.test(text)
+    || text.includes('could not find the table')
+    || text.includes('schema cache')
+  );
+};
+
+const normalizeClassCodeBase = (name: string) => {
+  const sanitized = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return sanitized || 'class';
+};
+
+const getLocalIsoDate = (date: Date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const isCourseAssignmentSchemaMissing = (message?: string | null) => {
+  const text = (message || '').toLowerCase();
+  return (
+    /relation|does not exist|column/.test(text)
+    || text.includes('could not find the table')
+    || text.includes('schema cache')
+  );
+};
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\d{6,15}$/;
+
+const isValidEmail = (value: string) => EMAIL_PATTERN.test(value.trim());
+const normalizeEmailValue = (value: string) => value.trim().toLowerCase();
+const normalizeDigits = (value: string) => value.replace(/\D/g, '');
+const isValidPhoneDigits = (value: string) => PHONE_PATTERN.test(normalizeDigits(value));
+const toInternationalPhone = (countryCode: string, phoneValue: string) => {
+  const normalizedCountryCode = String(countryCode || '').trim() || '+1';
+  const normalizedPhone = normalizeDigits(phoneValue);
+  return `${normalizedCountryCode}${normalizedPhone}`;
+};
+const normalizeOptionalText = (value: unknown) => {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+};
+const parseOptionalInteger = (value: unknown) => {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) return null;
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+const parseOptionalDecimal = (value: unknown) => {
+  const normalized = String(value ?? '').trim().replace(/,/g, '');
+  if (!normalized) return null;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+const calculateAgeFromDateOfBirth = (value: string) => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return null;
+
+  const birthDate = new Date(normalized);
+  if (Number.isNaN(birthDate.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  const dayDiff = today.getDate() - birthDate.getDate();
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
+};
+
+type EmailRegistryKind = 'student' | 'parent' | 'teacher' | 'staff';
+type EmailRegistryField = 'email' | 'parent_email' | 'secondary_parent_email';
+type EmailRegistryEntry = {
+  email: string;
+  kind: EmailRegistryKind;
+  field: EmailRegistryField;
+  name: string;
+  recordId: string;
+};
+type EmailCheck = {
+  email: string;
+  label: string;
+  allowExistingParentEmail?: boolean;
+};
+
+const addEmailRegistryEntry = (
+  registry: Map<string, EmailRegistryEntry[]>,
+  entry: EmailRegistryEntry | null | undefined
+) => {
+  if (!entry?.email) return;
+  const normalizedEmail = normalizeEmailValue(entry.email);
+  if (!normalizedEmail) return;
+
+  const nextEntry = {
+    ...entry,
+    email: normalizedEmail,
+  };
+  const existingEntries = registry.get(normalizedEmail) || [];
+  existingEntries.push(nextEntry);
+  registry.set(normalizedEmail, existingEntries);
+};
+
+const describeEmailRegistryEntries = (entries: EmailRegistryEntry[]) => {
+  const descriptions = Array.from(new Set(entries.map((entry) => {
+    if (entry.kind === 'parent') {
+      const relationship = entry.field === 'secondary_parent_email' ? 'secondary parent' : 'primary parent';
+      return `${relationship}${entry.name ? ` (${entry.name})` : ''}`;
+    }
+
+    const kindLabel = entry.kind === 'staff' ? 'staff account' : `${entry.kind} account`;
+    return `${kindLabel}${entry.name ? ` (${entry.name})` : ''}`;
+  })));
+
+  if (descriptions.length <= 1) return descriptions[0] || 'an existing record';
+  if (descriptions.length === 2) return `${descriptions[0]} and ${descriptions[1]}`;
+
+  return `${descriptions.slice(0, -1).join(', ')}, and ${descriptions[descriptions.length - 1]}`;
+};
+
+const getEmailConflictMessages = (
+  checks: EmailCheck[],
+  registry: Map<string, EmailRegistryEntry[]>
+) => {
+  const inputDuplicateMessages = new Set<string>();
+  const registryMessages = new Set<string>();
+  const seenInputs = new Map<string, string>();
+
+  checks.forEach((check) => {
+    const normalizedEmail = normalizeEmailValue(check.email);
+    if (!normalizedEmail) return;
+
+    const existingLabel = seenInputs.get(normalizedEmail);
+    if (existingLabel && existingLabel !== check.label) {
+      inputDuplicateMessages.add(`${check.label} matches ${existingLabel.toLowerCase()}.`);
+      return;
+    }
+
+    seenInputs.set(normalizedEmail, check.label);
+  });
+
+  checks.forEach((check) => {
+    const normalizedEmail = normalizeEmailValue(check.email);
+    if (!normalizedEmail) return;
+
+    const matches = (registry.get(normalizedEmail) || []).filter((entry) => {
+      if (check.allowExistingParentEmail && entry.kind === 'parent') {
+        return false;
+      }
+      return true;
+    });
+
+    if (matches.length > 0) {
+      registryMessages.add(`${check.label} already belongs to ${describeEmailRegistryEntries(matches)}.`);
+    }
+  });
+
+  return [...inputDuplicateMessages, ...registryMessages];
+};
+
+const createSchoolEmailRegistry = async (schoolId: string) => {
+  const [studentsResult, teachersResult, staffResult] = await Promise.all([
+    supabase
+      .from('students')
+      .select('id, name, email, parent_name, parent_email, secondary_parent_name, secondary_parent_email')
+      .eq('school_id', schoolId),
+    supabase
+      .from('teachers')
+      .select('id, name, email')
+      .eq('school_id', schoolId),
+    supabase
+      .from('student_services')
+      .select('id, name, email')
+      .eq('school_id', schoolId),
+  ]);
+
+  const registry = new Map<string, EmailRegistryEntry[]>();
+
+  if (studentsResult.error) throw studentsResult.error;
+  if (teachersResult.error) throw teachersResult.error;
+  if (staffResult.error) throw staffResult.error;
+
+  (studentsResult.data || []).forEach((student: any) => {
+    addEmailRegistryEntry(registry, {
+      email: String(student.email || ''),
+      kind: 'student',
+      field: 'email',
+      name: String(student.name || ''),
+      recordId: String(student.id || ''),
+    });
+    addEmailRegistryEntry(registry, {
+      email: String(student.parent_email || ''),
+      kind: 'parent',
+      field: 'parent_email',
+      name: String(student.parent_name || student.name || ''),
+      recordId: String(student.id || ''),
+    });
+    addEmailRegistryEntry(registry, {
+      email: String(student.secondary_parent_email || ''),
+      kind: 'parent',
+      field: 'secondary_parent_email',
+      name: String(student.secondary_parent_name || student.name || ''),
+      recordId: String(student.id || ''),
+    });
+  });
+
+  (teachersResult.data || []).forEach((teacher: any) => {
+    addEmailRegistryEntry(registry, {
+      email: String(teacher.email || ''),
+      kind: 'teacher',
+      field: 'email',
+      name: String(teacher.name || ''),
+      recordId: String(teacher.id || ''),
+    });
+  });
+
+  (staffResult.data || []).forEach((staff: any) => {
+    addEmailRegistryEntry(registry, {
+      email: String(staff.email || ''),
+      kind: 'staff',
+      field: 'email',
+      name: String(staff.name || ''),
+      recordId: String(staff.id || ''),
+    });
+  });
+
+  return registry;
+};
+
+const getInitialEnrollData = (type: 'New' | 'Old' = 'New') => ({
+  name: '',
+  email: '',
+  role: 'student' as const,
+  type,
+  selectedStudentId: '',
+  selectedClassIds: [] as string[],
+  selectedBatchCodes: [] as string[],
+  selectedClassCourseIds: [] as string[],
+  dateOfBirth: '',
+  parentName: '',
+  parentCountryCode: '+1',
+  parentNumber: '',
+  parentEmail: '',
+  secondaryParentName: '',
+  secondaryParentCountryCode: '+1',
+  secondaryParentNumber: '',
+  secondaryParentEmail: '',
+  studentCountryCode: '+1',
+  phone: '',
+  address: '',
+  studentschool_id: '',
+});
+
+const getInitialTeacherEnrollData = () => ({
+  name: '',
+  email: '',
+  phone: '',
+  address: '',
+  date_of_birth: '',
+  age: '',
+  gender: 'Male' as const,
+  nrc: '',
+  marital_status: '',
+  race: '',
+  religion: '',
+  salary: '',
+  job_position: '',
+  educational_background: '',
+  avatarFile: null,
+  school_id: '',
+});
+
+interface AppProps {
+  onSwitch?: () => void;
+  schoolId?: string;
+  schoolName?: string;
+  onSchoolIdChange?: (newId: string | undefined, newName?: string) => void;
+  isStudentService?: boolean;
+}
+
+const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdChange, isStudentService }) => {
+  const [allowedPages, setAllowedPages] = useState<string[] | undefined>(undefined);
+  const [onboardingStatus, setOnboardingStatus] = useState<'loading' | 'needs-school' | 'needs-auth' | 'ready'>('loading');
+  const [authStateVersion, setAuthStateVersion] = useState(0);
+  const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
+  const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [selectedClassAttendanceId, setSelectedClassAttendanceId] = useState<string | null>(null);
+  const [selectedClassCourse, setSelectedClassCourse] = useState<{ id: string; name: string; classId: string; className?: string } | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'info' } | null>(null);
+  const [cloudSyncCountdown, setCloudSyncCountdown] = useState(CLOUD_SYNC_INTERVAL_SECONDS);
+  const [isCloudSyncRunning, setIsCloudSyncRunning] = useState(false);
+  const isCloudSyncRunningRef = useRef(false);
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | undefined>(undefined);
+  const developerTapCountRef = useRef(0);
+  const developerTapResetTimeoutRef = useRef<number | null>(null);
+  const [isDeveloperAuthModalOpen, setIsDeveloperAuthModalOpen] = useState(false);
+  const [developerAuthPassword, setDeveloperAuthPassword] = useState('');
+  const [developerAuthError, setDeveloperAuthError] = useState<string | null>(null);
+  const [isDeveloperModeModalOpen, setIsDeveloperModeModalOpen] = useState(false);
+  const [developerSchoolPassword, setDeveloperSchoolPassword] = useState('');
+  const [developerSchoolPasswordConfirm, setDeveloperSchoolPasswordConfirm] = useState('');
+  const [developerSchoolPasswordError, setDeveloperSchoolPasswordError] = useState<string | null>(null);
+  const [developerSchoolPasswordStatus, setDeveloperSchoolPasswordStatus] = useState<string | null>(null);
+  const [isDeveloperSchoolPasswordSaving, setIsDeveloperSchoolPasswordSaving] = useState(false);
+
+  // Stateful Data
+  const [students, setStudents] = useState<Student[]>(INITIAL_STUDENTS);
+  const [attendanceStudents, setAttendanceStudents] = useState<Student[]>(INITIAL_STUDENTS);
+  const [subjects, setSubjects] = useState(INITIAL_SUBJECTS);
+  const [teachers, setTeachers] = useState<Student[]>(INITIAL_TEACHERS);
+  const [libraryItems, setLibraryItems] = useState(INITIAL_LIBRARY);
+  const [exams, setExams] = useState(INITIAL_EXAMS);
+  const [homeworks, setHomeworks] = useState(INITIAL_HOMEWORK);
+  const [programs, setPrograms] = useState(INITIAL_PROGRAMS);
+  const [parents, setParents] = useState(INITIAL_PARENTS);
+  const [currentCashBalanceMMK, setCurrentCashBalanceMMK] = useState(0);
+  const [policies, setPolicies] = useState({
+    mfaRequired: true,
+    ipWhitelist: false,
+    sessionTimeout: true,
+    bruteForceProtection: true,
+    dataEncryption: true
+  });
+
+  // Announcement Sections Data
+  const [events, setEvents] = useState<any[]>([]);
+  const [studentActivities, setStudentActivities] = useState<any[]>([]);
+  const [parentAnnouncements, setParentAnnouncements] = useState<any[]>([]);
+  const [liveIntelData, setLiveIntelData] = useState<any[]>([]);
+
+  // Filters
+  const [selectedDate, setSelectedDate] = useState('');
+  const [classes, setClasses] = useState<any[]>([]);
+  // const [schoolId, setSchoolId] = useState<string>(''); // Removed in favor of prop schoolId
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [className, setClassName] = useState('');
+  const [classImage, setClassImage] = useState<File | null>(null);
+  const [classOuterColor, setClassOuterColor] = useState('#f8fafc');
+  const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [isClassCodeSupported, setIsClassCodeSupported] = useState(true);
+
+  // Attendance State (Subject-specific)
+  const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
+  const [attendanceDate, setAttendanceDate] = useState(() => getLocalIsoDate());
+  // Mapping: subjectId -> date -> studentId -> status
+  const [subjectAttendanceStore, setSubjectAttendanceStore] = useState<Record<string, Record<string, Record<string, 'P' | 'A' | 'L'>>>>({});
+  const [isAttendanceContextNameSupported, setIsAttendanceContextNameSupported] = useState(true);
+
+  // Modals
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [enrollData, setEnrollData] = useState(() => getInitialEnrollData());
+  const [enrollClassCourses, setEnrollClassCourses] = useState<Array<{ id: string; name: string; class_id: string }>>([]);
+  const [isEnrollClassCoursesLoading, setIsEnrollClassCoursesLoading] = useState(false);
+  const [isBatchRegistering, setIsBatchRegistering] = useState(false);
+  const [isTeacherEnrollModalOpen, setIsTeacherEnrollModalOpen] = useState(false);
+  const [teacherEnrollData, setTeacherEnrollData] = useState(() => getInitialTeacherEnrollData());
+  const [isBatchTeacherRegistering, setIsBatchTeacherRegistering] = useState(false);
+  const [studentServiceStaff, setStudentServiceStaff] = useState<Student[]>([]);
+  const [isStudentServiceEnrollModalOpen, setIsStudentServiceEnrollModalOpen] = useState(false);
+  const [studentServiceEnrollData, setStudentServiceEnrollData] = useState(() => getInitialTeacherEnrollData());
+  const [isBatchStudentServiceRegistering, setIsBatchStudentServiceRegistering] = useState(false);
+  const [studentProfileImage, setStudentProfileImage] = useState<File | null>(null);
+  const enrollAbortCounterRef = useRef(0);
+  const [editTarget, setEditTarget] = useState<{ type: string, data: any } | null>(null);
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
+  const [permTarget, setPermTarget] = useState<Student | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string, onConfirm: () => void | Promise<void> } | null>(null);
+  const [studentDeleteDialog, setStudentDeleteDialog] = useState<{ id: string; name: string; entityType: 'student' | 'teacher' } | null>(null);
+  const [studentDeleteNameInput, setStudentDeleteNameInput] = useState('');
+  const [adminDeletePassword, setAdminDeletePassword] = useState('');
+  const [studentDeleteError, setStudentDeleteError] = useState<string | null>(null);
+  const [isStudentDeleteSubmitting, setIsStudentDeleteSubmitting] = useState(false);
+  const [studentEditAuthDialog, setStudentEditAuthDialog] = useState<Student | null>(null);
+  const [studentEditAuthPassword, setStudentEditAuthPassword] = useState('');
+  const [studentEditAuthError, setStudentEditAuthError] = useState<string | null>(null);
+  const [isStudentEditAuthSubmitting, setIsStudentEditAuthSubmitting] = useState(false);
+  const [classDeleteDialog, setClassDeleteDialog] = useState<{ id: string; name: string; onDeleted?: () => void } | null>(null);
+  const [classDeleteNameInput, setClassDeleteNameInput] = useState('');
+  const [classAdminDeletePassword, setClassAdminDeletePassword] = useState('');
+  const [classDeleteError, setClassDeleteError] = useState<string | null>(null);
+  const [isClassDeleteSubmitting, setIsClassDeleteSubmitting] = useState(false);
+  const [newStudentCredentials, setNewStudentCredentials] = useState<{ name: string; email: string; password: string } | null>(null);
+  const [isGlobalCreateModalOpen, setIsGlobalCreateModalOpen] = useState<'events' | 'student-activities' | 'announcements-parent' | 'live-intel' | null>(null);
+  const [isGlobalCreateSubmitting, setIsGlobalCreateSubmitting] = useState(false);
+  const [globalCreateData, setGlobalCreateData] = useState<any>({});
+  const [globalCreateFile, setGlobalCreateFile] = useState<File | null>(null);
+  const [globalEditId, setGlobalEditId] = useState<string | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewPdfTitle, setPreviewPdfTitle] = useState('');
+
+  const handleGlobalSave = async (type: string, payload: any) => {
+    if (!schoolId) return;
+    setIsGlobalCreateSubmitting(true);
+    try {
+      let tableName = '';
+      if (type === 'events') tableName = 'events';
+      else if (type === 'student-activities') tableName = 'student_activities';
+      else if (type === 'announcements-parent') tableName = 'parent_announcements';
+      else if (type === 'live-intel') tableName = 'live_intel';
+
+      if (!tableName) throw new Error('Invalid creation type');
+
+      let attachmentUrl = payload.attachment_url || payload.image_url || null;
+      if (globalCreateFile) {
+        attachmentUrl = await uploadAnnouncementAttachment(globalCreateFile);
+      }
+
+      // Build a clean payload for the specific table to avoid column mismatch errors
+      let cleanPayload: any = { school_id: schoolId };
+      if (type === 'events') {
+        cleanPayload.title = payload.title || '';
+        cleanPayload.description = payload.description || '';
+        cleanPayload.event_date = payload.event_date || new Date().toISOString().split('T')[0];
+        cleanPayload.type = payload.type || 'General';
+        cleanPayload.image_url = attachmentUrl; // Events uses image_url
+        cleanPayload.location = payload.location || '';
+      } else if (type === 'student-activities') {
+        cleanPayload.name = payload.name || '';
+        cleanPayload.description = payload.description || '';
+        cleanPayload.activity_type = payload.activity_type || 'Club';
+        cleanPayload.attachment_url = attachmentUrl;
+      } else if (type === 'announcements-parent') {
+        cleanPayload.title = payload.title || '';
+        cleanPayload.message = payload.message || '';
+        cleanPayload.importance = payload.importance || 'Medium';
+        cleanPayload.attachment_url = attachmentUrl;
+      } else if (type === 'live-intel') {
+        cleanPayload.event_type = payload.event_type || 'System';
+        cleanPayload.severity = payload.severity || 'Info';
+        cleanPayload.details = { log: payload.details_text || (payload.details?.log) || 'Institutional update logged.' };
+        cleanPayload.attachment_url = attachmentUrl;
+      }
+
+      let saveError;
+      if (globalEditId) {
+        const { error } = await supabase
+          .from(tableName)
+          .update(cleanPayload)
+          .eq('id', globalEditId)
+          .eq('school_id', schoolId);
+        saveError = error;
+      } else {
+        const { error } = await supabase
+          .from(tableName)
+          .insert([cleanPayload]);
+        saveError = error;
+      }
+
+      if (saveError) throw saveError;
+
+      notify(`${type.replace('-', ' ').toUpperCase()} successfully ${globalEditId ? 'updated' : 'published'}.`);
+      setIsGlobalCreateModalOpen(null);
+      setGlobalEditId(null);
+      setGlobalCreateFile(null); // Clear file
+      // Refresh current data
+      if (type === 'events') void fetchEvents();
+      else if (type === 'student-activities') void fetchStudentActivities();
+      else if (type === 'announcements-parent') void fetchParentAnnouncements();
+      else if (type === 'live-intel') void fetchLiveIntel();
+    } catch (err: any) {
+      console.error(`[GlobalSave] Error:`, err);
+      notify(`Error: ${err.message || 'Failed to save item'}`);
+    } finally {
+      setIsGlobalCreateSubmitting(false);
+    }
+  };
+
+  const openGlobalEdit = (type: any, item: any) => {
+    setGlobalEditId(item.id);
+    setIsGlobalCreateModalOpen(type);
+    setGlobalCreateData({ ...item, details_text: item.details?.log || '' });
+    setGlobalCreateFile(null);
+  };
+
+  const fetchEvents = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('event_date', { ascending: true });
+
+    if (!error && data) setEvents(data);
+  };
+
+  const fetchStudentActivities = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('student_activities')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setStudentActivities(data);
+  };
+
+  const fetchParentAnnouncements = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('parent_announcements')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setParentAnnouncements(data);
+  };
+
+  const fetchLiveIntel = async () => {
+    const currentSchoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('live_intel')
+      .select('*')
+      .eq('school_id', currentSchoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) setLiveIntelData(data);
+  };
+
+  const stats = useMemo(() => {
+    const totalStudents = allStudents.length || students.length;
+    const totalTeachers = teachers.length;
+
+    // Calculate parents from student records for dashboard consistency
+    const totalParents = buildParentEntries(allStudents.length > 0 ? allStudents : students).length;
+
+    const totalStudentServices = studentServiceStaff.length;
+    const maleStudents = students.filter(student => student.gender === 'Male').length;
+    const femaleStudents = students.filter(student => student.gender === 'Female').length;
+    const maleTeachers = teachers.filter(teacher => teacher.gender === 'Male').length;
+    const femaleTeachers = teachers.filter(teacher => teacher.gender === 'Female').length;
+
+    return {
+      totalStudents,
+      totalParents,
+      currentCashBalanceMMK,
+      totalTeachers,
+      totalStudentServices,
+      genderBreakdown: {
+        male: maleStudents,
+        female: femaleStudents,
+      },
+      teacherGenderBreakdown: {
+        male: maleTeachers,
+        female: femaleTeachers,
+      },
+    };
+  }, [students, teachers, parents, allStudents, currentCashBalanceMMK, studentServiceStaff]);
+
+  const notify = useCallback((message: string) => {
+    setNotification({ message, type: 'info' });
+    setTimeout(() => setNotification(null), 3000);
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      // 1. CLEAR ALL STATE SYNCHRONOUSLY FIRST
+      setStudents([]);
+      setAllStudents([]);
+      setAttendanceStudents([]);
+      setTeachers([]);
+      setParents([]);
+      setStudentServiceStaff([]);
+      setClasses([]);
+      setCurrentCashBalanceMMK(0);
+      setSubjects([]);
+      setLibraryItems([]);
+      setExams([]);
+      setHomeworks([]);
+      setPrograms([]);
+      setSelectedDate('');
+
+      await authService.signOut();
+      
+      // If student service, preserve school context but require re-auth
+      if (isStudentService && schoolId) {
+        setOnboardingStatus('needs-auth');
+      } else {
+        if (onSchoolIdChange) onSchoolIdChange(undefined);
+        setOnboardingStatus('needs-school');
+      }
+
+      notify('Logged out successfully.');
+      notify('Logged out successfully.');
+    } catch (error: any) {
+      notify(error?.message || 'Failed to log out.');
+    }
+  }, [notify, onSchoolIdChange]);
+
+  const requireSchoolId = useCallback(async () => {
+    if (schoolId) return schoolId;
+    const tenant = await getCurrentTenantContext();
+    return tenant.schoolId;
+  }, [schoolId]);
+
+  const handleSchoolProfileChange = useCallback((profile: { name?: string | null; logo_url?: string | null }) => {
+    if (Object.prototype.hasOwnProperty.call(profile, 'logo_url')) {
+      setSchoolLogoUrl(profile.logo_url || undefined);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(profile, 'name')) {
+      const nextSchoolName = profile.name || undefined;
+
+      if (onSchoolIdChange && schoolId) {
+        onSchoolIdChange(schoolId, nextSchoolName);
+      }
+    }
+  }, [onSchoolIdChange, schoolId]);
+
+  useEffect(() => {
+    const { data } = authService.onAuthStateChange(() => {
+      setAuthStateVersion(prev => prev + 1);
+      setOnboardingStatus('loading');
+    });
+
+    return () => {
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (developerTapResetTimeoutRef.current !== null) {
+        window.clearTimeout(developerTapResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Check onboarding status on mount
+  useEffect(() => {
+    let active = true;
+    let timerId: any = null;
+
+    const checkOnboarding = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!active) return;
+        if (!user) {
+          // If we have a school context in Student Service mode, require staff login
+          if (isStudentService && schoolId) {
+            setOnboardingStatus('needs-auth');
+          } else {
+            setOnboardingStatus('needs-school');
+          }
+          return;
+        }
+
+        // Fetch user permissions if Student Service mode
+        if (isStudentService) {
+          let resolvedStaffData: { permissions?: unknown } | null = null;
+          let permissionsQueryError: any = null;
+
+          {
+            const result = await supabase
+              .from('student_services')
+              .select('permissions')
+              .eq('auth_user_id', user.id)
+              .maybeSingle();
+
+            resolvedStaffData = result.data;
+            permissionsQueryError = result.error;
+          }
+
+          if (!resolvedStaffData && user.email) {
+            const fallbackResult = await supabase
+              .from('student_services')
+              .select('permissions')
+              .eq('email', user.email)
+              .maybeSingle();
+
+            resolvedStaffData = fallbackResult.data;
+            permissionsQueryError = permissionsQueryError || fallbackResult.error;
+          }
+
+          if (permissionsQueryError && !/permissions/i.test(permissionsQueryError.message || '')) {
+            throw permissionsQueryError;
+          }
+
+          if (!active) return;
+
+          if (resolvedStaffData) {
+            const normalizedPages = normalizeStaffAllowedPages(resolvedStaffData.permissions);
+            setAllowedPages(
+              resolvedStaffData.permissions === null || resolvedStaffData.permissions === undefined
+                ? DEFAULT_STAFF_ALLOWED_PAGES
+                : normalizedPages
+            );
+          } else {
+            setAllowedPages(DEFAULT_STAFF_ALLOWED_PAGES);
+          }
+        } else {
+          setAllowedPages(undefined); // Full access
+        }
+
+        let profile: any = null;
+        let profileError: any = null;
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+          if (!active) return;
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('school_id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          profile = data;
+          profileError = error;
+
+          if (!error && data) {
+            if (data.school_id && data.school_id !== schoolId && onSchoolIdChange) {
+              onSchoolIdChange(String(data.school_id));
+            }
+            break;
+          }
+
+          attempts++;
+          if (attempts < maxAttempts && active) {
+            await new Promise(resolve => {
+              timerId = setTimeout(resolve, 800 * attempts);
+            });
+          }
+        }
+
+        if (!active) return;
+
+        if (profileError || !profile?.school_id) {
+          setOnboardingStatus('needs-school');
+        } else {
+          setOnboardingStatus('ready');
+        }
+      } catch (err) {
+        if (!active) return;
+        console.error('Onboarding check failed:', err);
+        setOnboardingStatus('needs-school');
+      }
+    };
+    void checkOnboarding();
+
+    return () => {
+      active = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [authStateVersion, isStudentService, schoolId]);
+
+  useEffect(() => {
+    if (isDarkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [isDarkMode]);
+
+
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadSchoolBranding = async () => {
+      if (!schoolId || onboardingStatus !== 'ready') {
+        if (isActive) {
+          setSchoolLogoUrl(undefined);
+        }
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('schools')
+          .select('name, logo_url')
+          .eq('id', schoolId)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!isActive) return;
+
+        setSchoolLogoUrl(data?.logo_url ? String(data.logo_url) : undefined);
+        if (data?.name && onSchoolIdChange) {
+          onSchoolIdChange(schoolId, String(data.name));
+        }
+      } catch (err) {
+        console.error('Failed to load school branding:', err);
+        if (isActive) {
+          setSchoolLogoUrl(undefined);
+        }
+      }
+    };
+
+    void loadSchoolBranding();
+
+    return () => {
+      isActive = false;
+    };
+  }, [onboardingStatus, schoolId]);
+
+  const mapStudentFromDB = (student: any): Student => ({
+    ...(student as Student),
+    role: (student?.role || 'student') as Student['role'],
+    gender: (student?.gender || 'Male') as Student['gender'],
+    status: (student?.status || Status.PENDING) as Status,
+    attendanceRate: typeof student?.attendanceRate === 'number' ? student.attendanceRate : 0,
+    courseAttendance: Array.isArray(student?.courseAttendance) ? student.courseAttendance : [],
+    securityStatus: student?.securityStatus || { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+    studentschool_id: student?.studentschool_id || null,
+    teacherschool_id: student?.teacherschool_id || null,
+    staffschool_id: student?.staffschool_id || null,
+  });
+
+  const fetchStudentsByDate = async (date: string) => {
+    if (!date) return;
+    const schoolId = await requireSchoolId();
+
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    const { data, error } = await supabase
+      .schema('public')
+      .from('students')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setStudents(data.map(mapStudentFromDB));
+    }
+  };
+
+  const fetchAllStudents = async () => {
+    const schoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .schema('public')
+      .from('students')
+      .select('*')
+      .eq('school_id', schoolId);
+
+    if (!error && data) {
+      setAllStudents(data);
+    }
+  };
+
+  const fetchTeachers = async () => {
+    const schoolId = await requireSchoolId();
+    const orderedResult = await supabase
+      .schema('public')
+      .from('teachers')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!orderedResult.error && Array.isArray(orderedResult.data)) {
+      setTeachers(orderedResult.data.map((teacher: any) => mapStudentFromDB({ ...teacher, role: 'teacher' })));
+      return;
+    }
+
+    const fallbackResult = await supabase
+      .schema('public')
+      .from('teachers')
+      .select('*')
+      .eq('school_id', schoolId);
+
+    if (!fallbackResult.error && Array.isArray(fallbackResult.data)) {
+      setTeachers(fallbackResult.data.map((teacher: any) => mapStudentFromDB({ ...teacher, role: 'teacher' })));
+      return;
+    }
+
+    setTeachers([]);
+    const message = orderedResult.error?.message || fallbackResult.error?.message;
+    if (message) {
+      notify(`Failed to fetch teachers from public.teachers: ${message}`);
+    }
+  };
+
+  const fetchParents = async () => {
+    const schoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('parents')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setParents(data);
+      return;
+    }
+
+    if (error && /created_at|column|schema cache|does not exist/i.test(error.message || '')) {
+      const fallbackResult = await supabase
+        .from('parents')
+        .select('*')
+        .eq('school_id', schoolId);
+
+      if (!fallbackResult.error && fallbackResult.data) {
+        setParents(fallbackResult.data);
+      }
+    }
+  };
+
+  const fetchStudentServiceStaff = async () => {
+    const schoolId = await requireSchoolId();
+    const orderedResult = await supabase
+      .schema('public')
+      .from('student_services')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!orderedResult.error && Array.isArray(orderedResult.data)) {
+      setStudentServiceStaff(orderedResult.data.map((staff: any) => mapStudentFromDB({ ...staff, role: 'student_service' })));
+      return;
+    }
+
+    const fallbackResult = await supabase
+      .schema('public')
+      .from('student_services')
+      .select('*')
+      .eq('school_id', schoolId);
+
+    if (!fallbackResult.error && Array.isArray(fallbackResult.data)) {
+      setStudentServiceStaff(fallbackResult.data.map((staff: any) => mapStudentFromDB({ ...staff, role: 'student_service' })));
+      return;
+    }
+
+    setStudentServiceStaff([]);
+  };
+
+  const fetchCurrentCashBalance = async () => {
+    const schoolId = await requireSchoolId();
+    const { data: paymentRows, error: paymentError } = await supabase
+      .from('student_payments')
+      .select('amount_mmk, status')
+      .eq('school_id', schoolId);
+
+    if (paymentError) {
+      setCurrentCashBalanceMMK(0);
+      return;
+    }
+
+    const totalCashIn = (paymentRows || []).reduce((sum: number, row: any) => {
+      const status = String(row?.status || '').toLowerCase();
+      if (status !== 'paid') return sum;
+      return sum + Number(row?.amount_mmk || 0);
+    }, 0);
+
+    const { data: cashRecordRows, error: cashRecordError } = await supabase
+      .from('cash_records')
+      .select('amount_mmk')
+      .eq('school_id', schoolId);
+
+    if (cashRecordError) {
+      if (!isCashRecordsSchemaMissing(cashRecordError.message)) {
+        console.error('[Cash Records] Failed to calculate dashboard cash balance:', cashRecordError.message);
+      }
+      setCurrentCashBalanceMMK(Math.round(totalCashIn));
+      return;
+    }
+
+    const totalCashOut = (cashRecordRows || []).reduce(
+      (sum: number, row: any) => sum + Number(row?.amount_mmk || 0),
+      0
+    );
+
+    setCurrentCashBalanceMMK(Math.round(totalCashIn - totalCashOut));
+  };
+
+  const fetchClasses = async () => {
+    const schoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('classes')
+      .select('*, class_course_students(student_id)')
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      const mappedClasses = data.map((classItem: any) => ({
+        ...classItem,
+        class_code: classItem.class_code || null,
+        outer_color: classItem.color || classItem.outer_color || '#f8fafc',
+        student_ids: Array.from(new Set((classItem.class_course_students || []).map((relation: any) => String(relation.student_id)))),
+        student_count: Array.from(new Set((classItem.class_course_students || []).map((relation: any) => String(relation.student_id)))).length,
+      }));
+      setClasses(mappedClasses);
+    }
+  };
+
+  const buildNextClassCode = useCallback((name: string, excludeClassId?: string) => {
+    const base = normalizeClassCodeBase(name);
+    const prefixRegex = new RegExp(`^${base}(\\d+)$`);
+
+    const nextNumber = classes
+      .filter(classItem => (excludeClassId ? String(classItem.id) !== excludeClassId : true))
+      .reduce((max, classItem) => {
+        const existingCode = String(classItem.class_code || '');
+        const matched = existingCode.match(prefixRegex);
+        if (!matched) return max;
+        const parsed = Number(matched[1]);
+        if (!Number.isFinite(parsed)) return max;
+        return Math.max(max, parsed);
+      }, 0) + 1;
+
+    return `${base}${nextNumber}`;
+  }, [classes]);
+
+  const uploadClassImage = async (file: File) => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `class-${Date.now()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from('class_image')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('class_image')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded image URL.');
+    }
+
+    return data.publicUrl;
+  };
+
+  const uploadAnnouncementAttachment = async (file: File) => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `att-${Date.now()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from('announcements')
+      .upload(filePath, file, { upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('announcements')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded file URL.');
+    }
+
+    return data.publicUrl;
+  };
+
+  const uploadStudentProfileImage = async (file: File) => {
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const filePath = `profiles/student-${Date.now()}-${sanitizedName}`;
+
+    const { error } = await supabase.storage
+      .from('student_profile')
+      .upload(filePath, file, {
+        upsert: false,
+        contentType: file.type || 'image/jpeg',
+        cacheControl: '3600',
+      });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('student_profile')
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error('Failed to retrieve uploaded student profile URL.');
+    }
+
+    return data.publicUrl;
+  };
+
+  const createClassWithStudents = async () => {
+    try {
+      if (!className.trim()) {
+        notify('Please enter a class name.');
+        return;
+      }
+
+      let imageUrl = '';
+
+      if (classImage) {
+        imageUrl = await uploadClassImage(classImage);
+      }
+
+      const nextClassCode = buildNextClassCode(className);
+
+      const schoolId = await requireSchoolId();
+      const insertPayload = isClassCodeSupported
+        ? { name: className, image_url: imageUrl, color: classOuterColor, class_code: nextClassCode, school_id: schoolId }
+        : { name: className, image_url: imageUrl, color: classOuterColor, school_id: schoolId };
+
+      let classData: any = null;
+      let classError: any = null;
+
+      {
+        const result = await supabase
+          .from('classes')
+          .insert([insertPayload])
+          .select()
+          .maybeSingle();
+        classData = result.data;
+        classError = result.error;
+      }
+
+      if (classError && /class_code/i.test(classError.message || '')) {
+        setIsClassCodeSupported(false);
+        const fallbackResult = await supabase
+          .from('classes')
+          .insert([{ name: className, image_url: imageUrl, color: classOuterColor, school_id: schoolId }])
+          .select()
+          .maybeSingle();
+        classData = fallbackResult.data;
+        classError = fallbackResult.error;
+      }
+
+      if (classError) throw classError;
+
+      const createdClass = classData || { ...insertPayload, id: 'temp-' + Date.now() };
+
+      setClasses(prev => [{ ...createdClass, class_code: createdClass.class_code || (isClassCodeSupported ? nextClassCode : null), color: classOuterColor, outer_color: classOuterColor, student_ids: [], student_count: 0 }, ...prev]);
+      notify('Class created successfully!');
+      setClassName('');
+      setClassImage(null);
+      setClassOuterColor('#f8fafc');
+    } catch (err: any) {
+      console.error(err);
+      notify(`Error creating class: ${err?.message || 'Please try again.'}`);
+    }
+  };
+
+  const startEditClass = (classItem: any) => {
+    setEditingClassId(String(classItem.id));
+    setClassName(classItem.name || '');
+    setClassOuterColor(classItem.color || classItem.outer_color || '#f8fafc');
+    setClassImage(null);
+  };
+
+  const cancelEditClass = () => {
+    setEditingClassId(null);
+    setClassName('');
+    setClassImage(null);
+    setClassOuterColor('#f8fafc');
+  };
+
+  const saveClassEdits = async () => {
+    if (!editingClassId) return;
+    if (!className.trim()) {
+      notify('Please enter a class name.');
+      return;
+    }
+
+    try {
+      const targetClass = classes.find(classItem => String(classItem.id) === editingClassId);
+      let imageUrl = targetClass?.image_url || '';
+      const classCode = buildNextClassCode(className, editingClassId);
+
+      if (classImage) {
+        imageUrl = await uploadClassImage(classImage);
+      }
+
+      const schoolId = await requireSchoolId();
+      const updatePayload = isClassCodeSupported
+        ? { name: className, image_url: imageUrl, color: classOuterColor, class_code: classCode, school_id: schoolId }
+        : { name: className, image_url: imageUrl, color: classOuterColor, school_id: schoolId };
+
+      let error: any = null;
+
+      {
+        const result = await supabase
+          .from('classes')
+          .update(updatePayload)
+          .eq('id', editingClassId);
+        error = result.error;
+      }
+
+      if (error && /class_code/i.test(error.message || '')) {
+        setIsClassCodeSupported(false);
+        const fallbackResult = await supabase
+          .from('classes')
+          .update({ name: className, image_url: imageUrl, color: classOuterColor, school_id: schoolId })
+          .eq('id', editingClassId);
+        error = fallbackResult.error;
+      }
+
+      if (error) throw error;
+
+      setClasses(prev => prev.map(classItem => {
+        if (String(classItem.id) !== editingClassId) return classItem;
+        return {
+          ...classItem,
+          name: className,
+          class_code: isClassCodeSupported ? classCode : (classItem.class_code || null),
+          image_url: imageUrl,
+          color: classOuterColor,
+          outer_color: classOuterColor,
+          student_ids: classItem.student_ids || [],
+          student_count: classItem.student_count ?? (classItem.student_ids || []).length,
+        };
+      }));
+
+      notify('Class updated successfully.');
+      cancelEditClass();
+    } catch (error: any) {
+      console.error('Edit class error:', error);
+      notify(`Failed to update class: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const exportMonthlyAttendancePdf = useCallback(async (
+    contextType: AttendanceContextType,
+    contextId: string,
+    month: string,
+    studentList: Array<{ id: string; name: string }>,
+    contextLabel?: string
+  ) => {
+    if (!month) {
+      notify('Please choose a month to export.');
+      return;
+    }
+
+    if (!contextId) {
+      notify('Please choose a class or subject first.');
+      return;
+    }
+
+    const [yearStr, monthStr] = month.split('-');
+    const year = Number(yearStr);
+    const monthNumber = Number(monthStr);
+    if (!Number.isFinite(year) || !Number.isFinite(monthNumber) || monthNumber < 1 || monthNumber > 12) {
+      notify('Invalid month selected.');
+      return;
+    }
+
+    const monthStart = `${month}-01`;
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    const monthEnd = `${month}-${String(lastDay).padStart(2, '0')}`;
+
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('student_id, status, attendance_date')
+      .eq('context_type', contextType)
+      .eq('context_id', contextId)
+      .gte('attendance_date', monthStart)
+      .lte('attendance_date', monthEnd)
+      .order('attendance_date', { ascending: true });
+
+    if (error) {
+      console.error('Attendance export query failed:', error);
+      notify(`Failed to export attendance: ${error.message}`);
+      return;
+    }
+
+    const countsByStudent: Record<string, { present: number; absent: number; late: number; total: number }> = {};
+    (data || []).forEach((row: any) => {
+      const studentId = String(row.student_id);
+      if (!countsByStudent[studentId]) {
+        countsByStudent[studentId] = { present: 0, absent: 0, late: 0, total: 0 };
+      }
+      if (row.status === 'P') countsByStudent[studentId].present += 1;
+      if (row.status === 'A') countsByStudent[studentId].absent += 1;
+      if (row.status === 'L') countsByStudent[studentId].late += 1;
+      countsByStudent[studentId].total += 1;
+    });
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const monthLabel = new Date(year, monthNumber - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const headerTitle = `Attendance Report - ${monthLabel}`;
+    const subTitle = `${contextType.toUpperCase()}: ${contextLabel || contextId}`;
+
+    doc.setFontSize(18);
+    doc.text(headerTitle, 40, 40);
+    doc.setFontSize(11);
+    doc.text(subTitle, 40, 60);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 78);
+
+    let y = 110;
+    const lineHeight = 20;
+    const columns = [
+      { label: 'Student Name', x: 40 },
+      { label: 'Student ID', x: 260 },
+      { label: 'Present', x: 430 },
+      { label: 'Absent', x: 510 },
+      { label: 'Late', x: 580 },
+      { label: 'Marked Days', x: 650 },
+      { label: 'Rate %', x: 760 },
+    ];
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    columns.forEach(col => doc.text(col.label, col.x, y));
+    y += 10;
+    doc.line(40, y, 820, y);
+    y += 16;
+    doc.setFont('helvetica', 'normal');
+
+    const rows = studentList.map(student => {
+      const stats = countsByStudent[String(student.id)] || { present: 0, absent: 0, late: 0, total: 0 };
+      const rate = stats.total === 0 ? 0 : Math.round((stats.present / stats.total) * 100);
+      return {
+        name: student.name,
+        id: String(student.id),
+        ...stats,
+        rate,
+      };
+    });
+
+    rows.forEach(row => {
+      if (y > 560) {
+        doc.addPage();
+        y = 50;
+        doc.setFont('helvetica', 'bold');
+        columns.forEach(col => doc.text(col.label, col.x, y));
+        y += 10;
+        doc.line(40, y, 820, y);
+        y += 16;
+        doc.setFont('helvetica', 'normal');
+      }
+
+      doc.text(row.name.slice(0, 32), 40, y);
+      doc.text(row.id.slice(0, 18), 260, y);
+      doc.text(String(row.present), 430, y);
+      doc.text(String(row.absent), 510, y);
+      doc.text(String(row.late), 580, y);
+      doc.text(String(row.total), 650, y);
+      doc.text(String(row.rate), 760, y);
+      y += lineHeight;
+    });
+
+    const safeContext = (contextLabel || contextId).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    doc.save(`attendance-${safeContext}-${month}.pdf`);
+    notify(`Attendance PDF exported for ${monthLabel}.`);
+  }, [notify]);
+
+  const deleteClass = (classId: string, onDeleted?: () => void) => {
+    const targetClass = classes.find(classItem => String(classItem.id) === classId);
+    if (!targetClass) {
+      notify('Class not found.');
+      return;
+    }
+
+    setClassDeleteDialog({
+      id: classId,
+      name: targetClass.name || 'Unnamed Class',
+      onDeleted
+    });
+    setClassDeleteNameInput('');
+    setClassAdminDeletePassword('');
+    setClassDeleteError(null);
+  };
+
+  const removeStudentFromClass = async (classId: string, studentId: string, classCourseId?: string) => {
+    setConfirmDialog({
+      message: 'are you sure to remove this student?',
+      onConfirm: async () => {
+        try {
+          if (classCourseId) {
+            let usedFallbackStudentCourses = false;
+
+            const primaryDeleteResult = await supabase
+              .from('class_course_students')
+              .delete()
+              .eq('class_id', classId)
+              .eq('class_course_id', classCourseId)
+              .eq('student_id', studentId);
+
+            if (primaryDeleteResult.error && /class_id|column|schema cache|does not exist/i.test(primaryDeleteResult.error.message || '')) {
+              const secondaryDeleteResult = await supabase
+                .from('class_course_students')
+                .delete()
+                .eq('class_course_id', classCourseId)
+                .eq('student_id', studentId);
+
+              if (secondaryDeleteResult.error && isCourseAssignmentSchemaMissing(secondaryDeleteResult.error.message)) {
+                const fallbackDeleteResult = await supabase
+                  .from('student_courses')
+                  .delete()
+                  .eq('course_id', classCourseId)
+                  .eq('student_id', studentId);
+
+                if (fallbackDeleteResult.error && !isCourseAssignmentSchemaMissing(fallbackDeleteResult.error.message)) {
+                  throw fallbackDeleteResult.error;
+                }
+
+                usedFallbackStudentCourses = true;
+              } else if (secondaryDeleteResult.error && !isCourseAssignmentSchemaMissing(secondaryDeleteResult.error.message)) {
+                throw secondaryDeleteResult.error;
+              }
+            } else if (primaryDeleteResult.error && isCourseAssignmentSchemaMissing(primaryDeleteResult.error.message)) {
+              const fallbackDeleteResult = await supabase
+                .from('student_courses')
+                .delete()
+                .eq('course_id', classCourseId)
+                .eq('student_id', studentId);
+
+              if (fallbackDeleteResult.error && !isCourseAssignmentSchemaMissing(fallbackDeleteResult.error.message)) {
+                throw fallbackDeleteResult.error;
+              }
+
+              usedFallbackStudentCourses = true;
+            } else if (primaryDeleteResult.error) {
+              throw primaryDeleteResult.error;
+            }
+
+            if (usedFallbackStudentCourses) {
+              const fallbackVerifyResult = await supabase
+                .from('student_courses')
+                .select('student_id')
+                .eq('course_id', classCourseId)
+                .eq('student_id', studentId)
+                .limit(1);
+
+              if (!fallbackVerifyResult.error && (fallbackVerifyResult.data || []).length > 0) {
+                throw new Error('Student still exists in student_courses after delete attempt.');
+              }
+            } else {
+              const verifyResult = await supabase
+                .from('class_course_students')
+                .select('student_id')
+                .eq('class_course_id', classCourseId)
+                .eq('student_id', studentId)
+                .limit(1);
+
+              if (!verifyResult.error && (verifyResult.data || []).length > 0) {
+                throw new Error('Student still exists in class_course_students after delete attempt.');
+              }
+            }
+
+            const remainingInClassResult = await supabase
+              .from('class_course_students')
+              .select('student_id')
+              .eq('class_id', classId)
+              .eq('student_id', studentId)
+              .limit(1);
+
+            if (!remainingInClassResult.error && (remainingInClassResult.data || []).length === 0) {
+              setClasses(prev => prev.map(classItem => {
+                if (String(classItem.id) !== classId) return classItem;
+
+                const nextStudentIds = (classItem.student_ids || []).filter((id: string) => String(id) !== studentId);
+                return {
+                  ...classItem,
+                  student_ids: nextStudentIds,
+                  student_count: nextStudentIds.length,
+                };
+              }));
+            } else {
+              setClasses(prev => [...prev]);
+            }
+
+            notify('Student removed from course successfully.');
+            return;
+          }
+
+          const { error } = await supabase
+            .from('class_course_students')
+            .delete()
+            .eq('class_id', classId)
+            .eq('student_id', studentId);
+
+          if (error) throw error;
+
+          setClasses(prev => prev.map(classItem => {
+            if (String(classItem.id) !== classId) return classItem;
+
+            const nextStudentIds = (classItem.student_ids || []).filter((id: string) => String(id) !== studentId);
+            return {
+              ...classItem,
+              student_ids: nextStudentIds,
+              student_count: nextStudentIds.length,
+            };
+          }));
+
+          notify('Student removed from class.');
+        } catch (error) {
+          console.error('Remove student from class error:', error);
+          notify('Failed to remove student from class.');
+        }
+      }
+    });
+  };
+
+  const bulkAssignStudentsToClass = async (studentIds: string[], classId: string, classCourseId?: string) => {
+    if (!studentIds.length) {
+      notify('Please select at least one student.');
+      return;
+    }
+
+    const targetClass = classes.find(classItem => String(classItem.id) === String(classId));
+    if (!targetClass) {
+      notify('Selected class/batch was not found.');
+      return;
+    }
+
+    const existingClassIds = (targetClass.student_ids || []).map((id: any) => String(id));
+    const uniqueIncomingIds = Array.from(new Set(studentIds.map(id => String(id))));
+
+    if (!classCourseId) {
+      notify('Please select a class course when assigning students.');
+      return;
+    }
+
+    const schoolId = await requireSchoolId();
+
+    // Check which students are ALREADY in this specific course
+    const { data: existingCourseStudents } = await supabase
+      .from('class_course_students')
+      .select('student_id')
+      .eq('class_course_id', classCourseId)
+      .eq('school_id', schoolId);
+
+    const studentsInCourse = new Set((existingCourseStudents || []).map(r => String(r.student_id)));
+
+    const idsToInsertToCourse = uniqueIncomingIds.filter(id => !studentsInCourse.has(id));
+    const alreadyEnrolledCount = uniqueIncomingIds.length - idsToInsertToCourse.length;
+
+    if (!idsToInsertToCourse.length) {
+      notify(`All ${uniqueIncomingIds.length} selected students are already enrolled in this course.`);
+      return;
+    }
+
+    if (alreadyEnrolledCount > 0) {
+      notify(`Skipped ${alreadyEnrolledCount} student(s) already in this course. Proceeding with ${idsToInsertToCourse.length} new enrollment(s).`);
+    }
+
+    const idsToInsertToClass = idsToInsertToCourse.filter(id => !existingClassIds.includes(id));
+
+    if (idsToInsertToClass.length > 0) {
+      setClasses(prev => prev.map(classItem => {
+        if (String(classItem.id) !== String(classId)) return classItem;
+        const prevIds = (classItem.student_ids || []).map((id: any) => String(id));
+        const merged = Array.from(new Set([...prevIds, ...idsToInsertToClass]));
+        return {
+          ...classItem,
+          student_ids: merged,
+          student_count: merged.length,
+        };
+      }));
+    }
+
+    const coursePayload = idsToInsertToCourse.map(studentId => ({
+      class_id: classId,
+      class_course_id: classCourseId,
+      student_id: studentId,
+      school_id: schoolId,
+    }));
+
+    const primaryCourseAssign = await supabase
+      .from('class_course_students')
+      .insert(coursePayload);
+
+    if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
+      const fallbackCoursePayload = idsToInsertToCourse.map(studentId => ({
+        course_id: classCourseId,
+        student_id: studentId,
+        school_id: schoolId,
+      }));
+
+      const fallbackCourseAssign = await supabase
+        .from('student_courses')
+        .insert(fallbackCoursePayload);
+
+      if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
+        if (isCourseAssignmentSchemaMissing(fallbackCourseAssign.error.message)) {
+          notify('Course assignment skipped: no supported course-student table found. Create public.class_course_students in Supabase.');
+          return;
+        }
+        notify(`Class assignment completed, but course assignment failed: ${fallbackCourseAssign.error.message || 'Unknown error'}`);
+        return;
+      }
+    } else if (primaryCourseAssign.error && !/duplicate key|already exists/i.test(primaryCourseAssign.error.message || '')) {
+      notify(`Class assignment completed, but course assignment failed: ${primaryCourseAssign.error.message || 'Unknown error'}`);
+      return;
+    }
+
+    notify(`${idsToInsertToCourse.length} student(s) added to the selected course.`);
+  };
+
+  const bulkAssignTeachersToClass = async (teacherIds: string[], classId: string, classCourseId?: string) => {
+    if (!teacherIds.length) {
+      notify('Please select at least one teacher.');
+      return;
+    }
+
+    if (!classCourseId) {
+      notify('Please select a course to assign.');
+      return;
+    }
+
+    const schoolIdValue = await requireSchoolId();
+    
+    // We add all selected teachers to the course in a many-to-many join table
+    const teachersPayload = teacherIds.map(teacherId => ({
+      school_id: schoolIdValue,
+      class_id: classId,
+      class_course_id: classCourseId,
+      teacher_id: teacherId,
+    }));
+
+    const { error } = await supabase
+      .from('class_course_teachers')
+      .insert(teachersPayload);
+
+    if (error) {
+      if (/duplicate key|already exists/i.test(error.message)) {
+        notify('Some teachers were already assigned to this course. Others have been added.');
+      } else {
+        notify(`Failed to assign teachers: ${error.message}`);
+        console.error('Teacher assignment error:', error);
+        return;
+      }
+    } else {
+      notify(`${teacherIds.length} teacher(s) successfully assigned to the course.`);
+    }
+  };
+
+
+  const bulkDeleteStudents = async (studentIds: string[]) => {
+    const uniqueIds = Array.from(new Set(studentIds.map(id => String(id)).filter(Boolean)));
+    if (!uniqueIds.length) {
+      notify('No students selected.');
+      return;
+    }
+
+    setConfirmDialog({
+      message: `Delete ${uniqueIds.length} selected student(s)? This action is irreversible.`,
+      onConfirm: async () => {
+        const classRelationDeleteResult = await supabase
+          .from('class_course_students')
+          .delete()
+          .in('student_id', uniqueIds);
+
+        if (classRelationDeleteResult.error && !isCourseAssignmentSchemaMissing(classRelationDeleteResult.error.message)) {
+          notify(`Failed to delete class relations: ${classRelationDeleteResult.error.message || 'Unknown error'}`);
+          return;
+        }
+
+        const { error: attendanceDeleteError } = await supabase
+          .from('attendance_records')
+          .delete()
+          .in('student_id', uniqueIds);
+
+        if (attendanceDeleteError) {
+          notify(`Failed to delete attendance records: ${attendanceDeleteError.message || 'Unknown error'}`);
+          return;
+        }
+
+        const { error: deleteError } = await supabase
+          .from('students')
+          .delete()
+          .in('id', uniqueIds);
+
+        if (deleteError) {
+          notify(`Failed to delete students: ${deleteError.message || 'Unknown error'}`);
+          return;
+        }
+
+        const deletedIdSet = new Set(uniqueIds.map(id => String(id)));
+
+        setStudents(prev => prev.filter(student => !deletedIdSet.has(String(student.id))));
+        setTeachers(prev => prev.filter(teacher => !deletedIdSet.has(String(teacher.id))));
+        setAllStudents(prev => prev.filter((student: any) => !deletedIdSet.has(String(student.id))));
+        setAttendanceStudents(prev => prev.filter(student => !deletedIdSet.has(String(student.id))));
+        setClasses(prev => prev.map(classItem => {
+          const nextStudentIds = (classItem.student_ids || []).reduce((acc: string[], id: any) => {
+            const strId = String(id);
+            if (!deletedIdSet.has(strId)) acc.push(strId);
+            return acc;
+          }, []);
+
+          if (nextStudentIds.length === (classItem.student_ids || []).length) {
+            return classItem;
+          }
+
+          return {
+            ...classItem,
+            student_ids: nextStudentIds,
+            student_count: nextStudentIds.length,
+          };
+        }));
+
+        notify(`${uniqueIds.length} student(s) deleted.`);
+      }
+    });
+  };
+
+  const fetchAttendanceStudentsByDate = async (date: string) => {
+    if (!date) return;
+
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+
+    const schoolId = await requireSchoolId();
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .eq('school_id', schoolId)
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setAttendanceStudents(data.map(mapStudentFromDB));
+    }
+  };
+
+  // Main data synchronization effect with explicit state clearing for isolation
+  // Main data synchronization effect with explicit state clearing only on school switch
+  useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
+    const performCloudSync = async () => {
+      const activeSchoolId = await requireSchoolId();
+      if (!activeSchoolId) return;
+
+      // Only reset the whole app state if we've actually switched schools to prevent "Institutional Pulse" from zeroing out during refresh
+      const lastSchoolId = window.localStorage.getItem('iem_last_sync_school_id');
+      if (lastSchoolId !== activeSchoolId) {
+        setStudents([]);
+        setAllStudents([]);
+        setAttendanceStudents([]);
+        setTeachers([]);
+        setParents([]);
+        setStudentServiceStaff([]);
+        setClasses([]);
+        setCurrentCashBalanceMMK(0);
+        setSubjects([]);
+        setLibraryItems([]);
+        setExams([]);
+        setHomeworks([]);
+        setPrograms([]);
+        setSelectedDate('');
+        window.localStorage.setItem('iem_last_sync_school_id', activeSchoolId);
+      }
+
+      try {
+        await Promise.allSettled([
+          (async () => {
+            if (activeSchoolId) {
+              if (selectedDate) {
+                await fetchStudentsByDate(selectedDate);
+              } else {
+                const { data, error } = await supabase
+                  .schema('public')
+                  .from('students')
+                  .select('*')
+                  .eq('school_id', activeSchoolId)
+                  .order('created_at', { ascending: false });
+
+                if (error) console.error('[Students] Sync failed:', error.message);
+                if (data) {
+                  const mapped = data.map(mapStudentFromDB);
+                  setStudents(mapped);
+                  setAttendanceStudents(mapped);
+                }
+              }
+            }
+          })(),
+          fetchAllStudents(),
+          fetchTeachers(),
+          fetchParents(),
+          fetchStudentServiceStaff(),
+          fetchClasses(),
+          fetchCurrentCashBalance(),
+          fetchEvents(),
+          fetchStudentActivities(),
+          fetchParentAnnouncements(),
+          fetchLiveIntel()
+        ]);
+      } catch (err) {
+        console.error('Core data sync fatal error:', err);
+      }
+    };
+
+    void performCloudSync();
+  }, [onboardingStatus, schoolId, selectedDate, requireSchoolId]);
+
+  useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
+    if (currentPage === 'dashboard') {
+      void fetchCurrentCashBalance();
+    }
+  }, [currentPage, onboardingStatus]);
+
+  useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
+    if ((currentPage === 'student-attendance' || currentPage === 'class-attendance') && attendanceDate) {
+      void fetchAttendanceStudentsByDate(attendanceDate);
+    }
+  }, [attendanceDate, currentPage, onboardingStatus]);
+
+  useEffect(() => {
+    if (currentPage !== 'student-attendance' && currentPage !== 'class-attendance') {
+      setAttendanceStudents(students);
+    }
+  }, [students, currentPage]);
+
+  const generateStudentPassword = () => {
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const digits = '23456789';
+    const specials = '@#$%&*!';
+    const allChars = `${lower}${upper}${digits}${specials}`;
+
+    const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+
+    const passwordChars = [pick(lower), pick(upper), pick(digits), pick(specials)];
+    for (let i = passwordChars.length; i < 12; i += 1) {
+      passwordChars.push(pick(allChars));
+    }
+
+    for (let i = passwordChars.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [passwordChars[i], passwordChars[j]] = [passwordChars[j], passwordChars[i]];
+    }
+
+    return passwordChars.join('');
+  };
+
+  const generateStudentNodeId = () => {
+    const randomSeed = globalThis.crypto?.randomUUID
+      ? globalThis.crypto.randomUUID().replace(/-/g, '')
+      : `${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
+
+    return `NODE-${randomSeed.slice(0, 10).toUpperCase()}`;
+  };
+
+  const batchRegisterStudents = async (file: File) => {
+    const allowedExtensions = ['csv', 'tsv', 'xls', 'xlsx', 'ods'];
+    const extension = (file.name.split('.').pop() || '').toLowerCase();
+    if (!allowedExtensions.includes(extension)) {
+      notify('Unsupported file format. Please upload CSV, XLS, XLSX, or ODS file.');
+      return;
+    }
+
+    setIsBatchRegistering(true);
+    try {
+      const schoolId = await requireSchoolId();
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        notify('No sheet found in uploaded file.');
+        return;
+      }
+
+      const sheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, {
+        defval: '',
+        raw: false,
+      });
+
+      if (!rawRows.length) {
+        notify('Uploaded spreadsheet is empty.');
+        return;
+      }
+
+      const getValue = (row: Record<string, any>, keys: string[]) => {
+        const normalizedMap = Object.keys(row).reduce<Record<string, any>>((acc, key) => {
+          const normalized = String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+          acc[normalized] = row[key];
+          return acc;
+        }, {});
+
+        for (const key of keys) {
+          const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (normalizedMap[normalized] !== undefined && normalizedMap[normalized] !== null && String(normalizedMap[normalized]).trim() !== '') {
+            return String(normalizedMap[normalized]).trim();
+          }
+        }
+
+        return '';
+      };
+
+      const parseGender = (value: string): 'Male' | 'Female' => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return normalized === 'female' || normalized === 'f' ? 'Female' : 'Male';
+      };
+
+      const successfulStudents: Student[] = [];
+      const skippedRows: string[] = [];
+      const emailRegistry = await createSchoolEmailRegistry(schoolId);
+
+      for (let index = 0; index < rawRows.length; index += 1) {
+        const row = rawRows[index];
+        const rowNumber = index + 2;
+
+        const name = getValue(row, ['name', 'fullname', 'studentname']);
+        const email = getValue(row, ['email', 'studentemail', 'mail']);
+        const gender = parseGender(getValue(row, ['gender', 'sex']));
+        const normalizedStudentEmail = normalizeEmailValue(email);
+        const normalizedParentEmail = normalizeEmailValue(getValue(row, ['parentemail']));
+        const normalizedSecondaryParentEmail = normalizeEmailValue(getValue(row, ['secondaryparentemail']));
+
+        if (!name || !email) {
+          skippedRows.push(`Row ${rowNumber}: missing name or email`);
+          continue;
+        }
+
+        const emailConflicts = getEmailConflictMessages([
+          { email: normalizedStudentEmail, label: 'Student email' },
+          { email: normalizedParentEmail, label: 'Primary parent email', allowExistingParentEmail: true },
+          { email: normalizedSecondaryParentEmail, label: 'Secondary parent email', allowExistingParentEmail: true },
+        ], emailRegistry);
+
+        if (emailConflicts.length > 0) {
+          skippedRows.push(`Row ${rowNumber}: ${emailConflicts[0]}`);
+          continue;
+        }
+
+        const generatedPassword = generateStudentPassword();
+
+        const newStudent: Student = {
+          id: generateStudentNodeId(),
+          name,
+          role: 'student',
+          gender,
+          status: Status.PENDING,
+          email: normalizedStudentEmail,
+          attendanceRate: 0,
+          courseAttendance: [],
+          securityStatus: { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+          permissions: { ...INITIAL_PERMISSIONS },
+          type: 'New',
+        };
+
+        const payload = withSchoolId({
+          ...newStudent,
+          temp_password: generatedPassword,
+          temp_password_created_at: new Date().toISOString(),
+          date_of_birth: getValue(row, ['dateofbirth', 'dob']) || null,
+          parent_name: getValue(row, ['parentname']) || null,
+          parent_number: getValue(row, ['parentnumber', 'parentphone']) || null,
+          parent_email: normalizedParentEmail || null,
+          secondary_parent_name: getValue(row, ['secondaryparentname']) || null,
+          secondary_parent_number: getValue(row, ['secondaryparentnumber', 'secondaryparentphone']) || null,
+          secondary_parent_email: normalizedSecondaryParentEmail || null,
+          phone: getValue(row, ['phone', 'studentphone', 'contact']) || null,
+          address: getValue(row, ['address', 'residence', 'location']) || null,
+        }, schoolId);
+
+        let createdRow: any = null;
+        let insertError: any = null;
+
+        {
+          const result = await supabase
+            .from('students')
+            .insert([payload])
+            .select()
+            .maybeSingle();
+          createdRow = result.data;
+          insertError = result.error;
+        }
+
+        if (insertError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(insertError.message || '')) {
+          const { id, ...payloadWithoutId } = payload;
+          const retryResult = await supabase
+            .from('students')
+            .insert([payloadWithoutId])
+            .select()
+            .maybeSingle();
+          createdRow = retryResult.data;
+          insertError = retryResult.error;
+        }
+
+        if (insertError) {
+          skippedRows.push(`Row ${rowNumber}: ${insertError.message || 'insert failed'}`);
+          continue;
+        }
+
+        const createdStudent = mapStudentFromDB(createdRow || payload);
+        successfulStudents.push(createdStudent);
+        addEmailRegistryEntry(emailRegistry, {
+          email: createdStudent.email,
+          kind: 'student',
+          field: 'email',
+          name: createdStudent.name,
+          recordId: String(createdStudent.id || ''),
+        });
+        addEmailRegistryEntry(emailRegistry, {
+          email: payload.parent_email || '',
+          kind: 'parent',
+          field: 'parent_email',
+          name: String(payload.parent_name || createdStudent.name || ''),
+          recordId: String(createdStudent.id || ''),
+        });
+        addEmailRegistryEntry(emailRegistry, {
+          email: payload.secondary_parent_email || '',
+          kind: 'parent',
+          field: 'secondary_parent_email',
+          name: String(payload.secondary_parent_name || createdStudent.name || ''),
+          recordId: String(createdStudent.id || ''),
+        });
+      }
+
+      if (successfulStudents.length > 0) {
+        setStudents(prev => [...successfulStudents, ...prev]);
+        setAllStudents(prev => [...successfulStudents, ...prev]);
+      }
+
+      if (successfulStudents.length === 0) {
+        notify(`Batch import failed. ${skippedRows.slice(0, 2).join(' | ') || 'No valid rows found.'}`);
+      } else if (skippedRows.length > 0) {
+        notify(`Batch import completed: ${successfulStudents.length} added, ${skippedRows.length} skipped.`);
+      } else {
+        notify(`Batch import completed: ${successfulStudents.length} students added.`);
+      }
+    } catch (error: any) {
+      console.error('Batch registration error:', error);
+      notify(`Batch registration failed: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsBatchRegistering(false);
+    }
+  };
+
+  const batchRegisterTeachers = async (file: File) => {
+    const allowedExtensions = ['csv', 'tsv', 'xls', 'xlsx', 'ods'];
+    const extension = (file.name.split('.').pop() || '').toLowerCase();
+    if (!allowedExtensions.includes(extension)) {
+      notify('Unsupported file format. Please upload CSV, XLS, XLSX, or ODS file.');
+      return;
+    }
+
+    setIsBatchTeacherRegistering(true);
+    try {
+      const schoolId = await requireSchoolId();
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        notify('No sheet found in uploaded file.');
+        return;
+      }
+
+      const sheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, {
+        defval: '',
+        raw: false,
+      });
+
+      if (!rawRows.length) {
+        notify('Uploaded spreadsheet is empty.');
+        return;
+      }
+
+      const getValue = (row: Record<string, any>, keys: string[]) => {
+        const normalizedMap = Object.keys(row).reduce<Record<string, any>>((acc, key) => {
+          const normalized = String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+          acc[normalized] = row[key];
+          return acc;
+        }, {});
+
+        for (const key of keys) {
+          const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (normalizedMap[normalized] !== undefined && normalizedMap[normalized] !== null && String(normalizedMap[normalized]).trim() !== '') {
+            return String(normalizedMap[normalized]).trim();
+          }
+        }
+
+        return '';
+      };
+
+      const parseGender = (value: string): 'Male' | 'Female' => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return normalized === 'female' || normalized === 'f' ? 'Female' : 'Male';
+      };
+
+      const successfulTeachers: Student[] = [];
+      const skippedRows: string[] = [];
+      const emailRegistry = await createSchoolEmailRegistry(schoolId);
+
+      for (let index = 0; index < rawRows.length; index += 1) {
+        const row = rawRows[index];
+        const rowNumber = index + 2;
+
+        const name = getValue(row, ['name', 'fullname', 'teachername']);
+        const email = getValue(row, ['email', 'teacheremail', 'mail']);
+        const gender = parseGender(getValue(row, ['gender', 'sex']));
+        const normalizedTeacherEmail = normalizeEmailValue(email);
+        const dateOfBirth = getValue(row, ['dateofbirth', 'birthdate', 'dob']);
+        const age = parseOptionalInteger(getValue(row, ['age'])) ?? calculateAgeFromDateOfBirth(dateOfBirth);
+        const salary = parseOptionalDecimal(getValue(row, ['salary', 'monthlysalary', 'pay']));
+
+        if (!name || !email) {
+          skippedRows.push(`Row ${rowNumber}: missing name or email`);
+          continue;
+        }
+
+        const emailConflicts = getEmailConflictMessages([
+          { email: normalizedTeacherEmail, label: 'Teacher email' },
+        ], emailRegistry);
+
+        if (emailConflicts.length > 0) {
+          skippedRows.push(`Row ${rowNumber}: ${emailConflicts[0]}`);
+          continue;
+        }
+
+        const generatedPassword = generateStudentPassword();
+
+        const newTeacher: Student = {
+          id: generateStudentNodeId(),
+          name,
+          role: 'teacher',
+          gender,
+          status: Status.PENDING,
+          email: normalizedTeacherEmail,
+          attendanceRate: 0,
+          courseAttendance: [],
+          securityStatus: { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+          permissions: { ...INITIAL_PERMISSIONS },
+          type: 'New',
+        };
+
+        const payload = withSchoolId({
+          id: newTeacher.id,
+          name: newTeacher.name,
+          role: 'teacher',
+          gender: newTeacher.gender,
+          status: newTeacher.status,
+          email: newTeacher.email,
+          phone: getValue(row, ['phone', 'teacherphone', 'contact']) || null,
+          address: getValue(row, ['address', 'residence', 'location', 'address']) || null,
+          date_of_birth: dateOfBirth || null,
+          age,
+          nrc: getValue(row, ['nrc', 'nationalregistrationcard', 'nationalid']) || null,
+          marital_status: getValue(row, ['maritalstatus', 'marital']) || null,
+          race: getValue(row, ['race', 'ethnicity']) || null,
+          religion: getValue(row, ['religion', 'faith']) || null,
+          salary,
+          job_position: getValue(row, ['jobposition', 'position', 'jobtitle']) || null,
+          educational_background: getValue(row, ['educationalbackground', 'educationbackground', 'education', 'qualification']) || null,
+          type: newTeacher.type,
+          temp_password: generatedPassword,
+          temp_password_created_at: new Date().toISOString(),
+        }, schoolId);
+
+        let createdRow: any = null;
+        let insertError: any = null;
+
+        {
+          const result = await supabase
+            .from('teachers')
+            .insert([payload])
+            .select()
+            .maybeSingle();
+          createdRow = result.data;
+          insertError = result.error;
+        }
+
+        if (insertError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(insertError.message || '')) {
+          const { id, ...payloadWithoutId } = payload;
+          const retryResult = await supabase
+            .from('teachers')
+            .insert([payloadWithoutId])
+            .select()
+            .maybeSingle();
+          createdRow = retryResult.data;
+          insertError = retryResult.error;
+        }
+
+        if (insertError) {
+          skippedRows.push(`Row ${rowNumber}: ${insertError.message || 'insert failed'}`);
+          continue;
+        }
+
+        const createdTeacher = mapStudentFromDB(createdRow || payload);
+        successfulTeachers.push(createdTeacher);
+        addEmailRegistryEntry(emailRegistry, {
+          email: createdTeacher.email,
+          kind: 'teacher',
+          field: 'email',
+          name: createdTeacher.name,
+          recordId: String(createdTeacher.id || ''),
+        });
+      }
+
+      if (successfulTeachers.length > 0) {
+        setTeachers(prev => [...successfulTeachers, ...prev]);
+      }
+
+      if (successfulTeachers.length === 0) {
+        notify(`Batch teacher import failed. ${skippedRows.slice(0, 2).join(' | ') || 'No valid rows found.'}`);
+      } else if (skippedRows.length > 0) {
+        notify(`Batch teacher import completed: ${successfulTeachers.length} added, ${skippedRows.length} skipped.`);
+      } else {
+        notify(`Batch teacher import completed: ${successfulTeachers.length} teachers added.`);
+      }
+    } catch (error: any) {
+      console.error('Batch teacher registration error:', error);
+      notify(`Batch teacher registration failed: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsBatchTeacherRegistering(false);
+    }
+  };
+
+  const openEditModal = (type: string, data: any) => {
+    if (type === 'student') {
+      setEditTarget({
+        type,
+        data: {
+          ...data,
+          date_of_birth: data?.date_of_birth ?? '',
+          parent_name: data?.parent_name ?? '',
+          parent_number: data?.parent_number ?? '',
+          parent_email: data?.parent_email ?? '',
+          secondary_parent_name: data?.secondary_parent_name ?? '',
+          secondary_parent_number: data?.secondary_parent_number ?? '',
+          secondary_parent_email: data?.secondary_parent_email ?? '',
+          phone: data?.phone ?? '',
+          address: data?.address ?? '',
+        },
+      });
+      setIsEditModalOpen(true);
+      return;
+    }
+
+    setEditTarget({ type, data: { ...data } });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdate = async (newAvatarFile?: File) => {
+    if (!editTarget) return;
+    const { type, data } = editTarget;
+
+    try {
+      let finalData = { ...data };
+
+      // Handle avatar upload if provided
+      if (newAvatarFile && (type === 'student' || type === 'teacher' || type === 'student_service')) {
+        const imageUrl = await uploadStudentProfileImage(newAvatarFile);
+        finalData.avatar = imageUrl;
+      }
+
+      // Sync with Supabase if it's a student
+      if (type === 'student') {
+        const schoolId = await requireSchoolId();
+        const existingStudent = students.find(s => s.id === data.id);
+        
+        // Strip other roles' school IDs and non-DB fields
+        const { 
+          teacherschool_id, 
+          staffschool_id, 
+          courseAttendance, 
+          securityStatus, 
+          ...sanitizedStudentData 
+        } = finalData;
+
+        const studentPayload = withSchoolId({
+          ...sanitizedStudentData,
+          role: finalData.role ?? existingStudent?.role ?? 'student',
+          status: finalData.status ?? existingStudent?.status ?? Status.PENDING,
+          attendanceRate: finalData.attendanceRate ?? existingStudent?.attendanceRate ?? 0,
+        }, schoolId);
+
+        const { error } = await supabase.from('students').upsert(studentPayload);
+        if (error) {
+          console.error('Supabase Update Error:', error);
+          notify(`Student sync failed: ${error.message}`);
+          return;
+        }
+        finalData = studentPayload;
+      }
+
+      if (type === 'teacher') {
+        const schoolId = await requireSchoolId();
+        const existingTeacher = teachers.find(t => t.id === data.id);
+        
+        // Strip other roles' school IDs and non-DB fields
+        const { 
+          studentschool_id, 
+          staffschool_id, 
+          courseAttendance, 
+          securityStatus, 
+          ...sanitizedTeacherData 
+        } = finalData;
+
+        const teacherPayload = withSchoolId({
+          ...sanitizedTeacherData,
+          id: finalData.id,
+          name: finalData.name,
+          email: finalData.email,
+          role: 'teacher',
+          gender: finalData.gender ?? existingTeacher?.gender ?? 'Male',
+          status: finalData.status ?? existingTeacher?.status ?? Status.PENDING,
+          type: finalData.type ?? existingTeacher?.type ?? 'New',
+          avatar: finalData.avatar ?? existingTeacher?.avatar ?? null,
+          phone: finalData.phone ?? existingTeacher?.phone ?? '',
+          address: finalData.address ?? existingTeacher?.address ?? '',
+          date_of_birth: normalizeOptionalText(finalData.date_of_birth),
+          age: parseOptionalInteger(finalData.age),
+          nrc: normalizeOptionalText(finalData.nrc),
+          marital_status: normalizeOptionalText(finalData.marital_status),
+          race: normalizeOptionalText(finalData.race),
+          religion: normalizeOptionalText(finalData.religion),
+          salary: parseOptionalDecimal(finalData.salary),
+          job_position: normalizeOptionalText(finalData.job_position),
+          educational_background: normalizeOptionalText(finalData.educational_background),
+          teacherschool_id: finalData.teacherschool_id ?? null,
+        }, schoolId);
+
+        const { error } = await supabase.from('teachers').upsert(teacherPayload);
+        if (error) {
+          console.error('Supabase Teacher Update Error:', error);
+          notify(`Teacher sync failed: ${error.message}`);
+          return;
+        }
+        finalData = teacherPayload;
+      }
+
+      if (type === 'student_service') {
+        const schoolId = await requireSchoolId();
+        const existingStaff = studentServiceStaff.find(s => s.id === data.id);
+        
+        // Strip other roles' school IDs and non-DB fields
+        const { 
+          studentschool_id, 
+          teacherschool_id, 
+          courseAttendance, 
+          securityStatus, 
+          ...sanitizedStaffData 
+        } = finalData;
+
+        const staffPayload = withSchoolId({
+          ...sanitizedStaffData,
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          role: 'student_service',
+          gender: data.gender ?? existingStaff?.gender ?? 'Male',
+          status: data.status ?? existingStaff?.status ?? Status.PENDING,
+          type: data.type ?? existingStaff?.type ?? 'New',
+          avatar: data.avatar ?? existingStaff?.avatar ?? null,
+          phone: data.phone ?? existingStaff?.phone ?? '',
+          address: data.address ?? existingStaff?.address ?? '',
+          date_of_birth: normalizeOptionalText(data.date_of_birth),
+          age: parseOptionalInteger(data.age),
+          nrc: normalizeOptionalText(data.nrc),
+          marital_status: normalizeOptionalText(data.marital_status),
+          race: normalizeOptionalText(data.race),
+          religion: normalizeOptionalText(data.religion),
+          salary: parseOptionalDecimal(data.salary),
+          job_position: normalizeOptionalText(data.job_position),
+          educational_background: normalizeOptionalText(data.educational_background),
+          staffschool_id: finalData.staffschool_id ?? null,
+        }, schoolId);
+
+        const { error } = await supabase.from('student_services').upsert(staffPayload);
+        if (error) {
+          console.error('Supabase Student Service Update Error:', error);
+          notify(`Staff sync failed: ${error.message}`);
+          return;
+        }
+        finalData = staffPayload;
+      }
+
+      switch (type) {
+        case 'student':
+          setStudents(prev => prev.map(s => s.id === finalData.id ? finalData : s));
+          break;
+        case 'teacher': setTeachers(prev => prev.map(t => t.id === finalData.id ? finalData : t)); break;
+        case 'student_service': setStudentServiceStaff(prev => prev.map(s => s.id === finalData.id ? finalData : s)); break;
+        case 'subject': setSubjects(prev => prev.map(s => s.id === finalData.id ? finalData : s)); break;
+        case 'library': setLibraryItems(prev => prev.map(i => i.id === finalData.id ? finalData : i)); break;
+        case 'exam': setExams(prev => prev.map(e => e.id === finalData.id ? finalData : e)); break;
+        case 'homework': setHomeworks(prev => prev.map(h => h.id === finalData.id ? finalData : h)); break;
+        case 'program': setPrograms(prev => prev.map(p => p.id === finalData.id ? finalData : p)); break;
+      }
+
+      notify(`${type.charAt(0).toUpperCase() + type.slice(1)} synchronized.`);
+      setIsEditModalOpen(false);
+      setEditTarget(null);
+    } catch (err: any) {
+      console.error('Update operation failed:', err);
+      notify(err.message || `Failed to update ${type}.`);
+    }
+  };
+
+  const updateStudentProfilePhoto = async (studentId: string, file: File): Promise<Student> => {
+    const profileImageUrl = await uploadStudentProfileImage(file);
+
+    const schoolId = await requireSchoolId();
+    const { error: studentUpdateError } = await supabase
+      .from('students')
+      .update({ avatar: profileImageUrl })
+      .eq('id', studentId)
+      .eq('school_id', schoolId);
+
+    if (studentUpdateError) {
+      const { error: teacherUpdateError } = await supabase
+        .from('teachers')
+        .update({ avatar: profileImageUrl })
+        .eq('id', studentId)
+        .eq('school_id', schoolId);
+
+      if (teacherUpdateError) {
+        throw studentUpdateError;
+      }
+    }
+
+    let updatedStudent: Student | null = null;
+
+    setStudents(prev => prev.map(student => {
+      if (String(student.id) !== String(studentId)) return student;
+      const next = { ...student, avatar: profileImageUrl };
+      updatedStudent = next;
+      return next;
+    }));
+
+    setAllStudents(prev => prev.map((student: any) => {
+      if (String(student.id) !== String(studentId)) return student;
+      return { ...student, avatar: profileImageUrl };
+    }));
+
+    setTeachers(prev => prev.map(student => {
+      if (String(student.id) !== String(studentId)) return student;
+      return { ...student, avatar: profileImageUrl };
+    }));
+
+    notify('Profile photo updated successfully.');
+
+    if (updatedStudent) {
+      return updatedStudent;
+    }
+
+    throw new Error('Student not found after photo update.');
+  };
+
+  const deleteEntity = async (id: string, type: string) => {
+    if (type === 'student') {
+      const targetStudent = students.find(student => String(student.id) === String(id));
+      const targetTeacher = teachers.find(teacher => String(teacher.id) === String(id));
+      const target = targetStudent || targetTeacher;
+      if (!target) {
+        notify('Student not found.');
+        return;
+      }
+      setStudentDeleteDialog({
+        id: target.id,
+        name: target.name,
+        entityType: targetTeacher ? 'teacher' : 'student',
+      });
+      setStudentDeleteNameInput('');
+      setAdminDeletePassword('');
+      setStudentDeleteError(null);
+      return;
+    }
+
+    setConfirmDialog({
+      message: `Are you sure you want to terminate this ${type} node? This action is irreversible.`,
+      onConfirm: async () => {
+        switch (type) {
+          case 'teacher': setTeachers(prev => prev.filter(t => t.id !== id)); break;
+          case 'subject': setSubjects(prev => prev.filter(s => s.id !== id)); break;
+          case 'library': setLibraryItems(prev => prev.filter(i => i.id !== id)); break;
+          case 'exam': setExams(prev => prev.filter(e => e.id !== id)); break;
+          case 'homework': setHomeworks(prev => prev.filter(h => h.id !== id)); break;
+          case 'program': setPrograms(prev => prev.filter(p => p.id !== id)); break;
+          case 'student-service': {
+            const schoolId = await requireSchoolId();
+            void supabase.schema('public').from('student_services').delete().eq('id', id).eq('school_id', schoolId);
+            setStudentServiceStaff(prev => prev.filter(s => s.id !== id));
+            break;
+          }
+          case 'events': {
+            const schoolId = await requireSchoolId();
+            void supabase.from('events').delete().eq('id', id).eq('school_id', schoolId);
+            setEvents(prev => prev.filter(e => e.id !== id));
+            break;
+          }
+          case 'student-activities': {
+            const schoolId = await requireSchoolId();
+            void supabase.from('student_activities').delete().eq('id', id).eq('school_id', schoolId);
+            setStudentActivities(prev => prev.filter(a => a.id !== id));
+            break;
+          }
+          case 'announcements-parent': {
+            const schoolId = await requireSchoolId();
+            void supabase.from('parent_announcements').delete().eq('id', id).eq('school_id', schoolId);
+            setParentAnnouncements(prev => prev.filter(p => p.id !== id));
+            break;
+          }
+          case 'live-intel': {
+            const schoolId = await requireSchoolId();
+            void supabase.from('live_intel').delete().eq('id', id).eq('school_id', schoolId);
+            setLiveIntelData(prev => prev.filter(i => i.id !== id));
+            break;
+          }
+        }
+        notify(`${type.replace('-', ' ').toUpperCase()} node deleted.`);
+      }
+    });
+  };
+
+  const handleConfirmDialog = async () => {
+    if (!confirmDialog) return;
+    const action = confirmDialog.onConfirm;
+    setConfirmDialog(null);
+    await action();
+  };
+
+  const handleSecureStudentDelete = async () => {
+    if (!studentDeleteDialog) return;
+
+    const expectedName = studentDeleteDialog.name.trim();
+    const typedName = studentDeleteNameInput.trim();
+    if (typedName !== expectedName) {
+      setStudentDeleteError('Student name does not match.');
+      return;
+    }
+
+    if (!adminDeletePassword.trim()) {
+      setStudentDeleteError('Admin password is required.');
+      return;
+    }
+
+    setIsStudentDeleteSubmitting(true);
+    setStudentDeleteError(null);
+
+    try {
+      const passwordOk = await verifyAdminPassword(adminDeletePassword);
+      if (!passwordOk) {
+        setStudentDeleteError('Invalid admin password.');
+        return;
+      }
+
+      if (studentDeleteDialog.entityType === 'student') {
+        const schoolId = await requireSchoolId();
+        const { error: classRelationDeleteError } = await supabase
+          .from('class_course_students')
+          .delete()
+          .eq('student_id', studentDeleteDialog.id)
+          .eq('school_id', schoolId);
+
+        if (classRelationDeleteError && !isCourseAssignmentSchemaMissing(classRelationDeleteError.message)) {
+          console.error('Class relation delete error:', classRelationDeleteError);
+          setStudentDeleteError('Failed to delete student class relations.');
+          return;
+        }
+
+        const { error: attendanceDeleteError } = await supabase
+          .from('attendance_records')
+          .delete()
+          .eq('student_id', studentDeleteDialog.id)
+          .eq('school_id', schoolId);
+
+        if (attendanceDeleteError) {
+          console.error('Attendance delete error:', attendanceDeleteError);
+          setStudentDeleteError('Failed to delete student attendance records.');
+          return;
+        }
+      }
+
+      const schoolId = await requireSchoolId();
+      const { error: deleteError } = await supabase
+        .from(studentDeleteDialog.entityType === 'teacher' ? 'teachers' : 'students')
+        .delete()
+        .eq('id', studentDeleteDialog.id)
+        .eq('school_id', schoolId);
+      if (deleteError) {
+        console.error('Supabase Delete Error:', deleteError);
+        setStudentDeleteError('Failed to delete student.');
+        return;
+      }
+
+      setStudents(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
+      setTeachers(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
+      setAllStudents(prev => prev.filter(student => String(student.id) !== studentDeleteDialog.id));
+      setAttendanceStudents(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
+      setClasses(prev => prev.map(classItem => {
+        const nextStudentIds = (classItem.student_ids || []).filter((id: string) => String(id) !== studentDeleteDialog.id);
+        if (nextStudentIds.length === (classItem.student_ids || []).length) {
+          return classItem;
+        }
+
+        return {
+          ...classItem,
+          student_ids: nextStudentIds,
+          student_count: nextStudentIds.length,
+        };
+      }));
+      notify(`${studentDeleteDialog.entityType === 'teacher' ? 'Teacher' : 'Student'} node deleted.`);
+      setStudentDeleteDialog(null);
+      setStudentDeleteNameInput('');
+      setAdminDeletePassword('');
+      setStudentDeleteError(null);
+    } catch (error) {
+      console.error('Password verification error:', error);
+      setStudentDeleteError('Failed to verify admin password.');
+    } finally {
+      setIsStudentDeleteSubmitting(false);
+    }
+  };
+
+  const handleSecureClassDelete = async () => {
+    if (!classDeleteDialog) return;
+
+    const expectedName = classDeleteDialog.name.trim();
+    const typedName = classDeleteNameInput.trim();
+    if (typedName !== expectedName) {
+      setClassDeleteError('Class name does not match.');
+      return;
+    }
+
+    if (!classAdminDeletePassword.trim()) {
+      setClassDeleteError('Admin password is required.');
+      return;
+    }
+
+    setIsClassDeleteSubmitting(true);
+    setClassDeleteError(null);
+
+    try {
+      const passwordOk = await verifyAdminPassword(classAdminDeletePassword);
+      if (!passwordOk) {
+        setClassDeleteError('Invalid admin password.');
+        return;
+      }
+
+      const schoolId = await requireSchoolId();
+      const { error: relationDeleteError } = await supabase
+        .from('class_course_students')
+        .delete()
+        .eq('class_id', classDeleteDialog.id)
+        .eq('school_id', schoolId);
+      if (relationDeleteError && !isCourseAssignmentSchemaMissing(relationDeleteError.message)) {
+        console.error('Delete class relations error:', relationDeleteError);
+        setClassDeleteError('Failed to delete class students relations.');
+        return;
+      }
+
+      const { data: deletedClassRows, error: classDeleteErrorResult } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', classDeleteDialog.id)
+        .eq('school_id', schoolId)
+        .select('id');
+      if (classDeleteErrorResult) {
+        console.error('Delete class error:', classDeleteErrorResult);
+        setClassDeleteError('Failed to delete class.');
+        return;
+      }
+
+      if (!deletedClassRows || deletedClassRows.length === 0) {
+        setClassDeleteError('Supabase did not delete the class row. Check table permissions (RLS) for delete on classes.');
+        return;
+      }
+
+      const { data: verifyRows, error: verifyError } = await supabase
+        .from('classes')
+        .select('id')
+        .eq('id', classDeleteDialog.id)
+        .eq('school_id', schoolId)
+        .limit(1);
+
+      if (verifyError) {
+        console.error('Class delete verify error:', verifyError);
+        setClassDeleteError('Class delete verification failed.');
+        return;
+      }
+
+      if (verifyRows && verifyRows.length > 0) {
+        setClassDeleteError('Class still exists in database after delete attempt.');
+        return;
+      }
+
+      setClasses(prev => prev.filter(classItem => String(classItem.id) !== classDeleteDialog.id));
+      classDeleteDialog.onDeleted?.();
+      notify('Class deleted successfully.');
+      setClassDeleteDialog(null);
+      setClassDeleteNameInput('');
+      setClassAdminDeletePassword('');
+      setClassDeleteError(null);
+    } catch (error) {
+      console.error('Password verification error:', error);
+      setClassDeleteError('Failed to verify admin password.');
+    } finally {
+      setIsClassDeleteSubmitting(false);
+    }
+  };
+
+  const enrollStudentAction = (type: 'New' | 'Old') => {
+    setEnrollData(getInitialEnrollData(type));
+    setEnrollClassCourses([]);
+    setIsEnrollClassCoursesLoading(false);
+    setStudentProfileImage(null);
+    setIsEnrollModalOpen(true);
+  };
+
+  const abortEnrollFlow = () => {
+    enrollAbortCounterRef.current += 1;
+    setIsEnrollModalOpen(false);
+    setEnrollData(getInitialEnrollData());
+    setEnrollClassCourses([]);
+    setIsEnrollClassCoursesLoading(false);
+    setStudentProfileImage(null);
+  };
+
+  const enrollTeacherAction = () => {
+    setTeacherEnrollData(getInitialTeacherEnrollData());
+    setIsTeacherEnrollModalOpen(true);
+  };
+
+  const abortTeacherEnrollFlow = () => {
+    setIsTeacherEnrollModalOpen(false);
+    setTeacherEnrollData(getInitialTeacherEnrollData());
+  };
+
+  const enrollStudentServiceAction = () => {
+    setStudentServiceEnrollData(getInitialTeacherEnrollData());
+    setIsStudentServiceEnrollModalOpen(true);
+  };
+
+  const abortStudentServiceEnrollFlow = () => {
+    setIsStudentServiceEnrollModalOpen(false);
+    setStudentServiceEnrollData(getInitialTeacherEnrollData());
+  };
+
+  useEffect(() => {
+    const loadEnrollClassCourses = async () => {
+      if (!isEnrollModalOpen) {
+        setEnrollClassCourses([]);
+        setIsEnrollClassCoursesLoading(false);
+        return;
+      }
+
+      if (!enrollData.selectedClassIds || enrollData.selectedClassIds.length === 0) {
+        setEnrollClassCourses([]);
+        setIsEnrollClassCoursesLoading(false);
+        return;
+      }
+
+      setIsEnrollClassCoursesLoading(true);
+      const schoolId = await requireSchoolId();
+      const { data, error } = await supabase
+        .from('class_courses')
+        .select('id, name, class_id')
+        .in('class_id', enrollData.selectedClassIds)
+        .eq('school_id', schoolId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Failed to load enrollment class courses:', error);
+        setEnrollClassCourses([]);
+      } else {
+        setEnrollClassCourses((data || []).map((course: any) => ({
+          id: String(course.id),
+          name: String(course.name || ''),
+          class_id: String(course.class_id),
+        })));
+      }
+
+      setIsEnrollClassCoursesLoading(false);
+    };
+
+    void loadEnrollClassCourses();
+  }, [isEnrollModalOpen, enrollData.type, enrollData.selectedClassIds]);
+
+  const handleEnrollSubmit = async () => {
+    const enrollToken = enrollAbortCounterRef.current;
+    const isEnrollmentAborted = () => enrollToken !== enrollAbortCounterRef.current;
+
+    try {
+      const schoolId = await requireSchoolId();
+      if (enrollData.type === 'Old') {
+        if (!enrollData.selectedStudentId) {
+          notify('Please select a student for re-entry.');
+          return;
+        }
+
+        if (!enrollData.selectedClassIds || enrollData.selectedClassIds.length === 0) {
+          notify('Please select at least one class.');
+          return;
+        }
+
+        if (!enrollData.selectedClassCourseIds || enrollData.selectedClassCourseIds.length === 0) {
+          notify('Please select at least one course.');
+          return;
+        }
+
+        const target = students.find(student => String(student.id) === String(enrollData.selectedStudentId));
+        if (!target) {
+          notify('Selected student not found.');
+          return;
+        }
+
+        const updatedStudent: Student = {
+          ...target,
+          role: 'student',
+          type: 'Old',
+          status: Status.ACTIVE,
+        };
+
+        const { error: dbError } = await supabase
+          .from('students')
+          .update({ type: 'Old', status: Status.ACTIVE, role: 'student', school_id: schoolId })
+          .eq('id', updatedStudent.id)
+          .eq('school_id', schoolId);
+
+        if (dbError) throw dbError;
+
+        const assignments = enrollData.selectedClassCourseIds.map(courseId => {
+          const course = enrollClassCourses.find(c => String(c.id) === String(courseId));
+          return {
+            class_id: course ? course.class_id : enrollData.selectedClassIds[0],
+            class_course_id: courseId,
+            student_id: updatedStudent.id,
+            school_id: schoolId
+          };
+        });
+
+        const primaryCourseAssign = await supabase
+          .from('class_course_students')
+          .insert(assignments);
+
+        if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
+          const fallbackAssignments = enrollData.selectedClassCourseIds.map(courseId => ({
+            course_id: courseId,
+            student_id: updatedStudent.id,
+            school_id: schoolId
+          }));
+          const fallbackCourseAssign = await supabase
+            .from('student_courses')
+            .insert(fallbackAssignments);
+
+          if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
+            if (isCourseAssignmentSchemaMissing(fallbackCourseAssign.error.message)) {
+              throw new Error('Course assignment is not configured. Create public.class_course_students in Supabase.');
+            }
+            throw fallbackCourseAssign.error;
+          }
+        } else if (primaryCourseAssign.error && !/duplicate key|already exists/i.test(primaryCourseAssign.error.message || '')) {
+          throw primaryCourseAssign.error;
+        }
+
+        setStudents(prev => prev.map(student => String(student.id) === String(updatedStudent.id) ? updatedStudent : student));
+        setAllStudents(prev => prev.map(student => String(student.id) === String(updatedStudent.id) ? updatedStudent : student));
+
+        setClasses(prev => prev.map(classItem => {
+          if (!enrollData.selectedClassIds.includes(String(classItem.id))) return classItem;
+          const existingIds = (classItem.student_ids || []).map((id: any) => String(id));
+          if (existingIds.includes(String(updatedStudent.id))) {
+            return classItem;
+          }
+          return {
+            ...classItem,
+            student_ids: [...existingIds, String(updatedStudent.id)],
+            student_count: (classItem.student_count ?? existingIds.length) + 1,
+          };
+        }));
+        notify('Old student re-entry completed.');
+        abortEnrollFlow();
+        return;
+      }
+
+      if (!enrollData.name || !enrollData.email) {
+        notify('Please provide both name and email.');
+        return;
+      }
+
+      if (!isValidEmail(enrollData.email)) {
+        notify('Please enter a valid student email address.');
+        return;
+      }
+
+      if (!enrollData.dateOfBirth || !enrollData.parentName || !enrollData.parentNumber || !enrollData.parentEmail) {
+        notify('Please provide DOB and primary parent details.');
+        return;
+      }
+
+      if (!isValidPhoneDigits(enrollData.parentNumber)) {
+        notify('Please enter a valid primary parent phone number.');
+        return;
+      }
+
+      if (!isValidEmail(enrollData.parentEmail)) {
+        notify('Please enter a valid primary parent email address.');
+        return;
+      }
+
+      if (enrollData.secondaryParentNumber && !isValidPhoneDigits(enrollData.secondaryParentNumber)) {
+        notify('Please enter a valid secondary parent phone number.');
+        return;
+      }
+
+      if (enrollData.secondaryParentEmail && !isValidEmail(enrollData.secondaryParentEmail)) {
+        notify('Please enter a valid secondary parent email address.');
+        return;
+      }
+
+      if (!enrollData.selectedClassIds || enrollData.selectedClassIds.length === 0) {
+        notify('Please choose at least one class for the student.');
+        return;
+      }
+
+      if (!enrollData.selectedClassCourseIds || enrollData.selectedClassCourseIds.length === 0) {
+        notify('Please choose at least one class course for the student.');
+        return;
+      }
+
+      const generatedPassword = generateStudentPassword();
+      const normalizedStudentEmail = normalizeEmailValue(enrollData.email);
+      const normalizedParentEmail = normalizeEmailValue(enrollData.parentEmail);
+      const normalizedSecondaryParentEmail = normalizeEmailValue(enrollData.secondaryParentEmail);
+      const primaryParentPhone = toInternationalPhone(enrollData.parentCountryCode, enrollData.parentNumber);
+      const secondaryParentPhone = enrollData.secondaryParentNumber
+        ? toInternationalPhone(enrollData.secondaryParentCountryCode, enrollData.secondaryParentNumber)
+        : null;
+      const studentPhone = enrollData.phone
+        ? toInternationalPhone(enrollData.studentCountryCode, enrollData.phone)
+        : null;
+
+      const emailRegistry = await createSchoolEmailRegistry(schoolId);
+      const emailConflicts = getEmailConflictMessages([
+        { email: normalizedStudentEmail, label: 'Student email' },
+        { email: normalizedParentEmail, label: 'Primary parent email', allowExistingParentEmail: true },
+        { email: normalizedSecondaryParentEmail, label: 'Secondary parent email', allowExistingParentEmail: true },
+      ], emailRegistry);
+
+      if (emailConflicts.length > 0) {
+        notify(emailConflicts[0]);
+        return;
+      }
+
+      let profileImageUrl: string | undefined;
+      if (studentProfileImage) {
+        try {
+          profileImageUrl = await uploadStudentProfileImage(studentProfileImage);
+        } catch (uploadError: any) {
+          console.error('Student profile upload failed:', uploadError);
+          notify(`Profile upload failed: ${uploadError?.message || 'Upload blocked. Student will be created without image.'}`);
+          profileImageUrl = undefined;
+        }
+      }
+
+      if (isEnrollmentAborted()) {
+        return;
+      }
+
+      let authUserId: string | null = null;
+      try {
+        const authData = await authService.signUp(normalizedStudentEmail, generatedPassword, enrollData.name, 'student', schoolId);
+        authUserId = authData?.user?.id || null;
+      } catch (authError: any) {
+        console.error('Auth sign-up failed, continuing with student profile only:', authError);
+      }
+
+      if (isEnrollmentAborted()) {
+        return;
+      }
+
+      const newStudent: Student = {
+        id: generateStudentNodeId(),
+        name: enrollData.name,
+        role: 'student',
+        gender: 'Male',
+        status: Status.PENDING,
+        email: normalizedStudentEmail,
+        avatar: profileImageUrl,
+        attendanceRate: 0,
+        courseAttendance: [],
+        securityStatus: { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+        permissions: { ...INITIAL_PERMISSIONS },
+        type: 'New'
+      };
+
+      const insertPayload = withSchoolId({
+        ...newStudent,
+        auth_user_id: authUserId,
+        temp_password: generatedPassword,
+        date_of_birth: enrollData.dateOfBirth,
+        parent_name: enrollData.parentName,
+        parent_number: primaryParentPhone,
+        parent_email: normalizedParentEmail,
+        secondary_parent_name: enrollData.secondaryParentName || null,
+        secondary_parent_number: secondaryParentPhone,
+        secondary_parent_email: normalizedSecondaryParentEmail || null,
+        phone: studentPhone,
+        address: enrollData.address || null,
+        studentschool_id: enrollData.studentschool_id || null,
+      }, schoolId);
+
+      let createdStudentRecord: any = null;
+      let dbError: any = null;
+
+      {
+        const result = await supabase.from('students').insert([insertPayload]).select().maybeSingle();
+        createdStudentRecord = result.data;
+        dbError = result.error;
+      }
+
+      if (dbError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(dbError.message || '')) {
+        const { id, ...payloadWithoutId } = insertPayload;
+        const retryResult = await supabase.from('students').insert([payloadWithoutId]).select().maybeSingle();
+        createdStudentRecord = retryResult.data;
+        dbError = retryResult.error;
+      }
+
+      if (dbError) throw dbError;
+
+      if (isEnrollmentAborted()) {
+        if (createdStudentRecord?.id) {
+          const schoolId = await requireSchoolId();
+          await supabase.from('students').delete().eq('id', createdStudentRecord.id).eq('school_id', schoolId);
+        }
+        return;
+      }
+
+      const createdStudent = mapStudentFromDB(createdStudentRecord || newStudent);
+
+      const assignmentIssues: string[] = [];
+
+      {
+        const assignments = enrollData.selectedClassCourseIds.map(courseId => {
+          const course = enrollClassCourses.find(c => String(c.id) === String(courseId));
+          return {
+            class_id: course ? course.class_id : enrollData.selectedClassIds[0],
+            class_course_id: courseId,
+            student_id: createdStudent.id,
+            school_id: schoolId
+          };
+        });
+
+        const primaryCourseAssign = await supabase
+          .from('class_course_students')
+          .insert(assignments);
+
+        if (primaryCourseAssign.error && isCourseAssignmentSchemaMissing(primaryCourseAssign.error.message)) {
+          const fallbackAssignments = enrollData.selectedClassCourseIds.map(courseId => ({
+            course_id: courseId,
+            student_id: createdStudent.id,
+            school_id: schoolId
+          }));
+
+          const fallbackCourseAssign = await supabase
+            .from('student_courses')
+            .insert(fallbackAssignments);
+
+          if (fallbackCourseAssign.error && !/duplicate key|already exists/i.test(fallbackCourseAssign.error.message || '')) {
+            if (isCourseAssignmentSchemaMissing(fallbackCourseAssign.error.message)) {
+              assignmentIssues.push('course assignment not configured (create public.class_course_students)');
+            } else {
+              assignmentIssues.push(`course assignment failed (${fallbackCourseAssign.error.message})`);
+            }
+          }
+        } else if (primaryCourseAssign.error && !/duplicate key|already exists/i.test(primaryCourseAssign.error.message || '')) {
+          assignmentIssues.push(`course assignment failed (${primaryCourseAssign.error.message})`);
+        }
+
+        if (!primaryCourseAssign.error || /duplicate key|already exists/i.test(primaryCourseAssign.error.message || '')) {
+          setClasses(prev => prev.map(classItem => {
+            if (!enrollData.selectedClassIds.includes(String(classItem.id))) return classItem;
+            const existingIds = (classItem.student_ids || []).map((id: any) => String(id));
+            if (existingIds.includes(String(createdStudent.id))) {
+              return classItem;
+            }
+            return {
+              ...classItem,
+              student_ids: [...existingIds, String(createdStudent.id)],
+              student_count: (classItem.student_count ?? existingIds.length) + 1,
+            };
+          }));
+        }
+      }
+
+      notify(assignmentIssues.length > 0
+        ? `New Student Node Created, but ${assignmentIssues.join(' and ')}.`
+        : 'New Student Node Created & Synced.');
+      setNewStudentCredentials({ name: createdStudent.name, email: createdStudent.email, password: generatedPassword });
+
+      setStudents(prev => [createdStudent, ...prev]);
+      setAllStudents(prev => [createdStudent, ...prev]);
+      abortEnrollFlow();
+      openEditModal('student', createdStudent);
+    } catch (error: any) {
+      console.error('Enrollment Error:', error);
+      notify(`Sync Failed: ${error.message}`);
+    }
+  };
+
+  const handleTeacherEnrollSubmit = async () => {
+    try {
+      const schoolId = await requireSchoolId();
+      if (!teacherEnrollData.name || !teacherEnrollData.email) {
+        notify('Please provide both name and email.');
+        return;
+      }
+      if (!isValidEmail(teacherEnrollData.email)) {
+        notify('Please enter a valid teacher email address.');
+        return;
+      }
+
+      const normalizedTeacherEmail = normalizeEmailValue(teacherEnrollData.email);
+      const resolvedTeacherAge = parseOptionalInteger(teacherEnrollData.age) ?? calculateAgeFromDateOfBirth(teacherEnrollData.date_of_birth);
+      const resolvedTeacherSalary = parseOptionalDecimal(teacherEnrollData.salary);
+      const emailRegistry = await createSchoolEmailRegistry(schoolId);
+      const emailConflicts = getEmailConflictMessages([
+        { email: normalizedTeacherEmail, label: 'Teacher email' },
+      ], emailRegistry);
+
+      if (emailConflicts.length > 0) {
+        notify(emailConflicts[0]);
+        return;
+      }
+
+      // 1. Upload Avatar if present
+      let avatarUrl = '';
+      if (teacherEnrollData.avatarFile) {
+        try {
+          avatarUrl = await uploadStudentProfileImage(teacherEnrollData.avatarFile);
+        } catch (uploadErr: any) {
+          console.error('Staff avatar upload failed:', uploadErr);
+          // Continue anyway, it's not critical
+        }
+      }
+
+      const generatedPassword = generateStudentPassword();
+      const authUserId = await authService.signUpStaff(normalizedTeacherEmail, generatedPassword, 'teacher', schoolId);
+
+      const newTeacher: Student = {
+        id: generateStudentNodeId(),
+        name: teacherEnrollData.name,
+        role: 'teacher',
+        gender: teacherEnrollData.gender,
+        status: Status.PENDING,
+        email: normalizedTeacherEmail,
+        phone: teacherEnrollData.phone,
+        address: teacherEnrollData.address,
+        date_of_birth: teacherEnrollData.date_of_birth || undefined,
+        age: resolvedTeacherAge,
+        nrc: normalizeOptionalText(teacherEnrollData.nrc),
+        marital_status: normalizeOptionalText(teacherEnrollData.marital_status),
+        race: normalizeOptionalText(teacherEnrollData.race),
+        religion: normalizeOptionalText(teacherEnrollData.religion),
+        salary: resolvedTeacherSalary,
+        job_position: normalizeOptionalText(teacherEnrollData.job_position),
+        educational_background: normalizeOptionalText(teacherEnrollData.educational_background),
+        avatar: avatarUrl,
+        attendanceRate: 0,
+        courseAttendance: [],
+        securityStatus: { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+        permissions: { ...INITIAL_PERMISSIONS },
+        type: 'New',
+      };
+
+      const insertPayload = withSchoolId({
+        id: newTeacher.id,
+        name: newTeacher.name,
+        email: newTeacher.email,
+        role: 'teacher',
+        gender: newTeacher.gender,
+        status: newTeacher.status,
+        type: newTeacher.type,
+        phone: newTeacher.phone,
+        address: newTeacher.address,
+        date_of_birth: newTeacher.date_of_birth || null,
+        age: newTeacher.age,
+        nrc: newTeacher.nrc,
+        marital_status: newTeacher.marital_status,
+        race: newTeacher.race,
+        religion: newTeacher.religion,
+        salary: newTeacher.salary,
+        job_position: newTeacher.job_position,
+        educational_background: newTeacher.educational_background,
+        avatar: newTeacher.avatar,
+        auth_user_id: authUserId,
+        temp_password: generatedPassword,
+        temp_password_created_at: new Date().toISOString(),
+        teacherschool_id: teacherEnrollData.school_id || null,
+      }, schoolId);
+
+      const { data, error: insertError } = await supabase
+        .from('teachers')
+        .insert([insertPayload])
+        .select()
+        .maybeSingle();
+
+      if (insertError) throw insertError;
+
+      const createdTeacher = mapStudentFromDB(data || insertPayload);
+      setTeachers(prev => [createdTeacher, ...prev]);
+      setNewStudentCredentials({ name: createdTeacher.name, email: createdTeacher.email, password: generatedPassword });
+
+      notify('New Teacher Node Created & Synced.');
+      abortTeacherEnrollFlow();
+      openEditModal('teacher', createdTeacher);
+    } catch (error: any) {
+      console.error('Teacher enrollment error:', error);
+      notify(`Teacher sync failed: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleStudentServiceEnrollSubmit = async () => {
+    try {
+      const schoolId = await requireSchoolId();
+      if (!studentServiceEnrollData.name || !studentServiceEnrollData.email) {
+        notify('Please provide both name and email.');
+        return;
+      }
+
+      if (!isValidEmail(studentServiceEnrollData.email)) {
+        notify('Please enter a valid email address.');
+        return;
+      }
+
+      const normalizedStaffEmail = normalizeEmailValue(studentServiceEnrollData.email);
+      const resolvedStaffAge = parseOptionalInteger(studentServiceEnrollData.age) ?? calculateAgeFromDateOfBirth(studentServiceEnrollData.date_of_birth);
+      const resolvedStaffSalary = parseOptionalDecimal(studentServiceEnrollData.salary);
+      const emailRegistry = await createSchoolEmailRegistry(schoolId);
+      const emailConflicts = getEmailConflictMessages([
+        { email: normalizedStaffEmail, label: 'Staff email' },
+      ], emailRegistry);
+
+      if (emailConflicts.length > 0) {
+        notify(emailConflicts[0]);
+        return;
+      }
+
+      // 1. Upload Avatar if present
+      let finalAvatarUrl = '';
+      if (studentServiceEnrollData.avatarFile) {
+        try {
+          finalAvatarUrl = await uploadStudentProfileImage(studentServiceEnrollData.avatarFile);
+        } catch (uploadErr: any) {
+          console.error('Staff avatar upload failed:', uploadErr);
+          // Continue anyway, it's not critical
+        }
+      }
+
+      const generatedPassword = generateStudentPassword();
+      const authUserId = await authService.signUpStaff(normalizedStaffEmail, generatedPassword, 'student_service', schoolId);
+
+      const newStaff: Student = {
+        id: generateStudentNodeId(),
+        name: studentServiceEnrollData.name,
+        role: 'student_service',
+        gender: studentServiceEnrollData.gender,
+        status: Status.PENDING,
+        email: normalizedStaffEmail,
+        phone: studentServiceEnrollData.phone,
+        address: studentServiceEnrollData.address,
+        date_of_birth: studentServiceEnrollData.date_of_birth || undefined,
+        age: resolvedStaffAge,
+        nrc: normalizeOptionalText(studentServiceEnrollData.nrc),
+        marital_status: normalizeOptionalText(studentServiceEnrollData.marital_status),
+        race: normalizeOptionalText(studentServiceEnrollData.race),
+        religion: normalizeOptionalText(studentServiceEnrollData.religion),
+        salary: resolvedStaffSalary,
+        job_position: normalizeOptionalText(studentServiceEnrollData.job_position),
+        educational_background: normalizeOptionalText(studentServiceEnrollData.educational_background),
+        avatar: finalAvatarUrl,
+        attendanceRate: 0,
+        courseAttendance: [],
+        securityStatus: { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+        permissions: { ...INITIAL_PERMISSIONS },
+        type: 'New',
+      };
+
+      const insertPayload = withSchoolId({
+        id: newStaff.id,
+        name: newStaff.name,
+        email: newStaff.email,
+        role: 'student_service',
+        gender: newStaff.gender,
+        status: newStaff.status,
+        type: newStaff.type,
+        phone: newStaff.phone,
+        address: newStaff.address,
+        date_of_birth: newStaff.date_of_birth || null,
+        age: newStaff.age,
+        nrc: newStaff.nrc,
+        marital_status: newStaff.marital_status,
+        race: newStaff.race,
+        religion: newStaff.religion,
+        salary: newStaff.salary,
+        job_position: newStaff.job_position,
+        educational_background: newStaff.educational_background,
+        avatar: newStaff.avatar,
+        auth_user_id: authUserId,
+        temp_password: generatedPassword,
+        temp_password_created_at: new Date().toISOString(),
+        staffschool_id: studentServiceEnrollData.school_id || null,
+      }, schoolId);
+
+      const { data, error: dbError } = await supabase
+        .schema('public')
+        .from('student_services')
+        .insert([insertPayload])
+        .select()
+        .maybeSingle();
+
+      if (dbError) throw dbError;
+
+      const createdStaff = mapStudentFromDB(data || insertPayload);
+      setStudentServiceStaff(prev => [createdStaff, ...prev]);
+      setNewStudentCredentials({ name: createdStaff.name, email: createdStaff.email, password: generatedPassword });
+
+      notify('New Student Service Staff Created & Synced.');
+      abortStudentServiceEnrollFlow();
+    } catch (error: any) {
+      console.error('Student service enrollment error:', error);
+      notify(`Staff registration failed: ${error?.message || 'Unknown error'}`);
+    }
+  };
+
+  const batchRegisterStudentService = async (file: File) => {
+    const allowedExtensions = ['csv', 'tsv', 'xls', 'xlsx', 'ods'];
+    const extension = (file.name.split('.').pop() || '').toLowerCase();
+    if (!allowedExtensions.includes(extension)) {
+      notify('Unsupported file format. Please upload CSV, XLS, XLSX, or ODS file.');
+      return;
+    }
+
+    setIsBatchStudentServiceRegistering(true);
+    try {
+      const schoolId = await requireSchoolId();
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        notify('No sheet found in uploaded file.');
+        return;
+      }
+
+      const sheet = workbook.Sheets[firstSheetName];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, {
+        defval: '',
+        raw: false,
+      });
+
+      if (!rawRows.length) {
+        notify('Uploaded spreadsheet is empty.');
+        return;
+      }
+
+      const getValue = (row: Record<string, any>, keys: string[]) => {
+        const normalizedMap = Object.keys(row).reduce<Record<string, any>>((acc, key) => {
+          const normalized = String(key).toLowerCase().replace(/[^a-z0-9]/g, '');
+          acc[normalized] = row[key];
+          return acc;
+        }, {});
+        for (const key of keys) {
+          const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (normalizedMap[normalized] !== undefined && normalizedMap[normalized] !== null && String(normalizedMap[normalized]).trim() !== '') {
+            return String(normalizedMap[normalized]).trim();
+          }
+        }
+        return '';
+      };
+
+      const parseGender = (value: string): 'Male' | 'Female' => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return normalized === 'female' || normalized === 'f' ? 'Female' : 'Male';
+      };
+
+      const successfulStaff: Student[] = [];
+      const skippedRows: string[] = [];
+      const emailRegistry = await createSchoolEmailRegistry(schoolId);
+
+      for (let index = 0; index < rawRows.length; index += 1) {
+        const row = rawRows[index];
+        const rowNumber = index + 2;
+
+        const name = getValue(row, ['name', 'fullname', 'staffname']);
+        const email = getValue(row, ['email', 'staffemail', 'mail']);
+        const gender = parseGender(getValue(row, ['gender', 'sex']));
+        const normalizedStaffEmail = normalizeEmailValue(email);
+        const dateOfBirth = getValue(row, ['dateofbirth', 'birthdate', 'dob']);
+        const age = parseOptionalInteger(getValue(row, ['age'])) ?? calculateAgeFromDateOfBirth(dateOfBirth);
+        const salary = parseOptionalDecimal(getValue(row, ['salary', 'monthlysalary', 'pay']));
+
+        if (!name || !email) {
+          skippedRows.push(`Row ${rowNumber}: missing name or email`);
+          continue;
+        }
+
+        const emailConflicts = getEmailConflictMessages([
+          { email: normalizedStaffEmail, label: 'Staff email' },
+        ], emailRegistry);
+
+        if (emailConflicts.length > 0) {
+          skippedRows.push(`Row ${rowNumber}: ${emailConflicts[0]}`);
+          continue;
+        }
+
+        const generatedPassword = generateStudentPassword();
+
+        const newStaff: Student = {
+          id: generateStudentNodeId(),
+          name,
+          role: 'student_service',
+          gender,
+          status: Status.PENDING,
+          email: normalizedStaffEmail,
+          attendanceRate: 0,
+          courseAttendance: [],
+          securityStatus: { lastLogin: 'Never', twoFactorEnabled: false, trustedDevices: 0, riskLevel: 'Low' },
+          permissions: { ...INITIAL_PERMISSIONS },
+          type: 'New',
+        };
+
+        const payload = withSchoolId({
+          id: newStaff.id,
+          name: newStaff.name,
+          role: 'student_service',
+          gender: newStaff.gender,
+          status: newStaff.status,
+          email: newStaff.email,
+          phone: getValue(row, ['phone', 'staffphone', 'contact']) || null,
+          address: getValue(row, ['address', 'residence', 'location', 'address']) || null,
+          date_of_birth: dateOfBirth || null,
+          age,
+          nrc: getValue(row, ['nrc', 'nationalregistrationcard', 'nationalid']) || null,
+          marital_status: getValue(row, ['maritalstatus', 'marital']) || null,
+          race: getValue(row, ['race', 'ethnicity']) || null,
+          religion: getValue(row, ['religion', 'faith']) || null,
+          salary,
+          job_position: getValue(row, ['jobposition', 'position', 'jobtitle']) || null,
+          educational_background: getValue(row, ['educationalbackground', 'educationbackground', 'education', 'qualification']) || null,
+          type: newStaff.type,
+          temp_password: generatedPassword,
+          temp_password_created_at: new Date().toISOString(),
+        }, schoolId);
+
+        let createdRow: any = null;
+        let insertError: any = null;
+
+        {
+          const result = await supabase.schema('public').from('student_services').insert([payload]).select().maybeSingle();
+          createdRow = result.data;
+          insertError = result.error;
+        }
+
+        if (insertError && /invalid input syntax|type uuid|type integer|bigint|smallint/i.test(insertError.message || '')) {
+          const { id, ...payloadWithoutId } = payload;
+          const retryResult = await supabase.schema('public').from('student_services').insert([payloadWithoutId]).select().maybeSingle();
+          createdRow = retryResult.data;
+          insertError = retryResult.error;
+        }
+
+        if (insertError) {
+          skippedRows.push(`Row ${rowNumber}: ${insertError.message || 'insert failed'}`);
+          continue;
+        }
+
+        const createdStaff = mapStudentFromDB(createdRow || payload);
+        successfulStaff.push(createdStaff);
+        addEmailRegistryEntry(emailRegistry, {
+          email: createdStaff.email,
+          kind: 'staff',
+          field: 'email',
+          name: createdStaff.name,
+          recordId: String(createdStaff.id || ''),
+        });
+      }
+
+      if (successfulStaff.length > 0) {
+        setStudentServiceStaff(prev => [...successfulStaff, ...prev]);
+      }
+
+      if (successfulStaff.length === 0) {
+        notify(`Batch import failed. ${skippedRows.slice(0, 2).join(' | ') || 'No valid rows found.'}`);
+      } else if (skippedRows.length > 0) {
+        notify(`Batch import completed: ${successfulStaff.length} added, ${skippedRows.length} skipped.`);
+      } else {
+        notify(`Batch import completed: ${successfulStaff.length} staff members added.`);
+      }
+    } catch (error: any) {
+      console.error('Batch student service registration error:', error);
+      notify(`Batch registration failed: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setIsBatchStudentServiceRegistering(false);
+    }
+  };
+
+  const openPermissions = (student: Student) => {
+    setPermTarget(student);
+    setIsPermissionsModalOpen(true);
+  };
+
+  const resetDeveloperTapSequence = () => {
+    developerTapCountRef.current = 0;
+    if (developerTapResetTimeoutRef.current !== null) {
+      window.clearTimeout(developerTapResetTimeoutRef.current);
+      developerTapResetTimeoutRef.current = null;
+    }
+  };
+
+  const closeDeveloperAuthModal = () => {
+    setIsDeveloperAuthModalOpen(false);
+    setDeveloperAuthPassword('');
+    setDeveloperAuthError(null);
+  };
+
+  const closeDeveloperModeModal = () => {
+    if (isDeveloperSchoolPasswordSaving) return;
+    setIsDeveloperModeModalOpen(false);
+    setDeveloperSchoolPassword('');
+    setDeveloperSchoolPasswordConfirm('');
+    setDeveloperSchoolPasswordError(null);
+    setDeveloperSchoolPasswordStatus(null);
+  };
+
+  const handleDeveloperTriggerClick = () => {
+    if (isDeveloperAuthModalOpen || isDeveloperModeModalOpen) return;
+
+    developerTapCountRef.current += 1;
+
+    if (developerTapResetTimeoutRef.current !== null) {
+      window.clearTimeout(developerTapResetTimeoutRef.current);
+      developerTapResetTimeoutRef.current = null;
+    }
+
+    if (developerTapCountRef.current >= DEVELOPER_MODE_TAP_TARGET) {
+      resetDeveloperTapSequence();
+      setDeveloperAuthPassword('');
+      setDeveloperAuthError(null);
+      setIsDeveloperAuthModalOpen(true);
+      return;
+    }
+
+    developerTapResetTimeoutRef.current = window.setTimeout(() => {
+      developerTapCountRef.current = 0;
+      developerTapResetTimeoutRef.current = null;
+    }, DEVELOPER_MODE_TAP_RESET_MS);
+  };
+
+  const handleDeveloperAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!developerAuthPassword.trim()) {
+      setDeveloperAuthError('Admin password is required.');
+      return;
+    }
+
+    if (developerAuthPassword.trim() !== DEVELOPER_MODE_PASSWORD) {
+      setDeveloperAuthError('Invalid admin password.');
+      return;
+    }
+
+    setDeveloperAuthPassword('');
+    setDeveloperAuthError(null);
+    setIsDeveloperAuthModalOpen(false);
+    setDeveloperSchoolPassword('');
+    setDeveloperSchoolPasswordConfirm('');
+    setDeveloperSchoolPasswordError(null);
+    setDeveloperSchoolPasswordStatus(null);
+    setIsDeveloperModeModalOpen(true);
+  };
+
+  const verifyAdminPassword = async (password: string): Promise<boolean> => {
+    const resolvedSchoolId = await requireSchoolId();
+    return await verifySchoolAdminPassword(resolvedSchoolId, password);
+  };
+
+  const handleDeveloperSchoolPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const nextSchoolPassword = developerSchoolPassword.trim();
+    const nextSchoolPasswordConfirm = developerSchoolPasswordConfirm.trim();
+
+    if (!nextSchoolPassword) {
+      setDeveloperSchoolPasswordError('School password is required.');
+      return;
+    }
+
+    if (nextSchoolPassword.length < 8) {
+      setDeveloperSchoolPasswordError('School password must be at least 8 characters long.');
+      return;
+    }
+
+    if (nextSchoolPassword !== nextSchoolPasswordConfirm) {
+      setDeveloperSchoolPasswordError('Passwords do not match.');
+      return;
+    }
+
+    setIsDeveloperSchoolPasswordSaving(true);
+    setDeveloperSchoolPasswordError(null);
+    setDeveloperSchoolPasswordStatus(null);
+
+    try {
+      const resolvedSchoolId = await requireSchoolId();
+      await updateSchoolLoginPassword(resolvedSchoolId, nextSchoolPassword);
+      setDeveloperSchoolPassword('');
+      setDeveloperSchoolPasswordConfirm('');
+      setDeveloperSchoolPasswordStatus('School login password updated successfully.');
+      notify('School login password updated.');
+    } catch (error: any) {
+      console.error('Developer school password update error:', error);
+      setDeveloperSchoolPasswordError(error?.message || 'Failed to update school login password.');
+    } finally {
+      setIsDeveloperSchoolPasswordSaving(false);
+    }
+  };
+
+  const requestStudentEditWithPassword = (student: Student) => {
+    setStudentEditAuthDialog(student);
+    setStudentEditAuthPassword('');
+    setStudentEditAuthError(null);
+  };
+
+  const handleStudentEditAuthConfirm = async () => {
+    if (!studentEditAuthDialog) return;
+    if (!studentEditAuthPassword.trim()) {
+      setStudentEditAuthError('Admin password is required.');
+      return;
+    }
+
+    setIsStudentEditAuthSubmitting(true);
+    setStudentEditAuthError(null);
+
+    try {
+      const passwordOk = await verifyAdminPassword(studentEditAuthPassword);
+      if (!passwordOk) {
+        setStudentEditAuthError('Invalid admin password.');
+        return;
+      }
+
+      openEditModal(studentEditAuthDialog.role === 'teacher' ? 'teacher' : 'student', studentEditAuthDialog);
+      setStudentEditAuthDialog(null);
+      setStudentEditAuthPassword('');
+      setStudentEditAuthError(null);
+    } catch (error) {
+      console.error('Admin password verification error:', error);
+      setStudentEditAuthError('Failed to verify admin password.');
+    } finally {
+      setIsStudentEditAuthSubmitting(false);
+    }
+  };
+
+  const togglePermission = (key: keyof StudentPermissions) => {
+    if (!permTarget) return;
+    const updated = {
+      ...permTarget,
+      permissions: { ...permTarget.permissions!, [key]: !permTarget.permissions![key] }
+    };
+    setStudents(prev => prev.map(s => s.id === permTarget.id ? updated : s));
+    setPermTarget(updated);
+  };
+
+  const getAttendanceStoreKey = useCallback((contextType: AttendanceContextType, contextId: string) => `${contextType}:${contextId}`, []);
+
+  const setAttendanceForDate = useCallback((
+    storeKey: string,
+    date: string,
+    studentStatuses: Record<string, 'P' | 'A' | 'L'>
+  ) => {
+    setSubjectAttendanceStore(prev => {
+      const contextData = prev[storeKey] || {};
+      return {
+        ...prev,
+        [storeKey]: {
+          ...contextData,
+          [date]: studentStatuses,
+        },
+      };
+    });
+  }, []);
+
+  const loadAttendanceForContext = useCallback(async (contextType: AttendanceContextType, contextId: string, date: string) => {
+    if (!contextId || !date) return;
+
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('student_id, status')
+      .eq('context_type', contextType)
+      .eq('context_id', contextId)
+      .eq('attendance_date', date);
+
+    if (error) {
+      console.error('Failed to load attendance:', error);
+      notify(`Failed to load attendance: ${error.message}`);
+      return;
+    }
+
+    const nextDateData: Record<string, 'P' | 'A' | 'L'> = {};
+    (data || []).forEach((item: any) => {
+      nextDateData[String(item.student_id)] = item.status;
+    });
+
+    setAttendanceForDate(getAttendanceStoreKey(contextType, contextId), date, nextDateData);
+  }, [getAttendanceStoreKey, notify, setAttendanceForDate]);
+
+  const syncStudentAttendanceRates = useCallback(async (
+    studentIds: string[],
+    options?: { showErrorToast?: boolean; errorPrefix?: string }
+  ) => {
+    const showErrorToast = options?.showErrorToast ?? true;
+    const errorPrefix = options?.errorPrefix || 'Failed to sync attendance rate';
+    const uniqueStudentIds = Array.from(new Set(studentIds.map(id => String(id)).filter(Boolean)));
+    if (!uniqueStudentIds.length) return;
+
+    const { data: attendanceRows, error: attendanceError } = await supabase
+      .from('attendance_records')
+      .select('student_id, status')
+      .in('student_id', uniqueStudentIds);
+
+    if (attendanceError) {
+      console.error('Failed to load attendance records for rate sync:', attendanceError);
+      if (showErrorToast) {
+        notify(`${errorPrefix}: ${attendanceError.message}`);
+      }
+      return;
+    }
+
+    const statsMap = new Map<string, { total: number; presentLike: number }>();
+    uniqueStudentIds.forEach(id => {
+      statsMap.set(id, { total: 0, presentLike: 0 });
+    });
+
+    (attendanceRows || []).forEach((row: any) => {
+      const id = String(row.student_id);
+      const existing = statsMap.get(id) || { total: 0, presentLike: 0 };
+      existing.total += 1;
+      if (row.status === 'P' || row.status === 'L') {
+        existing.presentLike += 1;
+      }
+      statsMap.set(id, existing);
+    });
+
+    const updates = uniqueStudentIds.map(id => {
+      const stats = statsMap.get(id) || { total: 0, presentLike: 0 };
+      const attendanceRate = stats.total > 0
+        ? Number(((stats.presentLike / stats.total) * 100).toFixed(2))
+        : 0;
+      return { id, attendanceRate };
+    });
+
+    for (const item of updates) {
+      const { error: updateError } = await supabase
+        .from('students')
+        .update({ attendanceRate: item.attendanceRate })
+        .eq('id', item.id);
+
+      if (updateError) {
+        console.error('Failed to persist attendance rate:', updateError);
+        if (showErrorToast) {
+          notify(`${errorPrefix}: ${updateError.message}`);
+        }
+        return;
+      }
+    }
+
+    const rateMap = new Map<string, number>();
+    updates.forEach(item => {
+      rateMap.set(String(item.id), item.attendanceRate);
+    });
+
+    setStudents(prev => prev.map(student => {
+      const key = String(student.id);
+      if (!rateMap.has(key)) return student;
+      return { ...student, attendanceRate: rateMap.get(key)! };
+    }));
+
+    setAttendanceStudents(prev => prev.map(student => {
+      const key = String(student.id);
+      if (!rateMap.has(key)) return student;
+      return { ...student, attendanceRate: rateMap.get(key)! };
+    }));
+
+    setAllStudents(prev => prev.map((student: any) => {
+      const key = String(student.id);
+      if (!rateMap.has(key)) return student;
+      return { ...student, attendanceRate: rateMap.get(key)! };
+    }));
+  }, [notify]);
+
+  const syncAllStudentsToCloud = useCallback(async (showErrorToast = false) => {
+    if (onboardingStatus !== 'ready') return;
+    if (isCloudSyncRunningRef.current) return;
+
+    isCloudSyncRunningRef.current = true;
+    setIsCloudSyncRunning(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('id');
+
+      if (error) {
+        console.error('Failed to load students for cloud sync:', error);
+        if (showErrorToast) {
+          notify(`Cloud sync failed: ${error.message}`);
+        }
+        return;
+      }
+
+      if (!data?.length) return;
+
+      await syncStudentAttendanceRates(
+        data.map((row: any) => String(row.id)),
+        {
+          showErrorToast,
+          errorPrefix: 'Cloud sync failed',
+        }
+      );
+    } finally {
+      setIsCloudSyncRunning(false);
+      isCloudSyncRunningRef.current = false;
+    }
+  }, [notify, onboardingStatus, syncStudentAttendanceRates]);
+
+  const updateSubjectAttendance = useCallback(async (
+    contextType: AttendanceContextType,
+    contextId: string,
+    date: string,
+    studentId: string,
+    status: 'P' | 'A' | 'L',
+    contextName?: string
+  ) => {
+    const schoolId = await requireSchoolId();
+
+    const basePayload = withSchoolId({
+      context_type: contextType,
+      context_id: contextId,
+      attendance_date: date,
+      student_id: studentId,
+      status,
+    }, schoolId);
+
+    let error: any = null;
+
+    if (isAttendanceContextNameSupported && contextName) {
+      const result = await supabase
+        .from('attendance_records')
+        .upsert([
+          {
+            ...basePayload,
+            context_name: contextName,
+          },
+        ], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+      error = result.error;
+
+      if (error && /context_name/i.test(error.message || '')) {
+        setIsAttendanceContextNameSupported(false);
+        const fallbackResult = await supabase
+          .from('attendance_records')
+          .upsert([basePayload], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+        error = fallbackResult.error;
+      }
+    } else {
+      const result = await supabase
+        .from('attendance_records')
+        .upsert([basePayload], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+      error = result.error;
+    }
+
+    if (error) {
+      console.error('Failed to save attendance:', error);
+      notify(`Failed to save attendance: ${error.message}`);
+      return;
+    }
+
+    await syncStudentAttendanceRates([studentId]);
+
+    const storeKey = getAttendanceStoreKey(contextType, contextId);
+    setSubjectAttendanceStore(prev => {
+      const contextData = prev[storeKey] || {};
+      const dateData = contextData[date] || {};
+      return {
+        ...prev,
+        [storeKey]: {
+          ...contextData,
+          [date]: {
+            ...dateData,
+            [studentId]: status,
+          },
+        },
+      };
+    });
+  }, [getAttendanceStoreKey, notify, requireSchoolId, syncStudentAttendanceRates]);
+
+  const bulkMarkSubjectPresent = useCallback(async (
+    contextType: AttendanceContextType,
+    contextId: string,
+    date: string,
+    studentIds: string[],
+    contextName?: string
+  ) => {
+    if (studentIds.length === 0) {
+      notify('No students found to mark attendance.');
+      return;
+    }
+
+    const schoolId = await requireSchoolId();
+
+    const basePayload = studentIds.map(studentId => withSchoolId({
+      context_type: contextType,
+      context_id: contextId,
+      attendance_date: date,
+      student_id: studentId,
+      status: 'P' as const,
+    }, schoolId));
+
+    let error: any = null;
+
+    if (isAttendanceContextNameSupported && contextName) {
+      const payloadWithName = basePayload.map(item => ({
+        ...item,
+        context_name: contextName,
+      }));
+
+      const result = await supabase
+        .from('attendance_records')
+        .upsert(payloadWithName, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+      error = result.error;
+
+      if (error && /context_name/i.test(error.message || '')) {
+        setIsAttendanceContextNameSupported(false);
+        const fallbackResult = await supabase
+          .from('attendance_records')
+          .upsert(basePayload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+        error = fallbackResult.error;
+      }
+    } else {
+      const result = await supabase
+        .from('attendance_records')
+        .upsert(basePayload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+      error = result.error;
+    }
+
+    if (error) {
+      console.error('Failed to bulk save attendance:', error);
+      notify(`Failed to save attendance: ${error.message}`);
+      return;
+    }
+
+    await syncStudentAttendanceRates(studentIds);
+
+    const nextDateData: Record<string, 'P'> = {};
+    studentIds.forEach(studentId => {
+      nextDateData[studentId] = 'P';
+    });
+
+    setAttendanceForDate(getAttendanceStoreKey(contextType, contextId), date, nextDateData);
+    notify(`All students marked Present for ${contextName || 'selected attendance context'}.`);
+  }, [getAttendanceStoreKey, notify, requireSchoolId, setAttendanceForDate, syncStudentAttendanceRates]);
+
+  useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
+    void syncAllStudentsToCloud(false);
+  }, [onboardingStatus, syncAllStudentsToCloud]);
+
+  useEffect(() => {
+    if (onboardingStatus !== 'ready') {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setCloudSyncCountdown(prev => {
+        if (prev <= 1) {
+          void syncAllStudentsToCloud(false);
+          return CLOUD_SYNC_INTERVAL_SECONDS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [onboardingStatus, syncAllStudentsToCloud]);
+
+  const cloudSyncTimeText = useMemo(() => {
+    const minutes = Math.floor(cloudSyncCountdown / 60);
+    const seconds = cloudSyncCountdown % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }, [cloudSyncCountdown]);
+
+  if (onboardingStatus === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] dark:bg-slate-950 flex items-center justify-center">
+        <p className="text-sm font-bold text-slate-400">Loadingâ€¦</p>
+      </div>
+    );
+  }
+
+  if (onboardingStatus === 'needs-school') {
+    return (
+      <CreateSchoolPage
+        onBackToHubs={onSwitch}
+        onCreated={(id) => {
+          if (onSchoolIdChange) onSchoolIdChange(id);
+          setOnboardingStatus('ready');
+        }}
+      />
+    );
+  }
+
+  if (onboardingStatus === 'needs-auth') {
+    return (
+      <StaffLogin 
+        schoolName={schoolName}
+        onLoginSuccess={() => setOnboardingStatus('loading')}
+        onBackToSchoolSelect={() => {
+          if (onSchoolIdChange) onSchoolIdChange(undefined);
+          setOnboardingStatus('needs-school');
+        }}
+        onBackToHubs={onSwitch}
+      />
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen bg-[#f3f0e8] dark:bg-[#0a1a19] transition-colors duration-500 relative">
+
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9998] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-2">
+        <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+          {`Updating to cloud in ${isCloudSyncRunning ? '00:00' : cloudSyncTimeText}second`}
+        </p>
+      </div>
+
+      {notification && (
+        <div className="fixed top-4 right-4 z-[9999] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-3 min-w-[220px] max-w-[90vw]">
+          <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{notification.message}</p>
+        </div>
+      )}
+
+      {newStudentCredentials && (
+        <div className="fixed inset-0 z-[140] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Login Credentials</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Share these once with the user.</p>
+
+            <div className="rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 space-y-2">
+              <p className="text-sm"><span className="font-black">Name:</span> {newStudentCredentials.name}</p>
+              <p className="text-sm"><span className="font-black">Email:</span> {newStudentCredentials.email}</p>
+              <p className="text-sm"><span className="font-black">Password:</span> {newStudentCredentials.password}</p>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button" onClick={async () => {
+                  await navigator.clipboard.writeText(`Email: ${newStudentCredentials.email}\nPassword: ${newStudentCredentials.password}`);
+                  notify('Credentials copied.');
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Copy
+              </button>
+              <button
+                type="button" onClick={() => setNewStudentCredentials(null)}
+                className="px-4 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs uppercase tracking-widest"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isDeveloperAuthModalOpen && (
+        <div className="fixed inset-0 z-[140] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-500">Hidden Access</p>
+              <h3 className="text-xl font-black tracking-tight">Developer Mode</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Enter the admin password to unlock the school login password editor.
+              </p>
+            </div>
+
+            <form onSubmit={handleDeveloperAuthSubmit} className="space-y-4">
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
+                <input aria-label="Action"
+                  type="password"
+                  value={developerAuthPassword}
+                  onChange={(e) => setDeveloperAuthPassword(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                  placeholder="Enter admin password"
+                  autoFocus
+                />
+              </div>
+
+              {developerAuthError && (
+                <p className="text-xs font-bold text-rose-500">{developerAuthError}</p>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeDeveloperAuthModal}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2.5 rounded-xl bg-brand-500 text-white font-bold text-xs uppercase tracking-widest"
+                >
+                  Unlock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isDeveloperModeModalOpen && (
+        <div className="fixed inset-0 z-[145] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-500">Developer Mode</p>
+              <h3 className="text-xl font-black tracking-tight">School Login Password</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Update the current school's login password. This writes the new hash into <span className="font-black">schools.password_hash</span>.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-slate-50 dark:bg-slate-800/70 rounded-2xl p-4 border border-slate-200 dark:border-slate-700">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">School</p>
+                <p className="mt-2 text-sm font-black text-slate-900 dark:text-slate-100">{schoolName || 'Current School'}</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/70 rounded-2xl p-4 border border-slate-200 dark:border-slate-700">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Minimum Length</p>
+                <p className="mt-2 text-sm font-black text-slate-900 dark:text-slate-100">8 characters</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleDeveloperSchoolPasswordSubmit} className="space-y-4">
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">New School Login Password</label>
+                <input aria-label="Action"
+                  type="password"
+                  value={developerSchoolPassword}
+                  onChange={(e) => setDeveloperSchoolPassword(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                  placeholder="Enter new school password"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Confirm Password</label>
+                <input aria-label="Action"
+                  type="password"
+                  value={developerSchoolPasswordConfirm}
+                  onChange={(e) => setDeveloperSchoolPasswordConfirm(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                  placeholder="Re-enter new school password"
+                />
+              </div>
+
+              {developerSchoolPasswordError && (
+                <p className="text-xs font-bold text-rose-500">{developerSchoolPasswordError}</p>
+              )}
+
+              {developerSchoolPasswordStatus && (
+                <p className="text-xs font-bold text-emerald-600">{developerSchoolPasswordStatus}</p>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeDeveloperModeModal}
+                  disabled={isDeveloperSchoolPasswordSaving}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest disabled:opacity-60"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={isDeveloperSchoolPasswordSaving}
+                  className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isDeveloperSchoolPasswordSaving ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
+                >
+                  {isDeveloperSchoolPasswordSaving ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Confirm Deletion</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">{confirmDialog.message}</p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button" onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDialog}
+                className="px-4 py-2.5 rounded-xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest"
+               type="button">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {studentDeleteDialog && (
+        <div className="fixed inset-0 z-[130] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Secure Student Deletion</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Retype <span className="font-black">{studentDeleteDialog.name}</span> and enter admin password to continue.
+            </p>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retype Student Name</label>
+              <input aria-label="Action"
+                type="text"
+                value={studentDeleteNameInput}
+                onChange={(e) => setStudentDeleteNameInput(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter exact student name"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
+              <input aria-label="Action"
+                type="password"
+                value={adminDeletePassword}
+                onChange={(e) => setAdminDeletePassword(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter admin password"
+              />
+            </div>
+
+            {studentDeleteError && (
+              <p className="text-xs font-bold text-rose-500">{studentDeleteError}</p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button" onClick={() => {
+                  if (isStudentDeleteSubmitting) return;
+                  setStudentDeleteDialog(null);
+                  setStudentDeleteNameInput('');
+                  setAdminDeletePassword('');
+                  setStudentDeleteError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSecureStudentDelete}
+                disabled={isStudentDeleteSubmitting}
+                className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isStudentDeleteSubmitting ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
+               type="button">
+                {isStudentDeleteSubmitting ? 'Verifying...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {studentEditAuthDialog && (
+        <div className="fixed inset-0 z-[240] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Admin Verification Required</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Enter admin password to edit student: <span className="font-black">{studentEditAuthDialog.name}</span></p>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
+              <input aria-label="Action"
+                type="password"
+                value={studentEditAuthPassword}
+                onChange={(e) => setStudentEditAuthPassword(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter admin password"
+              />
+            </div>
+
+            {studentEditAuthError && (
+              <p className="text-xs font-bold text-rose-500">{studentEditAuthError}</p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button" onClick={() => {
+                  if (isStudentEditAuthSubmitting) return;
+                  setStudentEditAuthDialog(null);
+                  setStudentEditAuthPassword('');
+                  setStudentEditAuthError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStudentEditAuthConfirm}
+                disabled={isStudentEditAuthSubmitting}
+                className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isStudentEditAuthSubmitting ? 'bg-brand-300 cursor-not-allowed' : 'bg-brand-500'}`}
+               type="button">
+                {isStudentEditAuthSubmitting ? 'Verifying...' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {classDeleteDialog && (
+        <div className="fixed inset-0 z-[130] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
+            <h3 className="text-xl font-black tracking-tight">Secure Class Deletion</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Retype <span className="font-black">{classDeleteDialog.name}</span> and enter admin password to continue.
+            </p>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retype Class Name</label>
+              <input aria-label="Action"
+                type="text"
+                value={classDeleteNameInput}
+                onChange={(e) => setClassDeleteNameInput(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter exact class name"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Admin Password</label>
+              <input aria-label="Action"
+                type="password"
+                value={classAdminDeletePassword}
+                onChange={(e) => setClassAdminDeletePassword(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+                placeholder="Enter admin password"
+              />
+            </div>
+
+            {classDeleteError && (
+              <p className="text-xs font-bold text-rose-500">{classDeleteError}</p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button" onClick={() => {
+                  if (isClassDeleteSubmitting) return;
+                  setClassDeleteDialog(null);
+                  setClassDeleteNameInput('');
+                  setClassAdminDeletePassword('');
+                  setClassDeleteError(null);
+                }}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSecureClassDelete}
+                disabled={isClassDeleteSubmitting}
+                className={`px-4 py-2.5 rounded-xl text-white font-bold text-xs uppercase tracking-widest ${isClassDeleteSubmitting ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
+               type="button">
+                {isClassDeleteSubmitting ? 'Verifying...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ENROLLMENT MODAL */}
+      <EnrollmentModal
+        isOpen={isEnrollModalOpen}
+        onClose={abortEnrollFlow}
+        enrollData={enrollData}
+        setEnrollData={setEnrollData}
+        studentProfileImage={studentProfileImage}
+        setStudentProfileImage={setStudentProfileImage}
+        students={students}
+        classes={classes}
+        classCourses={enrollClassCourses}
+        isClassCoursesLoading={isEnrollClassCoursesLoading}
+        onSubmit={handleEnrollSubmit}
+      />
+
+      <TeacherEnrollmentModal
+        isOpen={isTeacherEnrollModalOpen}
+        onClose={abortTeacherEnrollFlow}
+        entityLabel="Teacher"
+        enrollData={teacherEnrollData}
+        setEnrollData={setTeacherEnrollData}
+        onSubmit={handleTeacherEnrollSubmit}
+      />
+
+      <TeacherEnrollmentModal
+        isOpen={isStudentServiceEnrollModalOpen}
+        onClose={abortStudentServiceEnrollFlow}
+        entityLabel="Student Service Staff"
+        enrollData={studentServiceEnrollData}
+        setEnrollData={setStudentServiceEnrollData}
+        onSubmit={handleStudentServiceEnrollSubmit}
+      />
+
+      {/* GLOBAL EDIT MODAL */}
+      <EditModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        editTarget={editTarget}
+        setEditTarget={setEditTarget}
+        onUpdate={handleUpdate}
+      />
+
+      {/* PERMISSIONS MODAL */}
+      <PermissionsModal
+        isOpen={isPermissionsModalOpen}
+        onClose={() => setIsPermissionsModalOpen(false)}
+        permTarget={permTarget}
+        togglePermission={togglePermission}
+      />
+
+      {/* Sidebar Navigation */}
+      <Sidebar
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+        isCollapsed={isSidebarCollapsed}
+        onCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onSwitch={onSwitch}
+        schoolName={schoolName}
+        schoolLogoUrl={schoolLogoUrl}
+        allowedPages={allowedPages}
+      />
+
+      <main className={`flex-1 transition-all duration-300 flex flex-col min-w-0`}>
+        <header className="h-20 bg-white/60 dark:bg-slate-900/40 backdrop-blur-md px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-40 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-4 sm:gap-8">
+            <button aria-label="Action" className="lg:hidden p-3 text-slate-500 hover:text-brand-500 transition-all" type="button" onClick={() => setIsMobileMenuOpen(true)}><i className="fas fa-bars-staggered"></i></button>
+            <div className="hidden sm:flex flex-col"><span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400"></span><span className="text-xs font-bold text-brand-500"></span></div>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-6">
+            <button
+              type="button" onClick={() => void handleLogout()}
+              className="px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-900 font-black text-xs uppercase tracking-widest hover:bg-rose-100 dark:hover:bg-rose-950/60 transition-all"
+            >
+              Log Out
+            </button>
+            <button aria-label="Action" type="button" onClick={() => setIsDarkMode(!isDarkMode)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-brand-500 rounded-xl active:scale-75 transition-all"><i className={`fas ${isDarkMode ? 'fa-sun' : 'fa-moon'}`}></i></button>
+            <button
+              type="button"
+              onClick={handleDeveloperTriggerClick}
+              className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden border-2 border-slate-200 dark:border-slate-800 hover:border-brand-300 transition-all active:scale-95"
+              aria-label="Developer mode access"
+            >
+              <img src={DEFAULT_AVATAR} alt="Developer mode user avatar" className="w-full h-full object-cover" />
+            </button>
+          </div>
+        </header>
+
+        <div className="p-4 sm:p-6 lg:p-10 xl:p-12 space-y-8 sm:space-y-10 lg:space-y-12 max-w-[1800px] w-full mx-auto overflow-hidden">
+
+          {/* DASHBOARD */}
+          {currentPage === 'dashboard' && <Dashboard stats={stats} schoolId={schoolId} />}
+
+          {/* DATA ARCHIVE */}
+          {currentPage === 'data-archive' && (
+            <DataArchive schoolId={schoolId} />
+          )}
+
+          {currentPage === 'live-calendar' && (
+            <LiveCalendar
+              classes={classes}
+              schoolId={schoolId}
+              notify={notify}
+            />
+          )}
+
+          {/* STUDENTS PAGE (DIRECTORY) - FULL CRUD CONTROLS */}
+          {currentPage === 'students' && (
+            <StudentDirectory
+              title="Student Directory"
+              selectLabel="Student Select"
+              students={students}
+              classes={classes}
+              schoolId={schoolId}
+              selectedDate={selectedDate}
+              setSelectedDate={setSelectedDate}
+              bulkAssignStudentsToClass={bulkAssignStudentsToClass}
+              openPermissions={openPermissions}
+              openEditModal={openEditModal}
+              requestStudentEditWithPassword={requestStudentEditWithPassword}
+              verifyAdminPassword={verifyAdminPassword}
+              updateStudentProfilePhoto={updateStudentProfilePhoto}
+              bulkDeleteStudents={bulkDeleteStudents}
+              deleteEntity={deleteEntity}
+            />
+          )}
+
+          {currentPage === 'parents' && (
+            <ParentDirectory
+              students={allStudents.length ? allStudents : students}
+              onOpenParent={(parentId) => {
+                setSelectedParentId(parentId);
+                setCurrentPage('parent-detail');
+              }}
+            />
+          )}
+
+          {currentPage === 'parent-detail' && (
+            <ParentDetailPage
+              parentId={selectedParentId}
+              students={allStudents.length ? allStudents : students}
+              classes={classes}
+              onBack={() => {
+                setCurrentPage('parents');
+              }}
+            />
+          )}
+
+          {/* REGISTRATION HUB - ENROLLMENT & DELETION */}
+          {currentPage === 'student-register' && (
+            <RegistrationHub
+              students={students}
+              schoolId={schoolId}
+              enrollStudentAction={enrollStudentAction}
+              batchRegisterStudents={batchRegisterStudents}
+              isBatchRegistering={isBatchRegistering}
+              deleteEntity={deleteEntity}
+            />
+          )}
+
+          {currentPage === 'teacher-register' && (
+            <TeacherRegistrationHub
+              teachers={teachers}
+              schoolId={schoolId}
+              enrollTeacherAction={enrollTeacherAction}
+              batchRegisterTeachers={batchRegisterTeachers}
+              isBatchRegistering={isBatchTeacherRegistering}
+              deleteEntity={deleteEntity}
+            />
+          )}
+
+          {/* DAILY ATTENDANCE - SUBJECT SPECIFIC */}
+          {currentPage === 'student-attendance' && (
+            <AttendanceProtocol
+              students={attendanceStudents}
+              teachers={teachers}
+              subjects={subjects}
+              attendanceDate={attendanceDate}
+              setAttendanceDate={setAttendanceDate}
+              classes={classes}
+              schoolId={schoolId}
+              allStudents={allStudents}
+              className={className}
+              setClassName={setClassName}
+              classImage={classImage}
+              setClassImage={setClassImage}
+              classOuterColor={classOuterColor}
+              setClassOuterColor={setClassOuterColor}
+              createClassWithStudents={createClassWithStudents}
+              editingClassId={editingClassId}
+              startEditClass={startEditClass}
+              cancelEditClass={cancelEditClass}
+              saveClassEdits={saveClassEdits}
+              deleteClass={deleteClass}
+              removeStudentFromClass={removeStudentFromClass}
+              selectedAttendanceSubject={selectedAttendanceSubject}
+              setSelectedAttendanceSubject={setSelectedAttendanceSubject}
+              subjectAttendanceStore={subjectAttendanceStore}
+              updateSubjectAttendance={updateSubjectAttendance}
+              bulkMarkSubjectPresent={bulkMarkSubjectPresent}
+              loadAttendanceForContext={loadAttendanceForContext}
+              exportMonthlyAttendancePdf={exportMonthlyAttendancePdf}
+              notify={notify}
+              openClassCoursePage={(course) => {
+                setSelectedClassAttendanceId(course.classId);
+                setSelectedClassCourse(course);
+                setCurrentPage('class-course');
+              }}
+              openClassAttendancePage={(classId) => {
+                setSelectedClassAttendanceId(classId);
+                setCurrentPage('class-attendance');
+              }}
+            />
+          )}
+
+          {currentPage === 'class-attendance' && (
+            <AttendanceProtocol
+              schoolId={schoolId}
+              students={attendanceStudents}
+              teachers={teachers}
+              subjects={subjects}
+              attendanceDate={attendanceDate}
+              setAttendanceDate={setAttendanceDate}
+              classes={classes}
+              allStudents={allStudents}
+              className={className}
+              setClassName={setClassName}
+              classImage={classImage}
+              setClassImage={setClassImage}
+              classOuterColor={classOuterColor}
+              setClassOuterColor={setClassOuterColor}
+              createClassWithStudents={createClassWithStudents}
+              editingClassId={editingClassId}
+              startEditClass={startEditClass}
+              cancelEditClass={cancelEditClass}
+              saveClassEdits={saveClassEdits}
+              deleteClass={deleteClass}
+              removeStudentFromClass={removeStudentFromClass}
+              selectedAttendanceSubject={selectedAttendanceSubject}
+              setSelectedAttendanceSubject={setSelectedAttendanceSubject}
+              subjectAttendanceStore={subjectAttendanceStore}
+              updateSubjectAttendance={updateSubjectAttendance}
+              bulkMarkSubjectPresent={bulkMarkSubjectPresent}
+              loadAttendanceForContext={loadAttendanceForContext}
+              exportMonthlyAttendancePdf={exportMonthlyAttendancePdf}
+              notify={notify}
+              openClassCoursePage={(course) => {
+                setSelectedClassAttendanceId(course.classId);
+                setSelectedClassCourse(course);
+                setCurrentPage('class-course');
+              }}
+              classAttendancePage
+              focusClassId={selectedClassAttendanceId}
+              onExitClassAttendancePage={() => {
+                setCurrentPage('student-attendance');
+                setSelectedClassAttendanceId(null);
+              }}
+            />
+          )}
+
+          {currentPage === 'class-course' && selectedClassCourse && (
+            <div className="space-y-10 animate-in fade-in duration-500 pb-20">
+              <div className="bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] lg:rounded-[56px] p-6 sm:p-8 lg:p-10 border border-slate-100 dark:border-slate-800 shadow-premium">
+                <div className="flex items-center gap-4 sm:gap-6 lg:gap-8 min-w-0">
+                  <button aria-label="Action"
+                    type="button" onClick={() => setCurrentPage('class-attendance')}
+                    className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 transition-all"
+                  >
+                    <i className="fas fa-arrow-left"></i>
+                  </button>
+                  <div className="min-w-0">
+                    <h3 className="text-2xl sm:text-3xl font-black tracking-tight">Course Page: {selectedClassCourse.name}</h3>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-2">
+                      Class: {selectedClassCourse.className || selectedClassCourse.classId}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <AttendanceProtocol
+                students={attendanceStudents}
+                teachers={teachers}
+                subjects={subjects}
+                attendanceDate={attendanceDate}
+                setAttendanceDate={setAttendanceDate}
+                classes={classes}
+                schoolId={schoolId}
+                allStudents={allStudents}
+                className={className}
+                setClassName={setClassName}
+                classImage={classImage}
+                setClassImage={setClassImage}
+                classOuterColor={classOuterColor}
+                setClassOuterColor={setClassOuterColor}
+                createClassWithStudents={createClassWithStudents}
+                editingClassId={editingClassId}
+                startEditClass={startEditClass}
+                cancelEditClass={cancelEditClass}
+                saveClassEdits={saveClassEdits}
+                deleteClass={deleteClass}
+                removeStudentFromClass={removeStudentFromClass}
+                selectedAttendanceSubject={selectedAttendanceSubject}
+                setSelectedAttendanceSubject={setSelectedAttendanceSubject}
+                subjectAttendanceStore={subjectAttendanceStore}
+                updateSubjectAttendance={updateSubjectAttendance}
+                bulkMarkSubjectPresent={bulkMarkSubjectPresent}
+                loadAttendanceForContext={loadAttendanceForContext}
+                exportMonthlyAttendancePdf={exportMonthlyAttendancePdf}
+                notify={notify}
+                openClassCoursePage={(course) => {
+                  setSelectedClassAttendanceId(course.classId);
+                  setSelectedClassCourse(course);
+                  setCurrentPage('class-course');
+                }}
+                classAttendancePage
+                courseAttendanceOnly
+                focusClassId={selectedClassCourse.classId}
+                focusCourse={selectedClassCourse}
+                onExitClassAttendancePage={() => {
+                  setCurrentPage('class-attendance');
+                  setSelectedClassAttendanceId(selectedClassCourse.classId);
+                }}
+              />
+            </div>
+          )}
+
+          {/* EXAM PAGE - WITH CRUD */}
+          {currentPage === 'exam' && (
+            <ExamManagementPage schoolId={schoolId} />
+          )}
+
+          {currentPage === 'notice' && (
+            <NoticeBoard
+              schoolId={schoolId}
+              onOpenNotice={(noticeId) => {
+                setSelectedNoticeId(noticeId);
+                setCurrentPage('notice-detail');
+              }}
+            />
+          )}
+
+          {currentPage === 'notice-detail' && (
+            <NoticeDetailPage
+              noticeId={selectedNoticeId}
+              onBack={() => {
+                setCurrentPage('notice');
+              }}
+            />
+          )}
+          
+          {currentPage === 'class-announcements' && (
+            <ClassAnnouncements schoolId={schoolId} />
+          )}
+
+          {currentPage === 'security' && (
+            <SecurityPermission schoolId={schoolId} />
+          )}
+
+          {currentPage === 'about-school' && (
+            <AboutSchool schoolId={schoolId} onSchoolProfileChange={handleSchoolProfileChange} />
+          )}
+
+          {currentPage === 'messages' && schoolId && (
+            <MessagesOversight schoolId={schoolId} schoolName={schoolName} />
+          )}
+
+          {currentPage === 'class-group-management' && schoolId && (
+            <ClassGroupManagement schoolId={schoolId} />
+          )}
+
+          {currentPage === 'sms-attendance' && schoolId && (
+            <AttendanceTaker schoolId={schoolId} />
+          )}
+
+          {currentPage === 'teacher-attendance' && schoolId && (
+            <TeacherAttendance schoolId={schoolId} />
+          )}
+
+          {currentPage === 'video-conference' && (
+            <VideoConference
+              user={{
+                id: 'admin-developer',
+                name: 'Administrator',
+                email: 'admin@iem.edu',
+                role: 'admin'
+              }}
+              schoolId={schoolId}
+              courses={subjects.map(s => ({
+                id: s.id,
+                title: s.name,
+                category: s.code,
+                subTeacherName: s.teacher,
+                scheduleDescription: 'Mon/Wed 10:00 AM'
+              }))}
+              isTeacher={true}
+              supabase={supabase}
+              classes={classes}
+            />
+          )}
+
+          {/* SUBJECT PAGE - WITH CRUD */}
+          {currentPage === 'subject' && (
+            <div className="space-y-12 animate-in fade-in duration-700 pb-20">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter">Neural Curricula</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                {subjects.map(sub => (
+                  <div key={sub.id} className="bg-white dark:bg-slate-900 p-10 rounded-[56px] shadow-premium border border-slate-100 dark:border-slate-800 group hover:-translate-y-4 transition-all duration-500 relative">
+                    <div className="absolute top-8 right-8 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <button type="button" onClick={() => openEditModal('subject', sub)} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 shadow-sm"><i className="fas fa-edit text-sm"></i></button>
+                      <button type="button" onClick={() => deleteEntity(sub.id, 'subject')} className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 shadow-sm"><i className="fas fa-trash text-sm"></i></button>
+                    </div>
+                    <div className="flex justify-between items-start mb-12">
+                      <div className={`w-20 h-20 ${sub.bg} ${sub.color} rounded-[32px] flex items-center justify-center text-4xl shadow-inner group-hover:rotate-6 transition-transform`}><i className={`fas ${sub.icon}`}></i></div>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{sub.code}</p>
+                    </div>
+                    <h4 className="text-2xl font-black mb-2 group-hover:text-brand-500 transition-colors">{sub.name}</h4>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10">{sub.teacher}</p>
+                    <div className="space-y-4">
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest"><span className="text-slate-400">Syllabus Sync</span><span className="text-brand-500">{sub.progress}%</span></div>
+                      <div className="h-2.5 w-full bg-slate-50 dark:bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-brand-500 transition-all duration-1000 shadow-glow" style={{ width: `${sub.progress}%` }}></div></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* HOMEWORK PAGE - WITH CRUD */}
+          {currentPage === 'homework' && (
+            <HomeworkManager schoolId={schoolId} />
+          )}
+
+          {currentPage === 'report-card' && (
+            <ReportCardPage schoolId={schoolId} />
+          )}
+
+          {currentPage === 'student-achievements' && (
+            <StudentAchievements 
+              schoolId={schoolId} 
+              students={allStudents.length > 0 ? allStudents : students}
+              notify={notify}
+              onConfirm={(message, action) => setConfirmDialog({ message, onConfirm: action })}
+            />
+          )}
+
+          {currentPage === 'payment' && (
+            <PaymentFinanceHub schoolId={schoolId} view="payment" />
+          )}
+
+          {currentPage === 'payment-assign' && (
+            <PaymentFinanceHub schoolId={schoolId} view="payment-assign" />
+          )}
+
+          {currentPage === 'payment-history' && (
+            <PaymentFinanceHub schoolId={schoolId} view="payment-history" />
+          )}
+
+          {currentPage === 'student-finance-status' && (
+            <PaymentFinanceHub schoolId={schoolId} view="student-finance-status" />
+          )}
+
+          {currentPage === 'cash-records' && (
+            <PaymentFinanceHub schoolId={schoolId} view="cash-records" />
+          )}
+
+          {/* PROGRAMS PAGE - WITH CRUD */}
+          {currentPage === 'programs' && (
+            <div className="space-y-12 animate-in fade-in duration-700 pb-20">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter">Academic Pathways</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                {programs.map((prog) => (
+                  <div key={prog.id} className="bg-white dark:bg-slate-900 rounded-[80px] p-16 shadow-premium border border-slate-100 dark:border-slate-800 group hover:shadow-2xl transition-all duration-500 flex flex-col md:flex-row gap-12 relative overflow-hidden">
+                    <div className="absolute top-12 right-12 flex gap-4 opacity-0 group-hover:opacity-100 transition-all">
+                      <button type="button" onClick={() => openEditModal('program', prog)} className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-brand-500 shadow-sm"><i className="fas fa-gear"></i></button>
+                      <button type="button" onClick={() => deleteEntity(prog.id, 'program')} className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 shadow-sm"><i className="fas fa-trash-can"></i></button>
+                    </div>
+                    <div className={`w-32 h-32 md:w-48 md:h-48 rounded-[64px] bg-gradient-to-tr ${prog.color} flex items-center justify-center text-white text-5xl md:text-7xl shadow-xl group-hover:scale-110 group-hover:-rotate-3 transition-transform flex-shrink-0`}><i className={`fas ${prog.icon}`}></i></div>
+                    <div className="flex-1 flex flex-col justify-center">
+                      <p className="text-xs font-black text-brand-500 uppercase tracking-[0.4em] mb-4">{prog.code}</p>
+                      <h4 className="text-4xl font-black mb-8 leading-tight tracking-tighter">{prog.name}</h4>
+                      <div className="flex gap-12">
+                        <div><p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Total Students</p><p className="text-2xl font-black">{prog.students}</p></div>
+                        <div><p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">Duration</p><p className="text-2xl font-black">{prog.duration}</p></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TEACHERS PAGE - DIRECTORY */}
+          {currentPage === 'teachers' && (
+            <StudentDirectory
+              title="Teacher Directory"
+              selectLabel="Teacher Select"
+              schoolId={schoolId}
+              namePrefix="(T) "
+              students={teachers}
+              classes={classes}
+              selectedDate={selectedDate}
+              setSelectedDate={setSelectedDate}
+              bulkAssignStudentsToClass={bulkAssignTeachersToClass}
+              openPermissions={openPermissions}
+              openEditModal={openEditModal}
+              requestStudentEditWithPassword={requestStudentEditWithPassword}
+              verifyAdminPassword={verifyAdminPassword}
+              updateStudentProfilePhoto={updateStudentProfilePhoto}
+              bulkDeleteStudents={bulkDeleteStudents}
+              deleteEntity={deleteEntity}
+            />
+          )}
+
+          {/* STUDENT SERVICE DIRECTORY */}
+          {currentPage === 'student-service' && (
+            <StudentDirectory
+              title="Student Service Directory"
+              selectLabel="Staff Select"
+              schoolId={schoolId}
+              namePrefix="(SS) "
+              students={studentServiceStaff}
+              classes={classes}
+              selectedDate={selectedDate}
+              setSelectedDate={setSelectedDate}
+              bulkAssignStudentsToClass={bulkAssignTeachersToClass}
+              openPermissions={openPermissions}
+              openEditModal={openEditModal}
+              requestStudentEditWithPassword={requestStudentEditWithPassword}
+              verifyAdminPassword={verifyAdminPassword}
+              updateStudentProfilePhoto={updateStudentProfilePhoto}
+              bulkDeleteStudents={bulkDeleteStudents}
+              deleteEntity={deleteEntity}
+            />
+          )}
+
+          {/* STUDENT SERVICE BATCH REGISTERING */}
+          {currentPage === 'student-service-batch' && (
+            <StudentServiceBatchRegister
+              studentServiceStaff={studentServiceStaff}
+              enrollStudentServiceAction={enrollStudentServiceAction}
+              batchRegisterStudentService={batchRegisterStudentService}
+              isBatchRegistering={isBatchStudentServiceRegistering}
+              deleteEntity={deleteEntity}
+            />
+          )}
+
+          {/* EVENTS PAGE */}
+          {currentPage === 'events' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl"><i className="fas fa-calendar-star"></i></div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">Events</h2>
+                  <p className="text-sm text-slate-400 mt-1">Manage and publish school events for students and parents.</p>
+                </div>
+              </div>
+              {events.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-10 text-center shadow-premium">
+                  <i className="fas fa-calendar-plus text-5xl text-brand-500/30 mb-6 block"></i>
+                  <p className="text-slate-500 font-semibold">No events scheduled yet. Create an event to share with the school community.</p>
+                  <button 
+                    type="button" onClick={() => setIsGlobalCreateModalOpen('events')}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Create Event
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                  <button type="button"
+                    onClick={() => setIsGlobalCreateModalOpen('events')}
+                    className="w-full text-left block group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:border-brand-500 hover:bg-brand-500/5 transition-all min-h-[280px]"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all group-hover:scale-110 mb-4">
+                      <i className="fas fa-plus text-xl"></i>
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Create New Event</h3>
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 max-w-[200px] mx-auto">
+                      Schedule a new school-wide or class-specific event
+                    </p>
+                  </button>
+                  {events.map((event: any) => (
+                    <div key={event.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 shadow-premium group hover:-translate-y-1 transition-all overflow-hidden relative">
+                      {event.image_url && (
+                        <div className="absolute inset-0 opacity-5 group-hover:opacity-10 transition-opacity">
+                          <img src={event.image_url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex justify-between items-start mb-6 relative z-10">
+                        <div className="flex flex-col gap-2">
+                          <span className="px-4 py-1.5 rounded-xl bg-brand-500/10 text-brand-500 text-[10px] font-black uppercase tracking-widest w-fit">{event.type}</span>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">{new Date(event.event_date).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <button type="button" onClick={(e) => { e.stopPropagation(); openGlobalEdit('events', event); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-brand-500 transition-all flex items-center justify-center text-xs shadow-sm"><i className="fas fa-pencil"></i></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); deleteEntity(event.id, 'events'); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-all flex items-center justify-center text-xs shadow-sm"><i className="fas fa-trash-can"></i></button>
+                        </div>
+                      </div>
+                      <h4 className="text-xl font-black tracking-tight mb-2 line-clamp-1 relative z-10">{event.title}</h4>
+                      <p className="text-sm text-slate-500 line-clamp-3 mb-6 font-medium leading-relaxed relative z-10">{event.description}</p>
+                      <div className="flex items-center justify-between mt-auto relative z-10">
+                        {event.location && (
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            <i className="fas fa-location-dot text-brand-500"></i>
+                            {event.location}
+                          </div>
+                        )}
+                        {event.image_url && (
+                          <a href={event.image_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-black uppercase tracking-widest text-brand-500 hover:text-brand-600 flex items-center gap-2 bg-brand-500/5 px-3 py-1.5 rounded-lg transition-colors">
+                            <i className="fas fa-file-image"></i> Media
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STUDENT ACTIVITIES PAGE */}
+          {currentPage === 'student-activities' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl"><i className="fas fa-masks-theater"></i></div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">Student Activities</h2>
+                  <p className="text-sm text-slate-400 mt-1">Publish extracurricular programs, clubs, and student initiatives.</p>
+                </div>
+              </div>
+              {studentActivities.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-10 text-center shadow-premium">
+                  <i className="fas fa-users text-5xl text-brand-500/30 mb-6 block"></i>
+                  <p className="text-slate-500 font-semibold">No activities posted yet. Add activities for students to explore and join.</p>
+                  <button 
+                    type="button" onClick={() => setIsGlobalCreateModalOpen('student-activities')}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Add Activity
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                  <button type="button"
+                    onClick={() => setIsGlobalCreateModalOpen('student-activities')}
+                    className="w-full text-left block group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:border-brand-500 hover:bg-brand-500/5 transition-all min-h-[250px]"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all group-hover:scale-110 mb-4">
+                      <i className="fas fa-plus text-xl"></i>
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Create New Activity</h3>
+                    <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 max-w-[200px] mx-auto">
+                      Set up extracurriculars, clubs, and student activities
+                    </p>
+                  </button>
+                  {studentActivities.map((act: any) => (
+                    <div key={act.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-6 shadow-premium group hover:-translate-y-1 transition-all">
+                      <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 text-brand-500 rounded-2xl flex items-center justify-center text-xl mb-6 group-hover:bg-brand-500 group-hover:text-white transition-all">
+                        <i className={`fas ${act.icon || 'fa-users'}`}></i>
+                      </div>
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-xl font-black tracking-tight line-clamp-1">{act.name}</h4>
+                        <div className="flex items-center gap-2">
+                           <button type="button" onClick={(e) => { e.stopPropagation(); openGlobalEdit('student-activities', act); }} className="text-slate-400 hover:text-brand-500 transition-colors text-xs p-1"><i className="fas fa-pencil"></i></button>
+                           <button type="button" onClick={(e) => { e.stopPropagation(); deleteEntity(act.id, 'student-activities'); }} className="text-slate-400 hover:text-rose-500 transition-colors text-xs p-1"><i className="fas fa-trash-can"></i></button>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 items-center mb-6">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{act.activity_type}</span>
+                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${act.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'}`}>{act.status}</span>
+                      </div>
+                      <p className="text-sm text-slate-500 line-clamp-4 font-medium leading-relaxed mb-6">{act.description}</p>
+                      {act.attachment_url && (
+                        <a href={act.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-brand-500 hover:text-brand-600 bg-brand-500/5 px-4 py-2 rounded-xl transition-all">
+                          <i className="fas fa-paperclip"></i> View Attached File
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ANNOUNCEMENTS FOR PARENT PAGE */}
+          {currentPage === 'announcements-parent' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl"><i className="fas fa-people-roof"></i></div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">Announcements For Parent</h2>
+                  <p className="text-sm text-slate-400 mt-1">Send targeted announcements directly to parents via the Parent Portal.</p>
+                </div>
+              </div>
+              {parentAnnouncements.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-10 text-center shadow-premium">
+                  <i className="fas fa-envelope-open-text text-5xl text-brand-500/30 mb-6 block"></i>
+                  <p className="text-slate-500 font-semibold">No parent announcements published yet. Create one to notify parents instantly.</p>
+                  <button 
+                    type="button" onClick={() => setIsGlobalCreateModalOpen('announcements-parent')}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Create Announcement
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
+                  <button type="button"
+                    onClick={() => setIsGlobalCreateModalOpen('announcements-parent')}
+                    className="w-full text-left block group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-8 flex items-center gap-6 hover:border-brand-500 hover:bg-brand-500/5 transition-all"
+                  >
+                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all group-hover:scale-110 shrink-0">
+                      <i className="fas fa-plus text-xl"></i>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 dark:text-white mb-1">Create Announcement</h3>
+                      <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                        Draft and send a new announcement to parents
+                      </p>
+                    </div>
+                  </button>
+                  {parentAnnouncements.map((pa: any) => (
+                    <div key={pa.id} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800 p-8 shadow-premium group">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                          pa.importance === 'Urgent' ? 'bg-rose-500/10 text-rose-500' :
+                          pa.importance === 'High' ? 'bg-amber-500/10 text-amber-500' :
+                          'bg-sky-500/10 text-sky-500'
+                        }`}>
+                          {pa.importance}
+                        </div>
+                        <div className="flex items-center gap-3">
+                           <button type="button" onClick={() => openGlobalEdit('announcements-parent', pa)} className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-brand-500 transition-all flex items-center justify-center shadow-sm"><i className="fas fa-edit text-xs"></i></button>
+                           <button type="button" onClick={() => deleteEntity(pa.id, 'announcements-parent')} className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 transition-all flex items-center justify-center shadow-sm"><i className="fas fa-trash text-xs"></i></button>
+                        </div>
+                      </div>
+                      <h4 className="text-2xl font-black tracking-tight mb-4">{pa.title}</h4>
+                      <p className="text-sm text-slate-500 font-medium leading-relaxed mb-6">{pa.message}</p>
+                      <div className="flex items-center gap-4 mt-6">
+                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-brand-500 bg-brand-500/5 px-4 py-2 rounded-xl w-fit">
+                          <i className="fas fa-check-double"></i> Published to Parent Portal
+                        </div>
+                        {pa.attachment_url && (
+                          <a href={pa.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-brand-500 transition-colors">
+                            <i className="fas fa-paperclip"></i> Attachment
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* LIVE INTEL PAGE */}
+          {currentPage === 'live-intel' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
+                <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl"><i className="fas fa-satellite-dish"></i></div>
+                <div>
+                  <h2 className="text-3xl font-black tracking-tighter">Live Intel</h2>
+                  <p className="text-sm text-slate-400 mt-1">Real-time alerts, system activity, and institutional intelligence feed.</p>
+                </div>
+              </div>
+
+              {liveIntelData.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-10 text-center shadow-premium">
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-black uppercase tracking-widest mb-4"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>Live Feed Active</span>
+                  <p className="text-slate-500 font-semibold">Real-time intelligence data will appear here as events occur across the institution.</p>
+                  <button 
+                    type="button" onClick={() => setIsGlobalCreateModalOpen('live-intel')}
+                    className="mt-6 px-8 py-3 bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Post Intel
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 pb-20">
+                  <button type="button"
+                    onClick={() => setIsGlobalCreateModalOpen('live-intel')}
+                    className="w-full text-left block group border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-6 flex items-center justify-between hover:border-brand-500 hover:bg-brand-500/5 transition-all"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-brand-500 group-hover:text-white transition-all">
+                        <i className="fas fa-plus"></i>
+                      </div>
+                      <div>
+                        <h4 className="text-base font-black text-slate-900 dark:text-white">Create Intel Task</h4>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Set up a new monitoring job</p>
+                      </div>
+                    </div>
+                    <i className="fas fa-arrow-right text-slate-300 group-hover:text-brand-500 transition-colors"></i>
+                  </button>
+                  {liveIntelData.map((intel: any) => (
+                    <div key={intel.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 shadow-sm flex items-center gap-6">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
+                        intel.severity === 'Critical' ? 'bg-rose-500/10 text-rose-500' :
+                        intel.severity === 'Warning' ? 'bg-amber-500/10 text-amber-500' :
+                        'bg-sky-500/10 text-sky-500'
+                      }`}>
+                        <i className={`fas ${
+                          intel.event_type.toLowerCase().includes('sec') ? 'fa-shield-halved' :
+                          intel.event_type.toLowerCase().includes('sys') ? 'fa-microchip' :
+                          'fa-bolt'
+                        }`}></i>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h5 className="font-black tracking-tight truncate uppercase text-xs">{intel.event_type}</h5>
+                          <span className="text-[10px] font-bold text-slate-400">{new Date(intel.created_at).toLocaleTimeString()}</span>
+                        </div>
+                        <div className="flex flex-col gap-2 overflow-hidden">
+                          <p className="text-sm text-slate-500 font-medium truncate italic">{intel.details?.log || 'Intel snapshot captured'}</p>
+                          {intel.attachment_url && (
+                            <div className="flex items-center gap-3">
+                              {/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(intel.attachment_url) ? (
+                                <div className="mt-2 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm max-w-[200px]">
+                                  <img 
+                                    src={intel.attachment_url} 
+                                    alt="Intel Attachment Preview" 
+                                    className="w-full h-auto object-cover hover:scale-110 transition-transform duration-500"
+                                  />
+                                </div>
+                              ) : (
+                                <a href={intel.attachment_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-500 hover:underline flex-shrink-0 flex items-center gap-1 font-bold uppercase tracking-widest">
+                                  <i className="fas fa-paperclip"></i> View Attachment
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => openGlobalEdit('live-intel', intel)} className="p-2 text-slate-400 hover:text-brand-500 transition-colors"><i className="fas fa-pen-to-square text-xs"></i></button>
+                        <button type="button" onClick={() => deleteEntity(intel.id, 'live-intel')} className="p-2 text-slate-400 hover:text-rose-500 transition-colors"><i className="fas fa-trash text-xs"></i></button>
+                        <div className={`text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full ${
+                          intel.severity === 'Critical' ? 'text-rose-500' :
+                          intel.severity === 'Warning' ? 'text-amber-500' :
+                          'text-sky-500'
+                        }`}>
+                          {intel.severity}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+
+
+
+
+
+
+
+
+
+
+          {/* GLOBAL CREATE MODAL */}
+          {isGlobalCreateModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 lg:p-10">
+              <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsGlobalCreateModalOpen(null)}></div>
+              <div className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-[32px] sm:rounded-[48px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500 border border-slate-100 dark:border-slate-800">
+                <div className="p-8 sm:p-10 lg:p-12 overflow-y-auto max-h-[85vh] no-scrollbar">
+                  <div className="flex justify-between items-start mb-10">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-brand-500/10 text-brand-500 rounded-2xl flex items-center justify-center text-xl">
+                        <i className={`fas ${
+                          isGlobalCreateModalOpen === 'events' ? 'fa-calendar-star' :
+                          isGlobalCreateModalOpen === 'student-activities' ? 'fa-masks-theater' :
+                          isGlobalCreateModalOpen === 'announcements-parent' ? 'fa-people-roof' : 'fa-satellite-dish'
+                        }`}></i>
+                      </div>
+                      <div>
+                        <h3 className="text-2xl font-black tracking-tighter capitalize">{isGlobalCreateModalOpen.replace('-', ' ')}</h3>
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Institutional Communication Hub</p>
+                      </div>
+                    </div>
+                    <button aria-label="Action" type="button" onClick={() => {
+                      setIsGlobalCreateModalOpen(null);
+                      setGlobalCreateData({});
+                      setGlobalCreateFile(null);
+                    }} className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all"><i className="fas fa-times"></i></button>
+                  </div>
+
+                  <form className="space-y-6" onSubmit={(e) => {
+                    e.preventDefault();
+                    handleGlobalSave(isGlobalCreateModalOpen, globalCreateData);
+                  }}>
+                    {/* COMMON TITLE/NAME/CATEGORY FIELD - HIDDEN FOR LIVE-INTEL AS IT HAS SPECIFIC LAYOUT */}
+                    {isGlobalCreateModalOpen !== 'live-intel' && (
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
+                          {isGlobalCreateModalOpen === 'student-activities' ? 'Activity Name' : 'Title / Subject'}
+                        </span>
+                        <input aria-label="Action"
+                          required
+                          type="text"
+                          value={
+                            isGlobalCreateModalOpen === 'student-activities' 
+                              ? (globalCreateData.name || '') 
+                              : (globalCreateData.title || '')
+                          }
+                          onChange={(e) => setGlobalCreateData({ 
+                            ...globalCreateData, 
+                            [isGlobalCreateModalOpen === 'student-activities' ? 'name' : 'title']: e.target.value 
+                          })}
+                          placeholder={isGlobalCreateModalOpen === 'events' ? 'Winter Workshop 2024' : 'Announcement Subject...'}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all font-sans"
+                        />
+                      </div>
+                    )}
+
+                    {/* CONTEXT SPECIFIC FIELDS */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {isGlobalCreateModalOpen === 'events' && (
+                        <>
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Event Date</span>
+                            <input aria-label="Action"
+                              required
+                              type="date"
+                              value={globalCreateData.event_date || ''}
+                              onChange={(e) => setGlobalCreateData({ ...globalCreateData, event_date: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Type</span>
+                            <select
+                              value={globalCreateData.type || 'General'}
+                              onChange={(e) => setGlobalCreateData({ ...globalCreateData, type: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all appearance-none"
+                            >
+                              <option value="General">General</option>
+                              <option value="Holiday">Holiday</option>
+                              <option value="Workshop">Workshop</option>
+                              <option value="Exam">Exam Schedule</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      {isGlobalCreateModalOpen === 'student-activities' && (
+                        <div className="sm:col-span-2 space-y-2">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Activity Category</span>
+                          <select
+                            value={globalCreateData.activity_type || 'Club'}
+                            onChange={(e) => setGlobalCreateData({ ...globalCreateData, activity_type: e.target.value })}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all appearance-none"
+                          >
+                            <option value="Club">Student Club</option>
+                            <option value="Sports">Sports / Athletics</option>
+                            <option value="Arts">Arts & Culture</option>
+                            <option value="Academic">Academic Competition</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {isGlobalCreateModalOpen === 'announcements-parent' && (
+                        <div className="sm:col-span-2 space-y-2">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Priority Status</span>
+                          <select
+                            value={globalCreateData.importance || 'Medium'}
+                            onChange={(e) => setGlobalCreateData({ ...globalCreateData, importance: e.target.value })}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all appearance-none"
+                          >
+                            <option value="Low">Low Priority</option>
+                            <option value="Medium">Standard Announcement</option>
+                            <option value="High">High Importance</option>
+                            <option value="Urgent">Urgent Alert</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {isGlobalCreateModalOpen === 'live-intel' && (
+                        <>
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Intel Category</span>
+                            <input aria-label="Action"
+                              required
+                              type="text"
+                              value={globalCreateData.event_type || ''}
+                              onChange={(e) => setGlobalCreateData({ ...globalCreateData, event_type: e.target.value })}
+                              placeholder="e.g. Security, System"
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Severity</span>
+                            <select
+                              value={globalCreateData.severity || 'Info'}
+                              onChange={(e) => setGlobalCreateData({ ...globalCreateData, severity: e.target.value })}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all appearance-none"
+                            >
+                              <option value="Info">Info</option>
+                              <option value="Warning">Warning</option>
+                              <option value="Critical">Critical Alert</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* MAIN DESCRIPTION FIELD */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">
+                        {isGlobalCreateModalOpen === 'live-intel' ? 'System Details' : 'Detailed Message / Description'}
+                      </span>
+                      <textarea aria-label="Action"
+                        required
+                        value={
+                          (isGlobalCreateModalOpen === 'events' || isGlobalCreateModalOpen === 'student-activities') ? (globalCreateData.description || '') :
+                          (isGlobalCreateModalOpen === 'announcements-parent') ? (globalCreateData.message || '') :
+                          (globalCreateData.details_text || '')
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (isGlobalCreateModalOpen === 'events' || isGlobalCreateModalOpen === 'student-activities') setGlobalCreateData({ ...globalCreateData, description: val });
+                          else if (isGlobalCreateModalOpen === 'announcements-parent') setGlobalCreateData({ ...globalCreateData, message: val });
+                          else if (isGlobalCreateModalOpen === 'live-intel') setGlobalCreateData({ ...globalCreateData, details_text: val });
+                        }}
+                        placeholder="Write details here..."
+                        className="w-full h-32 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-3xl px-6 py-4 text-sm font-bold shadow-inner focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all resize-none"
+                      />
+                    </div>
+
+                    {/* FILE ATTACHMENT FIELD */}
+                    <div className="space-y-2">
+                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-4">Attachment (Optional)</span>
+                       <div className="flex items-center gap-4 px-4">
+                          <input
+                            type="file"
+                            id="announcement-file"
+                            className="hidden"
+                            onChange={(e) => setGlobalCreateFile(e.target.files?.[0] || null)}
+                          />
+                          <label 
+                            htmlFor="announcement-file"
+                            className="flex-1 cursor-pointer bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4 flex items-center gap-3 text-sm font-bold text-slate-500 hover:border-brand-500 hover:bg-brand-500/5 transition-all group"
+                          >
+                            <i className="fas fa-paperclip text-brand-500 group-hover:scale-110 transition-transform"></i>
+                            {globalCreateFile ? globalCreateFile.name : 'Choose/Drop File'}
+                          </label>
+                          {globalCreateFile && (
+                            <button aria-label="Action" 
+                              type="button"
+                              onClick={() => setGlobalCreateFile(null)}
+                              className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all"
+                            >
+                              <i className="fas fa-trash-can"></i>
+                            </button>
+                          )}
+                       </div>
+                    </div>
+
+                    <button
+                      disabled={isGlobalCreateSubmitting}
+                      type="submit"
+                      className="w-full py-5 bg-brand-500 text-white font-black rounded-3xl text-sm uppercase tracking-[0.3em] shadow-xl shadow-brand-500/30 hover:bg-brand-600 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+                    >
+                      {isGlobalCreateSubmitting ? (
+                        <>
+                          <i className="fas fa-circle-notch fa-spin"></i>
+                          Uploading & Processing...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-paper-plane"></i>
+                          Deploy Announcement
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+
+export default App;
+

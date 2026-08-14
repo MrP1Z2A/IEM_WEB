@@ -1,0 +1,231 @@
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { PageId } from '../types';
+import logoIem from '../src/LOGO_IEM.png';
+
+const SidebarContext = React.createContext<{
+  currentPage: PageId;
+  setCurrentPage: (page: PageId) => void;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  isCollapsed?: boolean;
+  allowedPages?: string[];
+  openDropdowns: Record<string, boolean>;
+  setOpenDropdowns: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+} | null>(null);
+
+const SidebarSubItem = ({ id, label, activePage }: { id: PageId; label: string; activePage?: PageId }) => {
+  const context = React.useContext(SidebarContext);
+  if (!context) return null;
+  const { currentPage, setCurrentPage, setIsMobileMenuOpen, allowedPages } = context;
+
+  if (allowedPages && !allowedPages.includes(id || "")) return null;
+
+  return (
+    <button
+      type="button" onClick={() => { setCurrentPage(id); setIsMobileMenuOpen(false); }}
+      className={`w-full flex items-center gap-4 pl-16 pr-8 py-2.5 transition-all duration-300 group
+        ${currentPage === id ? 'text-brand-400 font-bold' : 'text-slate-500 hover:text-slate-300 font-semibold'}`}
+    >
+      <div className={`w-1.5 h-1.5 rounded-full transition-all ${currentPage === id ? 'bg-brand-500 scale-125' : 'bg-slate-700'}`}></div>
+      <span className="text-[12px]">{label}</span>
+    </button>
+  );
+};
+
+const SidebarMenuItem = ({ id, icon, label, hasDropdown, children, activePage }: { id?: PageId; icon?: string; label: string; hasDropdown?: boolean; children?: React.ReactNode; activePage?: PageId }) => {
+  const context = React.useContext(SidebarContext);
+  if (!context) return null;
+  const { currentPage, setCurrentPage, setIsMobileMenuOpen, isCollapsed, allowedPages, openDropdowns, setOpenDropdowns } = context;
+
+  const isOpen = openDropdowns[label];
+  const isParentActive = children && React.Children.toArray(children).some((child: any) => (child as any).props.id === currentPage);
+  const isActive = id && currentPage === id;
+  if (allowedPages && !allowedPages.includes(id || "") && !hasDropdown) return null;
+  if (allowedPages && hasDropdown) {
+    const subItems = React.Children.toArray(children);
+    const isAnySubItemAllowed = subItems.some((child: any) => allowedPages.includes(child.props.id));
+    if (!isAnySubItemAllowed) return null;
+  }
+
+  return (
+    <div className="w-full">
+      <button
+        type="button" onClick={() => {
+          if (hasDropdown) setOpenDropdowns(prev => ({ ...prev, [label]: !prev[label] }));
+          else if (id) { setCurrentPage(id); setIsMobileMenuOpen(false); }
+        }}
+        className={`w-full flex items-center justify-between ${isCollapsed ? 'px-0' : 'px-8'} py-3.5 transition-all duration-300 group
+          ${(isActive || (hasDropdown && isParentActive && !isOpen)) ? 'bg-[#4ea59d] text-white shadow-[0_8px_16px_-4px_rgba(78,165,157,0.5)] border-r-4 border-[#4ea59d]' : 'text-slate-300 hover:text-[#4ea59d] hover:bg-[#1f4e4a]'}`}
+      >
+        <div className={`flex items-center ${isCollapsed ? 'justify-center w-full' : 'gap-4'}`}>
+          {icon && <i className={`fas ${icon} w-5 text-sm transition-colors ${isActive || isParentActive ? 'text-white' : 'text-slate-400 group-hover:text-[#4ea59d]'}`}></i>}
+          {!isCollapsed && <span className="text-[13px] font-bold tracking-tight">{label}</span>}
+        </div>
+        {!isCollapsed && hasDropdown && <i className={`fas fa-chevron-down text-[10px] transition-transform duration-300 ${isOpen ? 'rotate-180 text-[#4ea59d]' : 'opacity-40 group-hover:opacity-100'}`}></i>}
+      </button>
+      {hasDropdown && isOpen && !isCollapsed && <div className="bg-black/10 py-1 animate-in slide-in-from-top-2 duration-300">{children}</div>}
+    </div>
+  );
+};
+
+interface SidebarProps {
+  currentPage: PageId;
+  setCurrentPage: (page: PageId) => void;
+  isMobileMenuOpen: boolean;
+  setIsMobileMenuOpen: (open: boolean) => void;
+  isCollapsed?: boolean;
+  onCollapse?: () => void;
+  onSwitch?: () => void;
+  schoolName?: string;
+  schoolLogoUrl?: string;
+  allowedPages?: string[];
+}
+
+const Sidebar: React.FC<SidebarProps> = ({
+  currentPage,
+  setCurrentPage,
+  isMobileMenuOpen,
+  setIsMobileMenuOpen,
+  isCollapsed,
+  onCollapse,
+  onSwitch,
+  schoolName,
+  schoolLogoUrl,
+  allowedPages
+}) => {
+  const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
+  const navRef = useRef<HTMLElement | null>(null);
+  const sidebarScrollTopRef = useRef(0);
+  const activeLogoUrl = schoolLogoUrl || logoIem;
+
+  useEffect(() => {
+    const navElement = navRef.current;
+    if (!navElement) return;
+
+    navElement.scrollTop = sidebarScrollTopRef.current;
+  }, [currentPage, openDropdowns, isMobileMenuOpen]);
+
+  const contextValue = useMemo(() => ({
+    currentPage,
+    setCurrentPage,
+    setIsMobileMenuOpen,
+    isCollapsed,
+    allowedPages,
+    openDropdowns,
+    setOpenDropdowns
+  }), [currentPage, setCurrentPage, setIsMobileMenuOpen, isCollapsed, allowedPages, openDropdowns, setOpenDropdowns]);
+
+  return (
+    <>
+      {isMobileMenuOpen && (
+        <div
+          role="presentation"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] lg:hidden transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+      <aside className={`fixed left-0 top-0 h-screen lg:sticky lg:top-0 lg:h-screen bg-[#0f2624] border-r border-[#1f4e4a] text-white z-[60] flex flex-col transition-all duration-300 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl w-64' : '-translate-x-full lg:translate-x-0'} ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}`}>
+        <div className={`p-6 sm:p-8 flex items-center justify-between shrink-0 ${isCollapsed ? 'lg:justify-center' : 'gap-3'}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-brand-500 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/30 overflow-hidden shrink-0">
+              <img src={activeLogoUrl} alt={schoolName || 'School'} className="w-full h-full object-cover" />
+            </div>
+            {!isCollapsed && <span className="text-xl font-black tracking-tighter truncate max-w-[140px]">{schoolName || 'IEM'}</span>}
+          </div>
+          <button aria-label="Close menu" type="button" onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-slate-400 hover:text-white p-2">
+            <i className="fa-solid fa-xmark text-xl"></i>
+          </button>
+        </div>
+
+      <div className="hidden lg:flex justify-end px-4 mb-2">
+        <button aria-label="Action"
+          onClick={onCollapse}
+          className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-brand-500 transition-all hover:scale-110"
+          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+         type="button">
+          <i className="fas fa-bars text-[10px]"></i>
+        </button>
+      </div>
+      <SidebarContext.Provider value={contextValue}>
+        <nav
+          ref={navRef}
+          onScroll={(event) => {
+            sidebarScrollTopRef.current = event.currentTarget.scrollTop;
+          }}
+          className="flex-1 overflow-y-auto no-scrollbar pb-10"
+        >
+        <SidebarMenuItem id="dashboard" icon="fa-house" label="Dashboard" activePage={currentPage} />
+        <SidebarMenuItem id="live-calendar" icon="fa-calendar-days" label="Live Calendar" activePage={currentPage} />
+        <SidebarMenuItem id="data-archive" icon="fa-box-archive" label="Data Archive" activePage={currentPage} />
+
+        {/* Academic Section */}
+        <div className="px-8 mt-3 mb-1 text-[11px] text-slate-400 font-black uppercase tracking-wider">Academic</div>
+        <SidebarMenuItem icon="fa-user-group" label="Students / Parents" activePage={currentPage} hasDropdown>
+          <SidebarSubItem id="students" label="Student Directory" activePage={currentPage} />
+          <SidebarSubItem id="parents" label="Parent Directory" activePage={currentPage} />
+          <SidebarSubItem id="student-achievements" label="Achievements" activePage={currentPage} />
+          <SidebarSubItem id="student-register" label="Registration" activePage={currentPage} />
+        </SidebarMenuItem>
+        <SidebarMenuItem icon="fa-chalkboard-teacher" label="Teachers" activePage={currentPage} hasDropdown>
+          <SidebarSubItem id="teachers" label="Teacher Directory" activePage={currentPage} />
+          <SidebarSubItem id="teacher-register" label="Registration" activePage={currentPage} />
+          <SidebarSubItem id="teacher-attendance" label="Staff Attendance" activePage={currentPage} />
+        </SidebarMenuItem>
+        <SidebarMenuItem icon="fa-calendar-check" label="Class Management" activePage={currentPage} hasDropdown>
+          <SidebarSubItem id="student-attendance" label="Classes" activePage={currentPage} />
+          <SidebarSubItem id="sms-attendance" label="Attendance" activePage={currentPage} />
+          <SidebarSubItem id="class-group-management" label="Group Management" activePage={currentPage} />
+        </SidebarMenuItem>
+        <SidebarMenuItem id="homework" icon="fa-book-open" label="Homework" activePage={currentPage} />
+        <SidebarMenuItem id="exam" icon="fa-clipboard-check" label="Exam Management" activePage={currentPage} />
+        <SidebarMenuItem id="report-card" icon="fa-file-lines" label="Report Card" activePage={currentPage} />
+
+        {/* Finance Section */}
+        <div className="px-8 mt-4 mb-1 text-[11px] text-slate-400 font-black uppercase tracking-wider">Finance</div>
+        <SidebarMenuItem icon="fa-money-bill-wave" label="Payments" activePage={currentPage} hasDropdown>
+          <SidebarSubItem id="payment" label="Make Payment" activePage={currentPage} />
+          <SidebarSubItem id="payment-assign" label="Assign Payment" activePage={currentPage} />
+          <SidebarSubItem id="payment-history" label="Payment History" activePage={currentPage} />
+          <SidebarSubItem id="student-finance-status" label="Student Finance" activePage={currentPage} />
+          <SidebarSubItem id="cash-records" label="Cash Records" activePage={currentPage} />
+        </SidebarMenuItem>
+
+        {/* Communications */}
+        <div className="px-8 mt-4 mb-1 text-[11px] text-slate-400 font-black uppercase tracking-wider">Communications</div>
+        <SidebarMenuItem icon="fa-bullhorn" label="Announcements" activePage={currentPage} hasDropdown>
+          <SidebarSubItem id="notice" label="Notice Board" activePage={currentPage} />
+          <SidebarSubItem id="events" label="Events" activePage={currentPage} />
+          <SidebarSubItem id="student-activities" label="Activities" activePage={currentPage} />
+          <SidebarSubItem id="announcements-parent" label="For Parents" activePage={currentPage} />
+          <SidebarSubItem id="class-announcements" label="Class Announcements" activePage={currentPage} />
+          <SidebarSubItem id="live-intel" label="Live Intel" activePage={currentPage} />
+        </SidebarMenuItem>
+        <SidebarMenuItem id="messages" icon="fa-comments" label="Messages" activePage={currentPage} />
+        <SidebarMenuItem id="video-conference" icon="fa-video" label="Video Conference" activePage={currentPage} />
+
+        {/* Administration / Utilities */}
+        <div className="px-8 mt-4 mb-1 text-[11px] text-slate-400 font-black uppercase tracking-wider">Administration</div>
+        <SidebarMenuItem icon="fa-user-tie" label="Student Service" activePage={currentPage} hasDropdown>
+          <SidebarSubItem id="student-service" label="SS Directory" activePage={currentPage} />
+          <SidebarSubItem id="student-service-batch" label="Batch Register" activePage={currentPage} />
+        </SidebarMenuItem>
+        <SidebarMenuItem id="about-school" icon="fa-circle-info" label="About School" activePage={currentPage} />
+        <SidebarMenuItem id="security" icon="fa-user-shield" label="Security / Permissions" activePage={currentPage} />
+
+
+        <div className="mt-auto px-8 mb-8 space-y-4">
+          <button
+            onClick={onSwitch}
+            className={`w-full flex items-center justify-center ${isCollapsed ? 'px-0' : 'gap-3 px-5'} py-3 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-500 hover:bg-brand-500 hover:text-white transition-all duration-300 group`}
+           type="button">
+            <i className="fas fa-rotate text-xs group-hover:rotate-180 transition-transform duration-500"></i>
+            {!isCollapsed && <span className="font-black text-[10px] uppercase tracking-[0.2em]">Switch Environment</span>}
+          </button>
+        </div>
+      </nav>
+      </SidebarContext.Provider>
+    </aside>
+    </>
+  );
+};
+
+export default Sidebar;

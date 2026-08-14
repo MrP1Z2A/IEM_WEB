@@ -1,0 +1,13 @@
+[
+  "id",
+  "class_id",
+  "class_course_id",
+  "title",
+  "description",
+  "due_date",
+  "created_by",
+  "created_at",
+  "updated_at",
+  "attachment_url",
+  "school_id"
+]

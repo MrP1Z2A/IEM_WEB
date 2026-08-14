@@ -1,0 +1,585 @@
+import React from 'react';
+import { Student } from '../../types';
+
+const COUNTRY_CODES = [
+  '+1 (US/CA)',
+  '+7 (RU)',
+  '+20 (EG)',
+  '+27 (ZA)',
+  '+30 (GR)',
+  '+31 (NL)',
+  '+32 (BE)',
+  '+33 (FR)',
+  '+34 (ES)',
+  '+39 (IT)',
+  '+44 (UK)',
+  '+49 (DE)',
+  '+52 (MX)',
+  '+55 (BR)',
+  '+60 (MY)',
+  '+61 (AU)',
+  '+62 (ID)',
+  '+63 (PH)',
+  '+64 (NZ)',
+  '+65 (SG)',
+  '+66 (TH)',
+  '+81 (JP)',
+  '+82 (KR)',
+  '+84 (VN)',
+  '+86 (CN)',
+  '+91 (IN)',
+  '+92 (PK)',
+  '+93 (AF)',
+  '+94 (LK)',
+  '+95 (MM)',
+  '+98 (IR)',
+  '+211 (SS)',
+  '+212 (MA)',
+  '+213 (DZ)',
+  '+216 (TN)',
+  '+218 (LY)',
+  '+220 (GM)',
+  '+221 (SN)',
+  '+222 (MR)',
+  '+223 (ML)',
+  '+224 (GN)',
+  '+225 (CI)',
+  '+226 (BF)',
+  '+227 (NE)',
+  '+228 (TG)',
+  '+229 (BJ)',
+  '+230 (MU)',
+  '+231 (LR)',
+  '+232 (SL)',
+  '+233 (GH)',
+  '+234 (NG)',
+  '+235 (TD)',
+  '+236 (CF)',
+  '+237 (CM)',
+  '+238 (CV)',
+  '+239 (ST)',
+  '+240 (GQ)',
+  '+241 (GA)',
+  '+242 (CG)',
+  '+243 (CD)',
+  '+244 (AO)',
+  '+251 (ET)',
+  '+252 (SO)',
+  '+253 (DJ)',
+  '+254 (KE)',
+  '+255 (TZ)',
+  '+256 (UG)',
+  '+257 (BI)',
+  '+258 (MZ)',
+  '+260 (ZM)',
+  '+261 (MG)',
+  '+262 (RE)',
+  '+263 (ZW)',
+  '+264 (NA)',
+  '+265 (MW)',
+  '+266 (LS)',
+  '+267 (BW)',
+  '+268 (SZ)',
+  '+269 (KM)',
+  '+351 (PT)',
+  '+353 (IE)',
+  '+354 (IS)',
+  '+356 (MT)',
+  '+357 (CY)',
+  '+358 (FI)',
+  '+359 (BG)',
+  '+370 (LT)',
+  '+371 (LV)',
+  '+372 (EE)',
+  '+373 (MD)',
+  '+374 (AM)',
+  '+375 (BY)',
+  '+376 (AD)',
+  '+377 (MC)',
+  '+378 (SM)',
+  '+380 (UA)',
+  '+381 (RS)',
+  '+382 (ME)',
+  '+383 (XK)',
+  '+385 (HR)',
+  '+386 (SI)',
+  '+387 (BA)',
+  '+389 (MK)',
+  '+420 (CZ)',
+  '+421 (SK)',
+  '+423 (LI)',
+  '+852 (HK)',
+  '+853 (MO)',
+  '+855 (KH)',
+  '+856 (LA)',
+  '+880 (BD)',
+  '+886 (TW)',
+  '+960 (MV)',
+  '+961 (LB)',
+  '+962 (JO)',
+  '+963 (SY)',
+  '+964 (IQ)',
+  '+965 (KW)',
+  '+966 (SA)',
+  '+967 (YE)',
+  '+968 (OM)',
+  '+970 (PS)',
+  '+971 (AE)',
+  '+972 (IL)',
+  '+973 (BH)',
+  '+974 (QA)',
+  '+975 (BT)',
+  '+976 (MN)',
+  '+977 (NP)',
+  '+992 (TJ)',
+  '+993 (TM)',
+  '+994 (AZ)',
+  '+995 (GE)',
+  '+996 (KG)',
+  '+998 (UZ)',
+];
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * EnrollmentModal Component
+ * 
+ * This modal handles the initial onboarding of a new student node.
+ * It captures the student's name and email, and provides feedback about the verification process.
+ */
+
+interface EnrollmentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  enrollData: {
+    name: string;
+    email: string;
+    type: 'New' | 'Old';
+    selectedStudentId: string;
+    selectedClassIds: string[];
+    selectedBatchCodes: string[];
+    selectedClassCourseIds: string[];
+    dateOfBirth: string;
+    parentName: string;
+    parentCountryCode: string;
+    parentNumber: string;
+    parentEmail: string;
+    secondaryParentName: string;
+    secondaryParentCountryCode: string;
+    secondaryParentNumber: string;
+    secondaryParentEmail: string;
+    studentCountryCode: string;
+    phone: string;
+    address: string;
+    studentschool_id?: string;
+  };
+  setEnrollData: (data: any) => void;
+  studentProfileImage: File | null;
+  setStudentProfileImage: (file: File | null) => void;
+  students: Student[];
+  classes: any[];
+  classCourses: Array<{ id: string; name: string; class_id: string }>;
+  isClassCoursesLoading: boolean;
+  onSubmit: () => void;
+}
+
+const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
+  isOpen,
+  onClose,
+  enrollData,
+  setEnrollData,
+  studentProfileImage,
+  setStudentProfileImage,
+  students,
+  classes,
+  classCourses,
+  isClassCoursesLoading,
+  onSubmit
+}) => {
+  if (!isOpen) return null;
+
+  const isStudentEmailValid = !enrollData.email || EMAIL_PATTERN.test(enrollData.email.trim());
+  const isParentEmailValid = !enrollData.parentEmail || EMAIL_PATTERN.test(enrollData.parentEmail.trim());
+  const isSecondaryParentEmailValid = !enrollData.secondaryParentEmail || EMAIL_PATTERN.test(enrollData.secondaryParentEmail.trim());
+
+  const toggleClass = (classId: string) => {
+    const nextIds = enrollData.selectedClassIds.includes(classId)
+      ? enrollData.selectedClassIds.filter(id => id !== classId)
+      : [...enrollData.selectedClassIds, classId];
+
+    // Also remove courses linked to unselected class
+    const nextCourseIds = enrollData.selectedClassCourseIds.filter(courseId => {
+      const course = classCourses.find(c => String(c.id) === String(courseId));
+      return !course || nextIds.includes(course.class_id);
+    });
+
+    setEnrollData({
+      ...enrollData,
+      selectedClassIds: nextIds,
+      selectedClassCourseIds: nextCourseIds
+    });
+  };
+
+  const toggleCourse = (courseId: string) => {
+    const nextIds = enrollData.selectedClassCourseIds.includes(courseId)
+      ? enrollData.selectedClassCourseIds.filter(id => id !== courseId)
+      : [...enrollData.selectedClassCourseIds, courseId];
+
+    setEnrollData({ ...enrollData, selectedClassCourseIds: nextIds });
+  };
+
+  const selectAllCoursesForClass = (classId: string) => {
+    const classCourseIds = classCourses.filter(c => c.class_id === classId).map(c => c.id);
+    const otherCourseIds = enrollData.selectedClassCourseIds.filter(id => {
+      const course = classCourses.find(c => String(c.id) === String(id));
+      return course && course.class_id !== classId;
+    });
+    setEnrollData({ ...enrollData, selectedClassCourseIds: [...otherCourseIds, ...classCourseIds] });
+  };
+
+  const clearCoursesForClass = (classId: string) => {
+    const nextCourseIds = enrollData.selectedClassCourseIds.filter(id => {
+      const course = classCourses.find(c => String(c.id) === String(id));
+      return !course || course.class_id !== classId;
+    });
+    setEnrollData({ ...enrollData, selectedClassCourseIds: nextCourseIds });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md max-h-[90vh] rounded-[24px] sm:rounded-[32px] lg:rounded-[40px] shadow-2xl overflow-y-auto border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-300">
+
+        {/* Modal Header */}
+        <div className="p-5 sm:p-6 lg:p-10 border-b border-slate-50 dark:border-slate-800 flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-xl sm:text-2xl font-black tracking-tighter">{enrollData.type} Registration</h3>
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1"></p>
+          </div>
+          <button aria-label="Action"
+            onClick={onClose}
+            className="w-10 h-10 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 flex items-center justify-center"
+            title="Close"
+           type="button">
+            <i className="fas fa-times"></i>
+          </button>
+        </div>
+
+        {/* Form Content */}
+        <div className="p-5 sm:p-6 lg:p-10 space-y-4 sm:space-y-6">
+          {enrollData.type === 'Old' && (
+            <div>
+              <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Select Existing Student</label>
+              <select
+                className="w-full bg-slate-50 dark:bg-slate-800 p-6 rounded-3xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all"
+                value={enrollData.selectedStudentId}
+                onChange={(e) => setEnrollData({ ...enrollData, selectedStudentId: e.target.value })}
+              >
+                <option value="">Choose a student...</option>
+                {students.map(student => (
+                  <option key={student.id} value={student.id}>{student.name} ({student.id})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {enrollData.type === 'New' && (
+            <>
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Full Legal Name</label>
+                <input aria-label="Action"
+                  type="text"
+                  placeholder="Enter student name..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
+                  value={enrollData.name}
+                  onChange={(e) => setEnrollData({ ...enrollData, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Network Email (Verification Hub)</label>
+                <input aria-label="Action"
+                  type="email"
+                  placeholder="student@iem.io"
+                  className={`w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 font-bold transition-all text-sm ${isStudentEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
+                  value={enrollData.email}
+                  onChange={(e) => setEnrollData({ ...enrollData, email: e.target.value })}
+                />
+                {!isStudentEmailValid && <p className="mt-2 text-[11px] font-bold text-rose-500">Enter a valid email format (example@domain.com).</p>}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">School Student ID (Optional)</label>
+                <input aria-label="Action"
+                  type="text"
+                  placeholder="e.g. SCH-2024-001"
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
+                  value={enrollData.studentschool_id || ''}
+                  onChange={(e) => setEnrollData({ ...enrollData, studentschool_id: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Student Phone Number</label>
+                <div className="flex gap-2">
+                  <select
+                    className="w-32 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-xs"
+                    value={enrollData.studentCountryCode}
+                    onChange={(e) => setEnrollData({ ...enrollData, studentCountryCode: e.target.value })}
+                  >
+                    {COUNTRY_CODES.map((code) => (
+                      <option key={code} value={code.split(' ')[0]}>{code}</option>
+                    ))}
+                  </select>
+                  <input aria-label="Action"
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="Enter phone number..."
+                    className="flex-1 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
+                    value={enrollData.phone}
+                    onChange={(e) => setEnrollData({ ...enrollData, phone: e.target.value.replace(/\D/g, '') })}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Multi-Select Classes */}
+          <div>
+            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Target Classes (Multiple)</label>
+            <div className="flex flex-wrap gap-2">
+              {classes.map((classItem) => {
+                const isSelected = enrollData.selectedClassIds.includes(String(classItem.id));
+                return (
+                  <button
+                    key={classItem.id}
+                    type="button" onClick={() => toggleClass(String(classItem.id))}
+                    className={`px-4 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border-2 transition-all ${isSelected
+                      ? 'bg-brand-500 border-brand-500 text-white shadow-lg shadow-brand-500/20'
+                      : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                  >
+                    {classItem.name}
+                  </button>
+                );
+              })}
+              {classes.length === 0 && <p className="text-xs font-bold text-slate-400">No classes found.</p>}
+            </div>
+          </div>
+
+          {/* Multi-Select Courses */}
+          <div>
+            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">
+              {isClassCoursesLoading ? 'Updating Course Nodes...' : 'Course Nodes (Multiple)'}
+            </label>
+
+            {enrollData.selectedClassIds.length === 0 ? (
+              <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 flex flex-col items-center justify-center text-center">
+                <i className="fas fa-layer-group text-slate-300 text-2xl mb-2"></i>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select class first</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {enrollData.selectedClassIds.map(classId => {
+                  const classItem = classes.find(c => String(c.id) === String(classId));
+                  const coursesForClass = classCourses.filter(c => String(c.class_id) === String(classId));
+
+                  if (coursesForClass.length === 0 && !isClassCoursesLoading) return null;
+
+                  return (
+                    <div key={classId} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-brand-500 tracking-widest">{classItem?.name || 'Class'} Courses</span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button" onClick={() => selectAllCoursesForClass(classId)}
+                            className="text-[9px] font-black uppercase text-slate-400 hover:text-brand-500 tracking-tighter"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button" onClick={() => clearCoursesForClass(classId)}
+                            className="text-[9px] font-black uppercase text-slate-400 hover:text-rose-500 tracking-tighter"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {coursesForClass.map(course => {
+                          const isSelected = enrollData.selectedClassCourseIds.includes(String(course.id));
+                          return (
+                            <button
+                              key={course.id}
+                              type="button" onClick={() => toggleCourse(String(course.id))}
+                              className={`px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tight border-2 transition-all ${isSelected
+                                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-md'
+                                : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-400 hover:border-brand-500 hover:text-brand-500'
+                                }`}
+                            >
+                              {course.name}
+                            </button>
+                          );
+                        })}
+                        {coursesForClass.length === 0 && isClassCoursesLoading && (
+                          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                            <i className="fas fa-circle-notch fa-spin"></i>
+                            Loading...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {enrollData.type === 'New' && (
+            <>
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-2">Date of Birth</label>
+                <input aria-label="Action"
+                  type="date"
+                  className="w-full bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl outline-none border-2 border-transparent focus:border-brand-500 font-bold transition-all text-sm"
+                  value={enrollData.dateOfBirth}
+                  onChange={(e) => setEnrollData({ ...enrollData, dateOfBirth: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Primary Parent</p>
+                <input aria-label="Action"
+                  type="text"
+                  placeholder="Parent Name"
+                  className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.parentName}
+                  onChange={(e) => setEnrollData({ ...enrollData, parentName: e.target.value })}
+                />
+                <div className="flex gap-3">
+                  <select
+                    className="w-40 bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                    value={enrollData.parentCountryCode}
+                    onChange={(e) => setEnrollData({ ...enrollData, parentCountryCode: e.target.value })}
+                  >
+                    {COUNTRY_CODES.map((code) => (
+                      <option key={code} value={code.split(' ')[0]}>{code}</option>
+                    ))}
+                  </select>
+                  <input aria-label="Action"
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="Parent Number"
+                    className="flex-1 bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                    value={enrollData.parentNumber}
+                    onChange={(e) => setEnrollData({ ...enrollData, parentNumber: e.target.value.replace(/\D/g, '') })}
+                  />
+                </div>
+                <input aria-label="Action"
+                  type="email"
+                  placeholder="Parent Email"
+                  className={`w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border font-bold transition-all ${isParentEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
+                  value={enrollData.parentEmail}
+                  onChange={(e) => setEnrollData({ ...enrollData, parentEmail: e.target.value })}
+                />
+                {!isParentEmailValid && <p className="text-[11px] font-bold text-rose-500 -mt-2">Enter a valid parent email format.</p>}
+              </div>
+
+              <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Secondary Parent (Optional)</p>
+                <input aria-label="Action"
+                  type="text"
+                  placeholder="Second Parent Name"
+                  className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                  value={enrollData.secondaryParentName}
+                  onChange={(e) => setEnrollData({ ...enrollData, secondaryParentName: e.target.value })}
+                />
+                <div className="flex gap-3">
+                  <select
+                    className="w-40 bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                    value={enrollData.secondaryParentCountryCode}
+                    onChange={(e) => setEnrollData({ ...enrollData, secondaryParentCountryCode: e.target.value })}
+                  >
+                    {COUNTRY_CODES.map((code) => (
+                      <option key={code} value={code.split(' ')[0]}>{code}</option>
+                    ))}
+                  </select>
+                  <input aria-label="Action"
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="Second Parent Number"
+                    className="flex-1 bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all"
+                    value={enrollData.secondaryParentNumber}
+                    onChange={(e) => setEnrollData({ ...enrollData, secondaryParentNumber: e.target.value.replace(/\D/g, '') })}
+                  />
+                </div>
+                <input aria-label="Action"
+                  type="email"
+                  placeholder="Second Parent Email"
+                  className={`w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border font-bold transition-all ${isSecondaryParentEmailValid ? 'border-transparent focus:border-brand-500' : 'border-rose-400 focus:border-rose-500'}`}
+                  value={enrollData.secondaryParentEmail}
+                  onChange={(e) => setEnrollData({ ...enrollData, secondaryParentEmail: e.target.value })}
+                />
+                {!isSecondaryParentEmailValid && <p className="text-[11px] font-bold text-rose-500 -mt-2">Enter a valid secondary parent email format.</p>}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Student Profile Image</label>
+                <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-3xl border border-slate-200 dark:border-slate-700 space-y-3">
+                  <input aria-label="Action"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        setStudentProfileImage(e.target.files[0]);
+                      }
+                    }}
+                    className="w-full text-xs font-semibold text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-brand-500 file:text-white"
+                  />
+                  {studentProfileImage && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-slate-500">Selected: {studentProfileImage.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => setStudentProfileImage(null)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-500 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-3">Residential Address</label>
+                <div className="space-y-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <textarea aria-label="Action"
+                    placeholder="Enter residential address..."
+                    rows={2}
+                    className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl outline-none border border-transparent focus:border-brand-500 font-bold transition-all resize-none"
+                    value={enrollData.address}
+                    onChange={(e) => setEnrollData({ ...enrollData, address: e.target.value })}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Information Box */}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="p-5 sm:p-6 lg:p-10 bg-slate-50 dark:bg-slate-900/50 flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
+          <button
+            onClick={onSubmit}
+            className="flex-1 py-4 bg-brand-500 text-white font-black rounded-[24px] text-xs uppercase tracking-widest shadow-xl shadow-brand-500/20 active:scale-95 transition-all outline-none"
+           type="button">
+            Registeration
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EnrollmentModal;

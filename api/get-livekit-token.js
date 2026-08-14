@@ -1,0 +1,82 @@
+import { AccessToken, TrackSource, RoomServiceClient } from 'livekit-server-sdk';
+
+/**
+ * Serverless function for Vercel/Netlify to securely generate LiveKit tokens.
+ * Place this file at "/api/get-livekit-token.js" in the root directory.
+ */
+export default async function handler(req, res) {
+  // CORS Headers to allow frontend access
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  const { userId, userName, roomId, isTeacher } = req.query;
+
+  if (!userId || !roomId) {
+    return res.status(400).json({ error: 'Missing userId or roomId' });
+  }
+
+  // Load from Vercel environment variables
+  const API_KEY = process.env.LIVEKIT_API_KEY;
+  const API_SECRET = process.env.LIVEKIT_API_SECRET;
+  
+  // Dynamically convert wss:// to https:// for RoomServiceClient connection
+  let livekitUrl = process.env.LIVEKIT_URL || process.env.VITE_LIVEKIT_WS_URL;
+  if (livekitUrl.startsWith('wss://')) {
+    livekitUrl = livekitUrl.replace('wss://', 'https://');
+  } else if (livekitUrl.startsWith('ws://')) {
+    livekitUrl = livekitUrl.replace('ws://', 'http://');
+  }
+
+  try {
+    // Connect to LiveKit Cloud to list active rooms
+    const roomService = new RoomServiceClient(livekitUrl, API_KEY, API_SECRET);
+
+    
+    // SECURITY: Students cannot join until Teacher starts the room
+    if (isTeacher !== 'true') {
+      const rooms = await roomService.listRooms();
+      const roomExists = rooms.some(r => r.name === roomId);
+      if (!roomExists) {
+        return res.status(403).json({
+          error: 'The teacher has not started this meeting yet. Please wait for them to begin.'
+        });
+      }
+    }
+
+    const at = new AccessToken(API_KEY, API_SECRET, {
+      identity: userId,
+      name: userName || 'Anonymous',
+      ttl: 3600,
+    });
+
+    const grants = { 
+      roomJoin: true, 
+      room: roomId, 
+      canSubscribe: true, 
+      canPublishData: true, 
+      canPublish: true 
+    };
+
+    if (isTeacher === 'true') {
+      grants.canPublishSources = [TrackSource.CAMERA, TrackSource.MICROPHONE, TrackSource.SCREEN_SHARE];
+    } else {
+      grants.canPublishSources = [TrackSource.CAMERA, TrackSource.MICROPHONE];
+    }
+
+    at.addGrant(grants);
+    
+    const token = await at.toJwt();
+    return res.status(200).json({ token });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}

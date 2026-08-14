@@ -1,0 +1,449 @@
+import React from 'react';
+import { supabase } from '../../supabaseClient';
+import { getCurrentTenantContext, withSchoolId } from '../../services/tenantService';
+import { Student } from '../../types';
+import {
+  AttendanceContextType,
+  AttendanceStatus,
+  AttendanceStudent,
+  LightweightSubject,
+  ClassRow
+} from '../ClassAndCoursesManager';
+
+interface AttendanceSectionProps {
+  classes: ClassRow[];
+  students: Student[];
+  allStudents?: Student[];
+  subjects: LightweightSubject[];
+  contextType: AttendanceContextType;
+  setContextType: (type: AttendanceContextType) => void;
+  selectedAttendanceContextId: string;
+  setSelectedAttendanceContextId: (id: string) => void;
+  attendanceDate: string;
+  setAttendanceDate: (date: string) => void;
+  safeNotify: (msg: string) => void;
+  selectedClassId: string | null;
+  setSelectedAttendanceContextIdStateOnly: (id: string) => void;
+}
+
+const normalizeAttendanceStatus = (value: unknown): AttendanceStatus | null => {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return null;
+  if (normalized === 'P' || normalized === 'PRESENT') return 'P';
+  if (normalized === 'A' || normalized === 'ABSENT') return 'A';
+  if (normalized === 'L' || normalized === 'LATE' || normalized === 'LEAVE') return 'L';
+  return null;
+};
+
+export const AttendanceSection: React.FC<AttendanceSectionProps> = ({
+  classes,
+  students,
+  allStudents,
+  subjects,
+  contextType,
+  setContextType,
+  selectedAttendanceContextId,
+  setSelectedAttendanceContextId,
+  attendanceDate,
+  setAttendanceDate,
+  safeNotify,
+  selectedClassId,
+  setSelectedAttendanceContextIdStateOnly,
+}) => {
+  const [attendanceMap, setAttendanceMap] = React.useState<Record<string, AttendanceStatus>>({});
+  const [isAttendanceLoading, setIsAttendanceLoading] = React.useState(false);
+  const [isAttendanceSaving, setIsAttendanceSaving] = React.useState(false);
+  const [deletingAttendanceStudentId, setDeletingAttendanceStudentId] = React.useState<string | null>(null);
+  const [linkedAttendanceStudents, setLinkedAttendanceStudents] = React.useState<AttendanceStudent[]>([]);
+  const [isLinkedAttendanceStudentsLoading, setIsLinkedAttendanceStudentsLoading] = React.useState(false);
+
+  const activeContextList = React.useMemo(
+    () => (contextType === 'class'
+      ? classes.map(classItem => ({ id: String(classItem.id), name: String(classItem.name || '') }))
+      : subjects),
+    [contextType, classes, subjects]
+  );
+
+  const effectiveAttendanceContextId = React.useMemo(() => {
+    if (!activeContextList.length) return '';
+    const exists = activeContextList.some(item => String(item.id) === String(selectedAttendanceContextId));
+    return exists ? selectedAttendanceContextId : String(activeContextList[0].id);
+  }, [activeContextList, selectedAttendanceContextId]);
+
+  const loadLinkedAttendanceStudents = React.useCallback(async () => {
+    if (!effectiveAttendanceContextId) {
+      setLinkedAttendanceStudents([]);
+      return;
+    }
+
+    const filterColumn = contextType === 'class' ? 'class_id' : 'class_course_id';
+    setIsLinkedAttendanceStudentsLoading(true);
+
+    const { data, error } = await supabase
+      .from('class_course_students')
+      .select('student_id, student_name, created_at')
+      .eq(filterColumn, effectiveAttendanceContextId)
+      .order('created_at', { ascending: true });
+
+    setIsLinkedAttendanceStudentsLoading(false);
+
+    if (error) {
+      console.error('Failed to load linked attendance students:', error);
+      setLinkedAttendanceStudents([]);
+      return;
+    }
+
+    const seen = new Set<string>();
+    const mapped: AttendanceStudent[] = [];
+
+    (data || []).forEach((row: any) => {
+      const id = String(row?.student_id || '').trim();
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      mapped.push({
+        id,
+        name: String(row?.student_name || '').trim() || id,
+      });
+    });
+
+    setLinkedAttendanceStudents(mapped);
+  }, [contextType, effectiveAttendanceContextId]);
+
+  React.useEffect(() => {
+    void loadLinkedAttendanceStudents();
+  }, [loadLinkedAttendanceStudents]);
+
+  const fallbackAttendanceStudents = React.useMemo(() => {
+    if (!effectiveAttendanceContextId) return [] as Student[];
+
+    if (contextType === 'class') {
+      const selectedClassForAttendance = classes.find(classItem => String(classItem.id) === String(effectiveAttendanceContextId));
+      const classStudentIds = (selectedClassForAttendance?.student_ids || []).map(id => String(id));
+      const sourceStudents = allStudents && allStudents.length > 0 ? allStudents : students;
+      return sourceStudents.filter(student => classStudentIds.includes(String(student.id)));
+    }
+
+    return students;
+  }, [effectiveAttendanceContextId, contextType, classes, allStudents, students]);
+
+  const activeAttendanceStudents = React.useMemo(() => {
+    if (linkedAttendanceStudents.length > 0) {
+      return linkedAttendanceStudents;
+    }
+
+    return fallbackAttendanceStudents.map(student => ({
+      id: String(student.id),
+      name: String(student.name || ''),
+      email: String(student.email || ''),
+    }));
+  }, [linkedAttendanceStudents, fallbackAttendanceStudents]);
+
+  const loadAttendance = React.useCallback(async () => {
+    if (!effectiveAttendanceContextId || !attendanceDate) return;
+
+    setIsAttendanceLoading(true);
+
+    const contextTypeCandidates = contextType === 'class'
+      ? ['class', 'batch']
+      : ['subject', 'course', 'class_course'];
+
+    const primaryResult = await supabase
+      .from('attendance_records')
+      .select('student_id, status, context_type')
+      .in('context_type', contextTypeCandidates)
+      .eq('context_id', effectiveAttendanceContextId)
+      .eq('attendance_date', attendanceDate);
+
+    let data: any[] | null = (primaryResult.data as any[] | null);
+    let error = primaryResult.error;
+
+    if (!error && (!data || data.length === 0)) {
+      const fallbackResult = await supabase
+        .from('attendance_records')
+        .select('student_id, status')
+        .eq('context_id', effectiveAttendanceContextId)
+        .eq('attendance_date', attendanceDate);
+
+      data = (fallbackResult.data as any[] | null);
+      error = fallbackResult.error;
+    }
+
+    setIsAttendanceLoading(false);
+
+    if (error) {
+      safeNotify(`Failed to load attendance: ${error.message}`);
+      return;
+    }
+
+    const nextMap: Record<string, AttendanceStatus> = {};
+    (data || []).forEach((row: any) => {
+      const normalizedStatus = normalizeAttendanceStatus(row.status);
+      if (!normalizedStatus) return;
+      nextMap[String(row.student_id)] = normalizedStatus;
+    });
+
+    setAttendanceMap(nextMap);
+  }, [effectiveAttendanceContextId, attendanceDate, contextType, safeNotify]);
+
+  React.useEffect(() => {
+    void loadAttendance();
+  }, [loadAttendance]);
+
+  const saveSingleAttendance = async (studentId: string, status: AttendanceStatus) => {
+    if (!effectiveAttendanceContextId || !attendanceDate) return;
+
+    setIsAttendanceSaving(true);
+
+    const { schoolId } = await getCurrentTenantContext();
+
+    const payload = withSchoolId({
+      context_type: contextType,
+      context_id: effectiveAttendanceContextId,
+      attendance_date: attendanceDate,
+      student_id: String(studentId),
+      status,
+    }, schoolId);
+
+    const upsertResult = await supabase
+      .from('attendance_records')
+      .upsert([payload], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+
+    setIsAttendanceSaving(false);
+
+    if (upsertResult.error) {
+      safeNotify(`Failed to save attendance: ${upsertResult.error.message}`);
+      return;
+    }
+
+    setAttendanceMap(prev => ({ ...prev, [String(studentId)]: status }));
+  };
+
+  const markAllPresent = async () => {
+    if (!effectiveAttendanceContextId || !attendanceDate || activeAttendanceStudents.length === 0) {
+      safeNotify('No students available to mark.');
+      return;
+    }
+
+    setIsAttendanceSaving(true);
+
+    const { schoolId } = await getCurrentTenantContext();
+
+    const payload = activeAttendanceStudents.map(student => withSchoolId({
+      context_type: contextType,
+      context_id: effectiveAttendanceContextId,
+      attendance_date: attendanceDate,
+      student_id: String(student.id),
+      status: 'P' as const,
+    }, schoolId));
+
+    const upsertResult = await supabase
+      .from('attendance_records')
+      .upsert(payload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+
+    setIsAttendanceSaving(false);
+
+    if (upsertResult.error) {
+      safeNotify(`Failed to bulk save attendance: ${upsertResult.error.message}`);
+      return;
+    }
+
+    const nextMap: Record<string, AttendanceStatus> = {};
+    activeAttendanceStudents.forEach(student => {
+      nextMap[String(student.id)] = 'P';
+    });
+
+    setAttendanceMap(nextMap);
+    safeNotify('All students marked Present.');
+  };
+
+  const removeAttendanceStudent = async (studentId: string) => {
+    if (!effectiveAttendanceContextId) {
+      safeNotify('No attendance context selected.');
+      return;
+    }
+
+    setDeletingAttendanceStudentId(studentId);
+
+    try {
+      if (contextType === 'class') {
+        const enrollmentDelete = await supabase
+          .from('class_course_students')
+          .delete()
+          .eq('class_id', effectiveAttendanceContextId)
+          .eq('student_id', studentId);
+
+        if (enrollmentDelete.error) throw enrollmentDelete.error;
+      } else {
+        const enrollmentDelete = await supabase
+          .from('class_course_students')
+          .delete()
+          .eq('class_course_id', effectiveAttendanceContextId)
+          .eq('student_id', studentId);
+
+        if (enrollmentDelete.error) throw enrollmentDelete.error;
+      }
+
+      const contextTypeCandidates = contextType === 'class'
+        ? ['class', 'batch']
+        : ['subject', 'course', 'class_course'];
+
+      const attendanceDelete = await supabase
+        .from('attendance_records')
+        .delete()
+        .eq('context_id', effectiveAttendanceContextId)
+        .eq('student_id', studentId)
+        .in('context_type', contextTypeCandidates);
+
+      if (attendanceDelete.error) {
+        console.error('Failed to delete attendance records:', attendanceDelete.error);
+      }
+
+      setAttendanceMap(prev => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
+
+      await loadLinkedAttendanceStudents();
+      safeNotify('Student removed from Supabase successfully.');
+    } catch (error: any) {
+      safeNotify(`Delete failed: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setDeletingAttendanceStudentId(null);
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">Class Management</h2>
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+          Integrated attendance section (class/subject).
+        </p>
+
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <select
+            value={contextType}
+            onChange={(e) => setContextType(e.target.value as AttendanceContextType)}
+            className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+          >
+            <option value="class">Class Attendance</option>
+            <option value="subject">Subject Attendance</option>
+          </select>
+
+          <select
+            value={effectiveAttendanceContextId}
+            onChange={(e) => setSelectedAttendanceContextId(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none md:col-span-2"
+          >
+            {!activeContextList.length && <option value="">No options available</option>}
+            {activeContextList.map(item => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            value={attendanceDate}
+            onChange={(e) => setAttendanceDate(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => void loadAttendance()}
+            disabled={isAttendanceLoading || isAttendanceSaving || !effectiveAttendanceContextId}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${
+              isAttendanceLoading || isAttendanceSaving || !effectiveAttendanceContextId
+                ? 'bg-slate-300 text-slate-600 cursor-not-allowed'
+                : 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+            }`}
+          >
+            {isAttendanceLoading ? 'Loading...' : 'Reload'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void markAllPresent()}
+            disabled={isAttendanceLoading || isAttendanceSaving || activeAttendanceStudents.length === 0}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${
+              isAttendanceLoading || isAttendanceSaving || activeAttendanceStudents.length === 0
+                ? 'bg-brand-200 text-brand-700 cursor-not-allowed'
+                : 'bg-brand-500 text-white'
+            }`}
+          >
+            {isAttendanceSaving ? 'Saving...' : 'Mark All Present'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <h3 className="text-sm sm:text-base font-black">Students ({activeAttendanceStudents.length})</h3>
+          <span className="text-[11px] font-bold text-slate-500">P = Present, A = Absent, L = Leave</span>
+        </div>
+
+        {isLinkedAttendanceStudentsLoading ? (
+          <p className="p-6 text-sm text-slate-500">Loading students from class_course_students...</p>
+        ) : activeAttendanceStudents.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">No students available for this context.</p>
+        ) : (
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+            {activeAttendanceStudents.map(student => {
+              const currentStatus = attendanceMap[String(student.id)] || '-';
+              return (
+                <li
+                  key={student.id}
+                  className="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                >
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-slate-100">{student.name}</p>
+                    <p className="text-xs text-slate-500">{student.email || student.id}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500 mr-1">Current: {currentStatus}</span>
+                    {(['P', 'A', 'L'] as AttendanceStatus[]).map(status => {
+                      const active = currentStatus === status;
+                      return (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => void saveSingleAttendance(String(student.id), status)}
+                          disabled={isAttendanceSaving || isAttendanceLoading}
+                          className={`w-9 h-9 rounded-lg text-xs font-black ${
+                            active
+                              ? 'bg-brand-500 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          {status}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => void removeAttendanceStudent(String(student.id))}
+                      disabled={deletingAttendanceStudentId === String(student.id) || isAttendanceSaving || isAttendanceLoading}
+                      className={`w-9 h-9 rounded-lg border flex items-center justify-center ${
+                        deletingAttendanceStudentId === String(student.id)
+                          ? 'text-slate-300 border-slate-200 cursor-not-allowed'
+                          : 'text-slate-400 border-slate-300 hover:text-rose-500 hover:border-rose-300'
+                      }`}
+                      title="Delete from Supabase"
+                    >
+                      <i className="fas fa-trash text-xs"></i>
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+};

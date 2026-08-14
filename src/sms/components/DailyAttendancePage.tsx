@@ -1,0 +1,469 @@
+import React from 'react';
+import { Student } from '../types';
+import { supabase } from '../supabaseClient';
+import { getCurrentTenantContext, withSchoolId } from '../services/tenantService';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+type AttendanceContextType = 'class' | 'subject';
+type AttendanceStatus = 'P' | 'A' | 'L';
+
+interface LightweightClass {
+  id: string;
+  name: string;
+  student_ids?: string[];
+}
+
+interface LightweightSubject {
+  id: string;
+  name: string;
+}
+
+interface DailyAttendancePageProps {
+  students: Student[];
+  allStudents?: Student[];
+  classes?: LightweightClass[];
+  subjects?: LightweightSubject[];
+  notify?: (message: string) => void;
+}
+
+const getTodayIsoDate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+type StatusState = {
+  isLoading: boolean;
+  isSaving: boolean;
+};
+
+type StatusAction =
+  | { type: 'START_LOADING' }
+  | { type: 'STOP_LOADING' }
+  | { type: 'START_SAVING' }
+  | { type: 'STOP_SAVING' };
+
+function statusReducer(state: StatusState, action: StatusAction): StatusState {
+  switch (action.type) {
+    case 'START_LOADING':
+      return { ...state, isLoading: true };
+    case 'STOP_LOADING':
+      return { ...state, isLoading: false };
+    case 'START_SAVING':
+      return { ...state, isSaving: true };
+    case 'STOP_SAVING':
+      return { ...state, isSaving: false };
+    default:
+      return state;
+  }
+}
+
+const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
+  students,
+  allStudents,
+  classes = [],
+  subjects = [],
+  notify,
+}) => {
+  const [contextType, setContextType] = React.useState<AttendanceContextType>('class');
+  const [selectedContextId, setSelectedContextId] = React.useState<string>('');
+  const [attendanceDate, setAttendanceDate] = React.useState(() => getTodayIsoDate());
+  const [attendanceMap, setAttendanceMap] = React.useState<Record<string, AttendanceStatus>>({});
+  const [statusState, dispatchStatus] = React.useReducer(statusReducer, { isLoading: false, isSaving: false });
+  const { isLoading, isSaving } = statusState;
+
+  const activeContextList = contextType === 'class' ? classes : subjects;
+
+  const activeContextName = React.useMemo(() => {
+    const selected = activeContextList.find(item => String(item.id) === String(selectedContextId));
+    return selected ? selected.name : 'Unknown';
+  }, [activeContextList, selectedContextId]);
+
+  React.useEffect(() => {
+    if (!activeContextList.length) {
+      setSelectedContextId('');
+      return;
+    }
+
+    const exists = activeContextList.some(item => String(item.id) === String(selectedContextId));
+    if (!exists) {
+      setSelectedContextId(String(activeContextList[0].id));
+    }
+  }, [activeContextList, selectedContextId]);
+
+  const activeStudents = React.useMemo(() => {
+    if (!selectedContextId) return [] as Student[];
+
+    if (contextType === 'class') {
+      const selectedClass = classes.find(classItem => String(classItem.id) === String(selectedContextId));
+      const ids = (selectedClass?.student_ids || []).map(id => String(id));
+      const source = allStudents && allStudents.length > 0 ? allStudents : students;
+      return source.filter(student => ids.includes(String(student.id)));
+    }
+
+    return students;
+  }, [contextType, selectedContextId, classes, allStudents, students]);
+
+  const loadAttendance = React.useCallback(async () => {
+    if (!selectedContextId || !attendanceDate) return;
+
+    dispatchStatus({ type: 'START_LOADING' });
+
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('student_id, status')
+      .eq('context_type', contextType)
+      .eq('context_id', selectedContextId)
+      .eq('attendance_date', attendanceDate);
+
+    if (error) {
+      notify?.(`Failed to load attendance: ${error.message}`);
+      dispatchStatus({ type: 'STOP_LOADING' });
+      return;
+    }
+
+    const nextMap: Record<string, AttendanceStatus> = {};
+    (data || []).forEach((row: any) => {
+      nextMap[String(row.student_id)] = row.status as AttendanceStatus;
+    });
+
+    setAttendanceMap(nextMap);
+    dispatchStatus({ type: 'STOP_LOADING' });
+  }, [selectedContextId, attendanceDate, contextType, notify]);
+
+  React.useEffect(() => {
+    void loadAttendance();
+  }, [loadAttendance]);
+
+  const saveSingle = async (studentId: string, status: AttendanceStatus) => {
+    if (!selectedContextId || !attendanceDate) return;
+
+    dispatchStatus({ type: 'START_SAVING' });
+
+    const { schoolId } = await getCurrentTenantContext();
+
+    const payload = withSchoolId({
+      context_type: contextType,
+      context_id: selectedContextId,
+      attendance_date: attendanceDate,
+      student_id: String(studentId),
+      status,
+    }, schoolId);
+
+    const upsertResult = await supabase
+      .from('attendance_records')
+      .upsert([payload], { onConflict: 'context_type,context_id,attendance_date,student_id' });
+
+    dispatchStatus({ type: 'STOP_SAVING' });
+
+    if (upsertResult.error) {
+      notify?.(`Failed to save attendance: ${upsertResult.error.message}`);
+      return;
+    }
+
+    setAttendanceMap(prev => ({ ...prev, [String(studentId)]: status }));
+  };
+
+  const markAllPresent = async () => {
+    if (!selectedContextId || !attendanceDate || activeStudents.length === 0) {
+      notify?.('No students available to mark.');
+      return;
+    }
+
+    dispatchStatus({ type: 'START_SAVING' });
+
+    const { schoolId } = await getCurrentTenantContext();
+
+    const payload = activeStudents.map(student => withSchoolId({
+      context_type: contextType,
+      context_id: selectedContextId,
+      attendance_date: attendanceDate,
+      student_id: String(student.id),
+      status: 'P' as const,
+    }, schoolId));
+
+    const upsertResult = await supabase
+      .from('attendance_records')
+      .upsert(payload, { onConflict: 'context_type,context_id,attendance_date,student_id' });
+
+    dispatchStatus({ type: 'STOP_SAVING' });
+
+    if (upsertResult.error) {
+      notify?.(`Failed to bulk save attendance: ${upsertResult.error.message}`);
+      return;
+    }
+
+    const nextMap: Record<string, AttendanceStatus> = {};
+    activeStudents.forEach(student => {
+      nextMap[String(student.id)] = 'P';
+    });
+
+    setAttendanceMap(nextMap);
+    notify?.('All students marked Present.');
+  };
+
+  const downloadAttendancePDF = async () => {
+    if (!selectedContextId || activeStudents.length === 0) return;
+
+    dispatchStatus({ type: 'START_LOADING' });
+    try {
+      const { schoolId } = await getCurrentTenantContext();
+      const { data: schoolData } = await supabase
+        .from('schools')
+        .select('name')
+        .eq('id', schoolId)
+        .single();
+      const schoolName = schoolData?.name || 'School Management System';
+
+      const doc = new jsPDF();
+
+      // Premium Indigo Header Banner
+      doc.setFillColor(79, 70, 229);
+      doc.rect(0, 0, 210, 38, 'F');
+
+      doc.setFontSize(22);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text(schoolName.toUpperCase(), 14, 20);
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(224, 231, 255);
+      doc.text('STUDENT ATTENDANCE REPORT', 14, 28);
+
+      // Metadata Section
+      let y = 48;
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Report Details', 14, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Type: ${contextType === 'class' ? 'Class Attendance' : 'Subject/Course Attendance'}`, 14, y + 6);
+      doc.text(`Name: ${activeContextName}`, 14, y + 12);
+      doc.text(`Date: ${attendanceDate}`, 14, y + 18);
+
+      const timestamp = new Date().toLocaleString();
+      doc.text(`Generated: ${timestamp}`, 135, y + 6);
+      doc.text(`Total Students: ${activeStudents.length}`, 135, y + 12);
+
+      // Statistics Card/Bar
+      const presentCount = activeStudents.filter(s => attendanceMap[String(s.id)] === 'P').length;
+      const absentCount = activeStudents.filter(s => attendanceMap[String(s.id)] === 'A').length;
+      const leaveCount = activeStudents.filter(s => attendanceMap[String(s.id)] === 'L').length;
+      const unmarkedCount = activeStudents.filter(s => !attendanceMap[String(s.id)]).length;
+
+      y += 24;
+      doc.setDrawColor(226, 232, 240);
+      doc.setFillColor(248, 250, 252);
+      doc.rect(14, y, 182, 16, 'F');
+      doc.rect(14, y, 182, 16, 'S');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      
+      doc.setTextColor(16, 185, 129); // emerald-600
+      doc.text(`Present: ${presentCount} (${activeStudents.length ? Math.round((presentCount / activeStudents.length) * 100) : 0}%)`, 20, y + 10);
+
+      doc.setTextColor(239, 68, 68); // rose-600
+      doc.text(`Absent: ${absentCount} (${activeStudents.length ? Math.round((absentCount / activeStudents.length) * 100) : 0}%)`, 65, y + 10);
+
+      doc.setTextColor(245, 158, 11); // amber-600
+      doc.text(`Leave: ${leaveCount} (${activeStudents.length ? Math.round((leaveCount / activeStudents.length) * 100) : 0}%)`, 110, y + 10);
+
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text(`Unmarked: ${unmarkedCount}`, 155, y + 10);
+
+      // Render Attendance Table
+      const tableRows = activeStudents.map((s, idx) => {
+        const rawStatus = attendanceMap[String(s.id)] || '-';
+        let statusText = 'Unmarked';
+        if (rawStatus === 'P') statusText = 'Present';
+        else if (rawStatus === 'A') statusText = 'Absent';
+        else if (rawStatus === 'L') statusText = 'Leave';
+
+        return [
+          (idx + 1).toString(),
+          s.name || 'N/A',
+          s.email || 'N/A',
+          statusText
+        ];
+      });
+
+      autoTable(doc, {
+        startY: y + 24,
+        head: [['No.', 'Student Name', 'Email Address', 'Status']],
+        body: tableRows,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [79, 70, 229],
+          textColor: [255, 255, 255],
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'left'
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 4,
+          textColor: [15, 23, 42]
+        },
+        columnStyles: {
+          0: { cellWidth: 15, halign: 'center' },
+          1: { cellWidth: 70 },
+          2: { cellWidth: 65 },
+          3: { cellWidth: 32, fontStyle: 'bold' }
+        },
+        didParseCell: function (data) {
+          if (data.column.index === 3 && data.section === 'body') {
+            const statusVal = data.cell.text[0];
+            if (statusVal === 'Present') {
+              data.cell.styles.textColor = [16, 185, 129];
+            } else if (statusVal === 'Absent') {
+              data.cell.styles.textColor = [239, 68, 68];
+            } else if (statusVal === 'Leave') {
+              data.cell.styles.textColor = [245, 158, 11];
+            } else {
+              data.cell.styles.textColor = [100, 116, 139];
+            }
+          }
+        }
+      });
+
+      // Footer
+      const pageCount = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(14, 280, 196, 280);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text('This is an official document generated by the IEM SMS Portal.', 105, 286, { align: 'center' });
+      }
+
+      const fileContextName = activeContextName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      doc.save(`attendance_${contextType}_${fileContextName}_${attendanceDate}.pdf`);
+      notify?.('Attendance PDF downloaded.');
+    } catch (err: any) {
+      console.error(err);
+      notify?.(`Failed to generate PDF: ${err.message || err}`);
+    } finally {
+      dispatchStatus({ type: 'STOP_LOADING' });
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight">Class Management</h2>
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">Standalone page component for class/subject attendance.</p>
+
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <select
+            value={contextType}
+            onChange={(e) => setContextType(e.target.value as AttendanceContextType)}
+            className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+          >
+            <option value="class">Class Attendance</option>
+            <option value="subject">Subject Attendance</option>
+          </select>
+
+          <select
+            value={selectedContextId}
+            onChange={(e) => setSelectedContextId(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none md:col-span-2"
+          >
+            {!activeContextList.length && <option value="">No options available</option>}
+            {activeContextList.map(item => (
+              <option key={item.id} value={item.id}>{item.name}</option>
+            ))}
+          </select>
+
+          <input aria-label="Action"
+            type="date"
+            value={attendanceDate}
+            onChange={(e) => setAttendanceDate(e.target.value)}
+            className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => void loadAttendance()}
+            disabled={isLoading || isSaving || !selectedContextId}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${isLoading || isSaving || !selectedContextId ? 'bg-slate-300 text-slate-600 cursor-not-allowed' : 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'}`}
+          >
+            {isLoading ? 'Loading...' : 'Reload'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void markAllPresent()}
+            disabled={isLoading || isSaving || activeStudents.length === 0}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${isLoading || isSaving || activeStudents.length === 0 ? 'bg-brand-200 text-brand-700 cursor-not-allowed' : 'bg-brand-500 text-white'}`}
+          >
+            {isSaving ? 'Saving...' : 'Mark All Present'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void downloadAttendancePDF()}
+            disabled={isLoading || isSaving || activeStudents.length === 0}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 ${isLoading || isSaving || activeStudents.length === 0 ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700 transition-all'}`}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+          <h3 className="text-sm sm:text-base font-black">Students ({activeStudents.length})</h3>
+          <span className="text-[11px] font-bold text-slate-500">P = Present, A = Absent, L = Leave</span>
+        </div>
+
+        {activeStudents.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">No students available for this context.</p>
+        ) : (
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700 max-h-[600px] overflow-y-auto custom-scrollbar">
+            {activeStudents.map(student => {
+              const currentStatus = attendanceMap[String(student.id)] || '-';
+              return (
+                <li key={student.id} className="px-5 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-slate-100">{student.name}</p>
+                    <p className="text-xs text-slate-500">{student.email}</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500 mr-1">Current: {currentStatus}</span>
+                    {(['P', 'A', 'L'] as AttendanceStatus[]).map(status => {
+                      const active = currentStatus === status;
+                      return (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => void saveSingle(String(student.id), status)}
+                          disabled={isSaving || isLoading}
+                          className={`w-9 h-9 rounded-lg text-xs font-black ${active ? 'bg-brand-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`}
+                        >
+                          {status}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+};
+
+export default DailyAttendancePage;

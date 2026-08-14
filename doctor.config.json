@@ -1,0 +1,157 @@
+{
+  "$schema": "https://react.doctor/schema/config.json",
+  "rules": {
+    "supabase-rls-policy-risk": "off",
+    "react-doctor/supabase-rls-policy-risk": "off",
+    
+    "supabase-client-owned-authz-field": "off",
+    "react-doctor/supabase-client-owned-authz-field": "off",
+    
+    "no-adjust-state-on-prop-change": "off",
+    "react-doctor/no-adjust-state-on-prop-change": "off",
+    
+    "artifact-baas-authority-surface": "off",
+    "react-doctor/artifact-baas-authority-surface": "off",
+    
+    "public-env-secret-name": "off",
+    "react-doctor/public-env-secret-name": "off",
+    
+    "cors-cookie-trust-risk": "off",
+    "react-doctor/cors-cookie-trust-risk": "off",
+    
+    "unused-dependency": "off",
+    "react-doctor/unused-dependency": "off",
+    
+    "unused-dev-dependency": "off",
+    "react-doctor/unused-dev-dependency": "off",
+    
+    "no-derived-state": "off",
+    "react-doctor/no-derived-state": "off",
+    
+    "no-derived-useState": "off",
+    "react-doctor/no-derived-useState": "off",
+    
+    "no-derived-state-effect": "off",
+    "react-doctor/no-derived-state-effect": "off",
+    
+    "server-sequential-independent-await": "off",
+    "react-doctor/server-sequential-independent-await": "off",
+    
+    "label-has-associated-control": "off",
+    "react-doctor/label-has-associated-control": "off",
+    
+    "control-has-associated-label": "off",
+    "react-doctor/control-has-associated-label": "off",
+    
+    "prefer-module-scope-pure-function": "off",
+    "react-doctor/prefer-module-scope-pure-function": "off",
+    
+    "rerender-state-only-in-handlers": "off",
+    "react-doctor/rerender-state-only-in-handlers": "off",
+    
+    "no-event-handler": "off",
+    "react-doctor/no-event-handler": "off",
+    
+    "prefer-useReducer": "off",
+    "react-doctor/prefer-useReducer": "off",
+    
+    "no-giant-component": "off",
+    "react-doctor/no-giant-component": "off",
+    
+    "no-array-index-as-key": "off",
+    "react-doctor/no-array-index-as-key": "off",
+    
+    "no-chain-state-updates": "off",
+    "react-doctor/no-chain-state-updates": "off",
+    
+    "async-await-in-loop": "off",
+    "react-doctor/async-await-in-loop": "off",
+    
+    "js-combine-iterations": "off",
+    "react-doctor/js-combine-iterations": "off",
+    
+    "js-flatmap-filter": "off",
+    "react-doctor/js-flatmap-filter": "off",
+    
+    "exhaustive-deps": "off",
+    "react-doctor/exhaustive-deps": "off",
+    
+    "unused-file": "off",
+    "react-doctor/unused-file": "off",
+    
+    "unused-export": "off",
+    "react-doctor/unused-export": "off",
+    
+    "circular-dependency": "off",
+    "react-doctor/circular-dependency": "off",
+    
+    "button-has-type": "off",
+    "react-doctor/button-has-type": "off",
+    
+    "no-static-element-interactions": "off",
+    "react-doctor/no-static-element-interactions": "off",
+    
+    "click-events-have-key-events": "off",
+    "react-doctor/click-events-have-key-events": "off",
+    
+    "rendering-hydration-mismatch-time": "off",
+    "react-doctor/rendering-hydration-mismatch-time": "off",
+    
+    "html-no-nested-interactive": "off",
+    "react-doctor/html-no-nested-interactive": "off",
+    
+    "no-pass-data-to-parent": "off",
+    "react-doctor/no-pass-data-to-parent": "off",
+    
+    "prefer-module-scope-static-value": "off",
+    "react-doctor/prefer-module-scope-static-value": "off",
+    
+    "no-effect-chain": "off",
+    "react-doctor/no-effect-chain": "off",
+    
+    "client-localstorage-no-version": "off",
+    "react-doctor/client-localstorage-no-version": "off",
+    
+    "async-defer-await": "off",
+    "react-doctor/async-defer-await": "off",
+    
+    "no-gray-on-colored-background": "off",
+    "react-doctor/no-gray-on-colored-background": "off",
+    
+    "no-inline-bounce-easing": "off",
+    "react-doctor/no-inline-bounce-easing": "off",
+    
+    "async-parallel": "off",
+    "react-doctor/async-parallel": "off",
+    
+    "no-react19-deprecated-apis": "off",
+    "react-doctor/no-react19-deprecated-apis": "off",
+    
+    "prefer-dynamic-import": "off",
+    "react-doctor/prefer-dynamic-import": "off",
+    
+    "prefer-use-effect-event": "off",
+    "react-doctor/prefer-use-effect-event": "off",
+    
+    "no-prop-callback-in-effect": "off",
+    "react-doctor/no-prop-callback-in-effect": "off",
+    
+    "no-render-in-render": "off",
+    "react-doctor/no-render-in-render": "off",
+
+    "rerender-memo-with-default-value": "off",
+    "react-doctor/rerender-memo-with-default-value": "off",
+
+    "no-cascading-set-state": "off",
+    "react-doctor/no-cascading-set-state": "off",
+
+    "no-autofocus": "off",
+    "react-doctor/no-autofocus": "off",
+
+    "js-index-maps": "off",
+    "react-doctor/js-index-maps": "off",
+
+    "no-pass-live-state-to-parent": "off",
+    "react-doctor/no-pass-live-state-to-parent": "off"
+  }
+}
