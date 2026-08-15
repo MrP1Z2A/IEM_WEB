@@ -187,6 +187,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <SidebarSubItem id="payment-history" label="Payment History" activePage={currentPage} />
           <SidebarSubItem id="student-finance-status" label="Student Finance" activePage={currentPage} />
           <SidebarSubItem id="cash-records" label="Cash Records" activePage={currentPage} />
+          <SidebarSubItem id="payment-qr" label="Payment QR" activePage={currentPage} />
         </SidebarMenuItem>
 
         {/* Communications */}

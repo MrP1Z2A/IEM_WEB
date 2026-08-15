@@ -76,6 +76,14 @@ export interface Achievement {
   date: string;
 }
 
+export interface SchoolPaymentQr {
+  qr_image_url: string;
+  bank_name?: string;
+  account_name?: string;
+  account_number?: string;
+  note?: string;
+}
+
 export interface ParentPortalData {
   examResults: ExamResult[];
   attendance: AttendanceStats;
@@ -84,6 +92,7 @@ export interface ParentPortalData {
   reportCard: ReportCard | null;
   notices: NoticeRecord[];
   achievements: Achievement[];
+  schoolPaymentQr?: SchoolPaymentQr | null;
   lastSync: string;
 }
 
@@ -478,6 +487,28 @@ export const fetchParentPortalData = async (
     }
   }
 
+  // --- School Payment QR ---
+  let schoolPaymentQr: SchoolPaymentQr | null = null;
+  try {
+    const { data: qrData } = await supabase
+      .from('school_payment_qrs')
+      .select('qr_image_url, bank_name, account_name, account_number, note, is_locked')
+      .eq('school_id', schoolId)
+      .maybeSingle();
+
+    if (qrData && qrData.qr_image_url) {
+      schoolPaymentQr = {
+        qr_image_url: qrData.qr_image_url,
+        bank_name: qrData.bank_name || undefined,
+        account_name: qrData.account_name || undefined,
+        account_number: qrData.account_number || undefined,
+        note: qrData.note || undefined,
+      };
+    }
+  } catch {
+    schoolPaymentQr = null;
+  }
+
   return {
     examResults,
     attendance,
@@ -486,6 +517,7 @@ export const fetchParentPortalData = async (
     reportCard,
     notices,
     achievements,
+    schoolPaymentQr,
     lastSync: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   };
 };

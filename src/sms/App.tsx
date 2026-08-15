@@ -4925,6 +4925,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <PaymentFinanceHub schoolId={schoolId} view="cash-records" />
           )}
 
+          {currentPage === 'payment-qr' && (
+            <PaymentFinanceHub schoolId={schoolId} view="payment-qr" />
+          )}
+
           {/* PROGRAMS PAGE - WITH CRUD */}
           {currentPage === 'programs' && (
             <div className="space-y-12 animate-in fade-in duration-700 pb-20">

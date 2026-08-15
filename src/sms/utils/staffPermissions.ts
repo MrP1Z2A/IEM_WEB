@@ -25,6 +25,7 @@ const STAFF_PERMISSION_ITEM_IDS = [
   'payment-history',
   'student-finance-status',
   'cash-records',
+  'payment-qr',
   'exam',
   'about-school',
   'security',

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PaymentRecord, uploadPaymentReceipt } from '../services/smsService';
+import { PaymentRecord, SchoolPaymentQr, uploadPaymentReceipt } from '../services/smsService';
 import {
   ArrowLeft, QrCode, Upload, FileText, CheckCircle2,
   ShieldCheck, AlertCircle, RefreshCw, Image as ImageIcon, Check
@@ -9,6 +9,7 @@ interface PaymentCheckoutProps {
   payment: PaymentRecord | null;
   studentId?: string;
   schoolId?: string;
+  schoolPaymentQr?: SchoolPaymentQr | null;
   onBack: () => void;
   onReceiptUploaded?: () => void;
 }
@@ -17,6 +18,7 @@ const PaymentCheckout: React.FC<PaymentCheckoutProps> = ({
   payment,
   studentId,
   schoolId,
+  schoolPaymentQr,
   onBack,
   onReceiptUploaded,
 }) => {
@@ -162,11 +164,39 @@ const PaymentCheckout: React.FC<PaymentCheckoutProps> = ({
 
             <div className="bg-emerald-50/50 p-4 rounded-3xl border-2 border-dashed border-emerald-200 inline-block mb-4 shadow-sm">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=IEM_PAY_${paymentId}_${amount}&color=059669`}
-                alt="Payment QR Code"
+                src={schoolPaymentQr?.qr_image_url || `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=IEM_PAY_${paymentId}_${amount}&color=059669`}
+                alt="School Payment QR Code"
                 className="w-48 h-48 sm:w-56 sm:h-56 rounded-2xl object-contain bg-white p-2 shadow-inner"
               />
             </div>
+
+            {schoolPaymentQr && (
+              <div className="w-full bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 text-left space-y-2 mb-4 text-xs">
+                {schoolPaymentQr.bank_name && (
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[9px] block tracking-wider">Provider / Bank</span>
+                    <p className="font-black text-slate-900 dark:text-white text-sm">{schoolPaymentQr.bank_name}</p>
+                  </div>
+                )}
+                {schoolPaymentQr.account_name && (
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[9px] block tracking-wider">Account Holder Name</span>
+                    <p className="font-black text-slate-900 dark:text-white text-sm">{schoolPaymentQr.account_name}</p>
+                  </div>
+                )}
+                {schoolPaymentQr.account_number && (
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[9px] block tracking-wider">Account / Phone Number</span>
+                    <p className="font-black text-emerald-600 dark:text-emerald-400 text-base">{schoolPaymentQr.account_number}</p>
+                  </div>
+                )}
+                {schoolPaymentQr.note && (
+                  <div className="bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900 mt-2">
+                    <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300">💡 {schoolPaymentQr.note}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
               Please take a screenshot of your transfer receipt after payment

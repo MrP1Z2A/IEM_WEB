@@ -3,7 +3,7 @@ import { jsPDF } from 'jspdf';
 import { supabase } from '../../supabaseClient';
 import { getCurrentTenantContext, withSchoolId, withSchoolIdRows } from '../../services/tenantService';
 
-type FinanceView = 'payment' | 'payment-assign' | 'payment-history' | 'student-finance-status' | 'cash-records';
+type FinanceView = 'payment' | 'payment-assign' | 'payment-history' | 'student-finance-status' | 'cash-records' | 'payment-qr';
 
 type AppStudent = {
   id: string;

@@ -112,6 +112,7 @@ export type PageId =
   | 'payment-history'
   | 'student-finance-status'
   | 'cash-records'
+  | 'payment-qr'
   | 'student-service'
   | 'student-service-batch'
   | 'events'

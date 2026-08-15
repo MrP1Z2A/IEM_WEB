@@ -15,7 +15,7 @@ import LoginPage from './components/LoginPage';
 import NoticeDetail from './components/NoticeDetail';
 import MessagingCenter from './components/MessagingCenter';
 import PaymentCheckout from './components/PaymentCheckout';
-import { PaymentRecord } from './services/smsService';
+import { fetchParentPortalData, PaymentRecord, SchoolPaymentQr } from './services/smsService';
 import { buildParentMessagingId, getFallbackParentName } from '../shared/messaging/parentMessaging';
 
 type ParentView = 'dashboard' | 'student' | 'institution' | 'messages' | 'news' | 'finance' | 'notice-detail' | 'checkout';
@@ -216,6 +216,17 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
   const [currentView, setCurrentView] = useState<ParentView>('dashboard');
   const [selectedNotice, setSelectedNotice] = useState<any>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
+  const [schoolPaymentQr, setSchoolPaymentQr] = useState<SchoolPaymentQr | null>(null);
+
+  useEffect(() => {
+    if (parentData?.studentIds && parentData?.schoolId) {
+      fetchParentPortalData(parentData.studentIds, parentData.schoolId).then(data => {
+        if (data.schoolPaymentQr) {
+          setSchoolPaymentQr(data.schoolPaymentQr);
+        }
+      }).catch(() => {});
+    }
+  }, [parentData]);
 
   // Expose onSwitch to window so Header can call it
   useEffect(() => {
@@ -258,7 +269,7 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
       case 'news':          return <Communications schoolId={parentData?.schoolId} />;
       case 'finance':       return <Finance key={keyStr} studentIds={ids} schoolId={parentData?.schoolId} onSelectPayment={(payment) => { setSelectedPayment(payment); setCurrentView('checkout'); }} />;
       case 'notice-detail': return <NoticeDetail notice={selectedNotice} onBack={() => setCurrentView('dashboard')} />;
-      case 'checkout':      return <PaymentCheckout payment={selectedPayment} studentId={ids?.[0]} schoolId={parentData?.schoolId} onBack={() => setCurrentView('finance')} />;
+      case 'checkout':      return <PaymentCheckout payment={selectedPayment} studentId={ids?.[0]} schoolId={parentData?.schoolId} schoolPaymentQr={schoolPaymentQr} onBack={() => setCurrentView('finance')} />;
       default:              return <Dashboard key={keyStr} studentNames={names} studentIds={ids} schoolId={parentData?.schoolId} />;
     }
   };
