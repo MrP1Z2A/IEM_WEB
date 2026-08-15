@@ -22,6 +22,9 @@ type StudentPayment = {
   status: PaymentStatus;
   note: string | null;
   created_at: string;
+  receipt_url?: string | null;
+  receipt_status?: string | null;
+  receipt_uploaded_at?: string | null;
 };
 
 type StudentCourseLink = {
@@ -162,6 +165,8 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
   const [assignClassFilter, setAssignClassFilter] = useState('');
   const [assignCourseFilter, setAssignCourseFilter] = useState('');
   const [financeStatusTab, setFinanceStatusTab] = useState<'all' | 'pending'>('all');
+  const [historyTab, setHistoryTab] = useState<'pending' | 'paid'>('pending');
+  const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     student_id: '',
@@ -338,6 +343,9 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
         status: (String(row.status || 'paid').toLowerCase() as PaymentStatus),
         note: row.note ? String(row.note) : null,
         created_at: String(row.created_at || new Date().toISOString()),
+        receipt_url: row.receipt_url ? String(row.receipt_url) : null,
+        receipt_status: row.receipt_status ? String(row.receipt_status) : null,
+        receipt_uploaded_at: row.receipt_uploaded_at ? String(row.receipt_uploaded_at) : null,
       }));
 
       const nextClassesMap = new Map<string, string>();
@@ -689,6 +697,32 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
       await loadData();
     } catch (saveError: any) {
       setError(saveError?.message || 'Failed to save payment.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const markPaymentAsPaid = async (paymentId: string) => {
+    setError(null);
+    setStatus(null);
+    setIsSaving(true);
+    try {
+      const { error: updateErr } = await supabase
+        .from('student_payments')
+        .update({
+          status: 'paid',
+          receipt_status: 'verified',
+          payment_date: getTodayIso(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', paymentId);
+
+      if (updateErr) throw updateErr;
+
+      setStatus('Payment verified and marked as paid! Pending status removed for parent.');
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update payment status.');
     } finally {
       setIsSaving(false);
     }
@@ -1264,9 +1298,9 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
           )}
 
           {(view === 'payment-history' || view === 'payment') && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[36px] p-5 sm:p-6 lg:p-8 shadow-premium space-y-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[36px] p-5 sm:p-6 lg:p-8 shadow-premium space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-xl font-black tracking-tight">Payment History</h3>
+                <h3 className="text-xl font-black tracking-tight">Payment Verification & History</h3>
                 <button
                   type="button"
                   onClick={downloadPaymentStatementPdf}
@@ -1275,39 +1309,154 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
                   Download Payment Statement
                 </button>
               </div>
-              {filteredPaidPayments.length === 0 ? (
-                <p className="text-sm font-semibold text-slate-500">No paid records found.</p>
-              ) : (
-                <div className="space-y-3">
-                  {filteredPaidPayments.map(payment => (
-                    <div key={payment.id} className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="space-y-2">
-                        <p className="text-sm font-black text-slate-900 dark:text-white">{studentMap.get(payment.student_id)?.name || payment.student_id}</p>
-                        <p className="text-xs text-slate-500">
-                          Collected: {toIsoDate(payment.payment_date) || '-'} | Deadline: {toIsoDate(payment.due_date) || '-'}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black tracking-wide">
-                            Class: {getStudentAcademic(payment.student_id).className}
-                          </span>
-                          <span className="px-3 py-1.5 rounded-xl bg-cyan-50 text-cyan-700 text-xs font-black tracking-wide">
-                            Course: {getStudentAcademic(payment.student_id).courseName}
-                          </span>
+
+              {/* Sub Tabs */}
+              <div className="flex flex-wrap gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab('pending')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                    historyTab === 'pending'
+                      ? 'bg-amber-500 text-white shadow-md'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Pending & Verification Queue ({filteredPayments.filter(p => p.status !== 'paid').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHistoryTab('paid')}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                    historyTab === 'paid'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  Verified Paid History ({filteredPaidPayments.length})
+                </button>
+              </div>
+
+              {historyTab === 'pending' ? (
+                <div className="space-y-4">
+                  {filteredPayments.filter(p => p.status !== 'paid').length === 0 ? (
+                    <div className="text-center py-12 bg-slate-50 dark:bg-slate-950 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+                      <p className="text-sm font-black text-slate-400 uppercase tracking-widest">No pending payments or verification requests</p>
+                      <p className="text-xs text-slate-400 mt-1">All student accounts are clear.</p>
+                    </div>
+                  ) : (
+                    filteredPayments.filter(p => p.status !== 'paid').map(payment => (
+                      <div key={payment.id} className="rounded-3xl border border-amber-200/60 dark:border-slate-800 bg-amber-50/10 dark:bg-slate-900 p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm hover:border-amber-400 transition-all">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-base font-black text-slate-900 dark:text-white">{studentMap.get(payment.student_id)?.name || payment.student_id}</p>
+                            <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest">
+                              {payment.status}
+                            </span>
+                            {payment.receipt_url ? (
+                              <span className="px-2.5 py-0.5 rounded-md bg-cyan-100 text-cyan-800 text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                                📄 Receipt Uploaded
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                                Awaiting Receipt
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                            {payment.note || 'Tuition / Academic Dues'} | Deadline: <span className="font-bold text-rose-600">{toIsoDate(payment.due_date) || 'No deadline'}</span>
+                          </p>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <span className="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black">
+                              Class: {getStudentAcademic(payment.student_id).className}
+                            </span>
+                            <span className="px-3 py-1 rounded-xl bg-cyan-50 text-cyan-700 text-xs font-black">
+                              Course: {getStudentAcademic(payment.student_id).courseName}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0 pt-3 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0">
+                          <div className="text-left sm:text-right">
+                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Amount Due</p>
+                            <p className="text-xl font-black text-emerald-600">{formatMMK(payment.amount_mmk)}</p>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                            {payment.receipt_url && (
+                              <button
+                                type="button"
+                                onClick={() => setViewingReceiptUrl(payment.receipt_url || null)}
+                                className="flex-1 sm:flex-none px-4 py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-black uppercase tracking-widest shadow-md transition-all flex items-center justify-center gap-2"
+                              >
+                                👁️ View Receipt
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => void markPaymentAsPaid(payment.id)}
+                              disabled={isSaving}
+                              className="flex-1 sm:flex-none px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest shadow-md transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                            >
+                              ✓ Verify & Mark Paid
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap justify-end">
-                        <button
-                          type="button"
-                          onClick={() => downloadPaymentInvoicePdf(payment)}
-                          className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest"
-                        >
-                          Download Invoice
-                        </button>
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-500">{payment.status}</span>
-                        <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-[10px] font-black uppercase tracking-widest text-emerald-700">{formatMMK(payment.amount_mmk)}</span>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredPaidPayments.length === 0 ? (
+                    <p className="text-sm font-semibold text-slate-500">No paid records found.</p>
+                  ) : (
+                    filteredPaidPayments.map(payment => (
+                      <div key={payment.id} className="rounded-2xl border border-slate-200 dark:border-slate-700 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-black text-slate-900 dark:text-white">{studentMap.get(payment.student_id)?.name || payment.student_id}</p>
+                            {payment.receipt_url && (
+                              <span className="px-2 py-0.5 rounded-md bg-cyan-100 text-cyan-800 text-[9px] font-black uppercase tracking-widest">
+                                Receipt Verified
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            Collected: {toIsoDate(payment.payment_date) || '-'} | {payment.note || 'Paid'}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black tracking-wide">
+                              Class: {getStudentAcademic(payment.student_id).className}
+                            </span>
+                            <span className="px-3 py-1.5 rounded-xl bg-cyan-50 text-cyan-700 text-xs font-black tracking-wide">
+                              Course: {getStudentAcademic(payment.student_id).courseName}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                          {payment.receipt_url && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingReceiptUrl(payment.receipt_url || null)}
+                              className="px-3 py-1.5 rounded-lg bg-cyan-600 text-white text-[10px] font-black uppercase tracking-widest"
+                            >
+                              View Receipt
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => downloadPaymentInvoicePdf(payment)}
+                            className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest"
+                          >
+                            Download Invoice
+                          </button>
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-[10px] font-black uppercase tracking-widest text-emerald-800">Paid</span>
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-[10px] font-black uppercase tracking-widest text-emerald-700">{formatMMK(payment.amount_mmk)}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -1539,6 +1688,51 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
             </div>
           )}
         </>
+      )}
+      {viewingReceiptUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Payment Receipt Proof</h3>
+                <p className="text-xs text-slate-500 font-semibold mt-0.5">Uploaded by Parent for Verification</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingReceiptUrl(null)}
+                className="p-2 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-all font-black text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-950 flex items-center justify-center p-2 min-h-[300px]">
+              <img
+                src={viewingReceiptUrl}
+                alt="Payment Receipt"
+                className="max-h-[60vh] object-contain rounded-xl shadow-md"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <a
+                href={viewingReceiptUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-black text-cyan-600 hover:underline uppercase tracking-widest"
+              >
+                Open Original Image ↗
+              </a>
+              <button
+                type="button"
+                onClick={() => setViewingReceiptUrl(null)}
+                className="px-6 py-2.5 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-800"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

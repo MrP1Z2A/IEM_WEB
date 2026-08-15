@@ -22,6 +22,9 @@ type StudentPayment = {
   status: PaymentStatus;
   note: string | null;
   created_at: string;
+  receipt_url?: string | null;
+  receipt_status?: string | null;
+  receipt_uploaded_at?: string | null;
 };
 
 type StudentCourseLink = {
@@ -338,6 +341,9 @@ export function usePaymentFinanceHub(schoolId: string | undefined, view: any) {
         status: (String(row.status || 'paid').toLowerCase() as PaymentStatus),
         note: row.note ? String(row.note) : null,
         created_at: String(row.created_at || new Date().toISOString()),
+        receipt_url: row.receipt_url ? String(row.receipt_url) : null,
+        receipt_status: row.receipt_status ? String(row.receipt_status) : null,
+        receipt_uploaded_at: row.receipt_uploaded_at ? String(row.receipt_uploaded_at) : null,
       }));
 
       const nextClassesMap = new Map<string, string>();
@@ -689,6 +695,32 @@ export function usePaymentFinanceHub(schoolId: string | undefined, view: any) {
       await loadData();
     } catch (saveError: any) {
       setError(saveError?.message || 'Failed to save payment.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const markPaymentAsPaid = async (paymentId: string) => {
+    setError(null);
+    setStatus(null);
+    setIsSaving(true);
+    try {
+      const { error: updateErr } = await supabase
+        .from('student_payments')
+        .update({
+          status: 'paid',
+          receipt_status: 'verified',
+          payment_date: getTodayIso(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', paymentId);
+
+      if (updateErr) throw updateErr;
+
+      setStatus('Payment verified and marked as paid! Pending status removed for parent.');
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update payment status.');
     } finally {
       setIsSaving(false);
     }
@@ -1087,6 +1119,7 @@ export function usePaymentFinanceHub(schoolId: string | undefined, view: any) {
     toggleSelectAllFilteredStudents,
     assignPaymentsToSelectedStudents,
     submitPayment,
+    markPaymentAsPaid,
     submitCashOutRecord,
     collectOutstandingPaymentsForStudent,
     downloadPaymentStatementPdf,
