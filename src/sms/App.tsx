@@ -2524,18 +2524,21 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   };
 
   const deleteEntity = async (id: string, type: string) => {
-    if (type === 'student') {
-      const targetStudent = students.find(student => String(student.id) === String(id));
-      const targetTeacher = teachers.find(teacher => String(teacher.id) === String(id));
-      const target = targetStudent || targetTeacher;
+    if (type === 'student' || type === 'teacher') {
+      const targetStudent = type === 'student' ? students.find(student => String(student.id) === String(id)) : null;
+      const targetTeacher = type === 'teacher' ? teachers.find(teacher => String(teacher.id) === String(id)) : null;
+      const fallbackTarget = students.find(student => String(student.id) === String(id)) || teachers.find(teacher => String(teacher.id) === String(id));
+      const target = targetTeacher || targetStudent || fallbackTarget;
+
       if (!target) {
-        notify('Student not found.');
+        notify(`${type === 'teacher' ? 'Teacher' : 'Student'} not found.`);
         return;
       }
+
       setStudentDeleteDialog({
         id: target.id,
         name: target.name,
-        entityType: targetTeacher ? 'teacher' : 'student',
+        entityType: (targetTeacher || type === 'teacher') ? 'teacher' : 'student',
       });
       setStudentDeleteNameInput('');
       setAdminDeletePassword('');
@@ -2599,10 +2602,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const handleSecureStudentDelete = async () => {
     if (!studentDeleteDialog) return;
 
+    const isTeacher = studentDeleteDialog.entityType === 'teacher';
+    const entityLabel = isTeacher ? 'teacher' : 'student';
+
     const expectedName = studentDeleteDialog.name.trim();
     const typedName = studentDeleteNameInput.trim();
     if (typedName !== expectedName) {
-      setStudentDeleteError('Student name does not match.');
+      setStudentDeleteError(`${isTeacher ? 'Teacher' : 'Student'} name does not match.`);
       return;
     }
 
@@ -2621,8 +2627,51 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         return;
       }
 
-      if (studentDeleteDialog.entityType === 'student') {
-        const schoolId = await requireSchoolId();
+      const schoolId = await requireSchoolId();
+
+      if (isTeacher) {
+        // Clean up foreign key references prior to deleting teacher row
+        try {
+          await supabase
+            .from('class_courses')
+            .update({ teacher_id: null })
+            .eq('teacher_id', studentDeleteDialog.id)
+            .eq('school_id', schoolId);
+        } catch (e) {
+          console.warn('Foreign key cleanup (class_courses):', e);
+        }
+
+        try {
+          await supabase
+            .from('class_course_teachers')
+            .delete()
+            .eq('teacher_id', studentDeleteDialog.id);
+        } catch (e) {
+          console.warn('Foreign key cleanup (class_course_teachers):', e);
+        }
+
+        try {
+          await supabase
+            .from('attendance_records')
+            .delete()
+            .eq('teacher_id', studentDeleteDialog.id);
+        } catch (e) {
+          console.warn('Foreign key cleanup (attendance_records):', e);
+        }
+
+        try {
+          await supabase
+            .from('teacher_registrations')
+            .delete()
+            .eq('teacher_id', studentDeleteDialog.id);
+          await supabase
+            .from('teacher_registrations')
+            .delete()
+            .eq('id', studentDeleteDialog.id);
+        } catch (e) {
+          console.warn('Foreign key cleanup (teacher_registrations):', e);
+        }
+      } else {
         const { error: classRelationDeleteError } = await supabase
           .from('class_course_students')
           .delete()
@@ -2648,20 +2697,30 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         }
       }
 
-      const schoolId = await requireSchoolId();
-      const { error: deleteError } = await supabase
-        .from(studentDeleteDialog.entityType === 'teacher' ? 'teachers' : 'students')
+      const targetTable = isTeacher ? 'teachers' : 'students';
+      
+      const { error: deleteError1 } = await supabase
+        .from(targetTable)
         .delete()
         .eq('id', studentDeleteDialog.id)
         .eq('school_id', schoolId);
-      if (deleteError) {
-        console.error('Supabase Delete Error:', deleteError);
-        setStudentDeleteError('Failed to delete student.');
-        return;
+
+      if (deleteError1) {
+        // Fallback: Delete by ID alone in case school_id column filter fails
+        const { error: deleteError2 } = await supabase
+          .from(targetTable)
+          .delete()
+          .eq('id', studentDeleteDialog.id);
+
+        if (deleteError2) {
+          console.error(`Supabase Delete Error (${targetTable}):`, deleteError2);
+          setStudentDeleteError(`Failed to delete ${entityLabel}: ${deleteError2.message || deleteError1.message}`);
+          return;
+        }
       }
 
       setStudents(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
-      setTeachers(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
+      setTeachers(prev => prev.filter(teacher => teacher.id !== studentDeleteDialog.id));
       setAllStudents(prev => prev.filter(student => String(student.id) !== studentDeleteDialog.id));
       setAttendanceStudents(prev => prev.filter(student => student.id !== studentDeleteDialog.id));
       setClasses(prev => prev.map(classItem => {
@@ -2669,21 +2728,16 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         if (nextStudentIds.length === (classItem.student_ids || []).length) {
           return classItem;
         }
-
-        return {
-          ...classItem,
-          student_ids: nextStudentIds,
-          student_count: nextStudentIds.length,
-        };
+        return { ...classItem, student_ids: nextStudentIds };
       }));
-      notify(`${studentDeleteDialog.entityType === 'teacher' ? 'Teacher' : 'Student'} node deleted.`);
+
+      notify(`${isTeacher ? 'Teacher' : 'Student'} profile deleted successfully.`);
       setStudentDeleteDialog(null);
       setStudentDeleteNameInput('');
       setAdminDeletePassword('');
-      setStudentDeleteError(null);
-    } catch (error) {
-      console.error('Password verification error:', error);
-      setStudentDeleteError('Failed to verify admin password.');
+    } catch (err: any) {
+      console.error('Delete execution error:', err);
+      setStudentDeleteError(`Failed to delete ${entityLabel}: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsStudentDeleteSubmitting(false);
     }
@@ -4299,19 +4353,23 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       {studentDeleteDialog && (
         <div className="fixed inset-0 z-[130] bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
-            <h3 className="text-xl font-black tracking-tight">Secure Student Deletion</h3>
+            <h3 className="text-xl font-black tracking-tight">
+              Secure {studentDeleteDialog.entityType === 'teacher' ? 'Teacher' : 'Student'} Deletion
+            </h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">
               Retype <span className="font-black">{studentDeleteDialog.name}</span> and enter admin password to continue.
             </p>
 
             <div className="space-y-3">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Retype Student Name</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                Retype {studentDeleteDialog.entityType === 'teacher' ? 'Teacher' : 'Student'} Name
+              </label>
               <input aria-label="Action"
                 type="text"
                 value={studentDeleteNameInput}
                 onChange={(e) => setStudentDeleteNameInput(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 outline-none"
-                placeholder="Enter exact student name"
+                placeholder={`Enter exact ${studentDeleteDialog.entityType === 'teacher' ? 'teacher' : 'student'} name`}
               />
             </div>
 

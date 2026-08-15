@@ -94,7 +94,7 @@ const TeacherRegistrationHub: React.FC<TeacherRegistrationHubProps> = ({
                   </div>
                 </div>
                 <button aria-label="Action"
-                  type="button" onClick={() => deleteEntity(t.id, 'student')}
+                  type="button" onClick={() => deleteEntity(t.id, 'teacher')}
                   className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 text-slate-300 hover:text-rose-500 transition-all shadow-sm flex items-center justify-center"
                 >
                   <i className="fas fa-trash-can text-sm"></i>
