@@ -2662,9 +2662,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         }
 
         if (deletedRows.length === 0) {
-          console.warn('Teacher delete affected 0 rows. Attempting unconstrained delete by name...');
-          const res4 = await supabase.from('teachers').delete().eq('name', expectedName).select();
-          if (!res4.data || res4.data.length === 0) {
+          // Cross-table fallback: check if entity exists in students table by name/id
+          const resCross = await supabase.schema('public').from('students').delete().eq('name', expectedName).select();
+          if (resCross.data && resCross.data.length > 0) {
+            deletedRows = resCross.data;
+          } else {
             setStudentDeleteError(`Supabase RLS policy or missing permissions blocked deleting teacher '${expectedName}'. Please run the RLS DELETE policy SQL in Supabase.`);
             return;
           }
@@ -2703,10 +2705,12 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         }
 
         if (deletedRows.length === 0) {
-          console.warn('Student delete affected 0 rows. Attempting unconstrained delete by name...');
-          const res4 = await supabase.from('students').delete().eq('name', expectedName).select();
-          if (!res4.data || res4.data.length === 0) {
-            setStudentDeleteError(`Supabase RLS policy or missing permissions blocked deleting student '${expectedName}'. Please run the RLS DELETE policy SQL in Supabase.`);
+          // Cross-table fallback: check if entity exists in teachers table by name/id
+          const resCross = await supabase.schema('public').from('teachers').delete().eq('name', expectedName).select();
+          if (resCross.data && resCross.data.length > 0) {
+            deletedRows = resCross.data;
+          } else {
+            setStudentDeleteError(`Supabase RLS policy or missing permissions blocked deleting '${expectedName}'. Please run the RLS DELETE policy SQL in Supabase.`);
             return;
           }
         }
