@@ -2631,61 +2631,40 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       const targetId = studentDeleteDialog.id;
 
       if (isTeacher) {
-        // Clean up foreign key references and registrations in public schema
-        await Promise.allSettled([
-          supabase.schema('public').from('class_courses').update({ teacher_id: null }).eq('teacher_id', targetId).eq('school_id', schoolId),
-          supabase.schema('public').from('class_courses').update({ teacher_id: null }).eq('teacher_id', targetId),
-          supabase.schema('public').from('class_course_teachers').delete().eq('teacher_id', targetId),
-          supabase.schema('public').from('attendance_records').delete().eq('teacher_id', targetId),
-          supabase.schema('public').from('attendance_records').delete().eq('context_id', targetId),
-          supabase.schema('public').from('teacher_registrations').delete().eq('teacher_id', targetId),
-          supabase.schema('public').from('teacher_registrations').delete().eq('id', targetId),
-          supabase.from('attendance_records').delete().eq('teacher_id', targetId),
-          supabase.from('teacher_registrations').delete().eq('teacher_id', targetId),
-          supabase.from('teacher_registrations').delete().eq('id', targetId),
-        ]);
+        // Sequentially clean up child tables first to avoid foreign key errors
+        try { await supabase.schema('public').from('class_courses').update({ teacher_id: null }).eq('teacher_id', targetId); } catch {}
+        try { await supabase.schema('public').from('class_course_teachers').delete().eq('teacher_id', targetId); } catch {}
+        try { await supabase.schema('public').from('attendance_records').delete().eq('teacher_id', targetId); } catch {}
+        try { await supabase.schema('public').from('attendance_records').delete().eq('context_id', targetId); } catch {}
+        try { await supabase.schema('public').from('teacher_registrations').delete().eq('teacher_id', targetId); } catch {}
+        try { await supabase.schema('public').from('teacher_registrations').delete().eq('id', targetId); } catch {}
 
-        // Delete from main public.teachers table
-        const res1 = await supabase.schema('public').from('teachers').delete().eq('id', targetId).eq('school_id', schoolId);
-        if (res1.error) {
-          const res2 = await supabase.schema('public').from('teachers').delete().eq('id', targetId);
-          if (res2.error) {
-            const res3 = await supabase.from('teachers').delete().eq('id', targetId);
-            if (res3.error) {
-              console.error('Supabase Delete Teacher Error:', res3.error);
-              setStudentDeleteError(`Failed to delete teacher in Supabase: ${res3.error.message || res1.error.message}`);
-              return;
-            }
-          }
+        // Now delete from main teachers table
+        const { error: delErr } = await supabase.schema('public').from('teachers').delete().eq('id', targetId);
+        if (delErr) {
+          console.error('Supabase Delete Teacher Error:', delErr);
+          setStudentDeleteError(`Failed to delete teacher in Supabase: ${delErr.message}`);
+          return;
         }
       } else {
-        // Clean up foreign key references and registrations in public schema
-        await Promise.allSettled([
-          supabase.schema('public').from('class_course_students').delete().eq('student_id', targetId).eq('school_id', schoolId),
-          supabase.schema('public').from('class_course_students').delete().eq('student_id', targetId),
-          supabase.schema('public').from('attendance_records').delete().eq('student_id', targetId),
-          supabase.schema('public').from('attendance_records').delete().eq('context_id', targetId),
-          supabase.schema('public').from('student_payments').delete().eq('student_id', targetId),
-          supabase.schema('public').from('exam_grades').delete().eq('student_id', targetId),
-          supabase.schema('public').from('report_cards').delete().eq('student_id', targetId),
-          supabase.schema('public').from('student_registrations').delete().eq('student_id', targetId),
-          supabase.schema('public').from('student_registrations').delete().eq('id', targetId),
-          supabase.from('attendance_records').delete().eq('student_id', targetId),
-          supabase.from('student_registrations').delete().eq('student_id', targetId),
-          supabase.from('student_registrations').delete().eq('id', targetId),
-        ]);
+        // Sequentially clean up child tables first to avoid foreign key errors
+        try { await supabase.schema('public').from('class_course_students').delete().eq('student_id', targetId); } catch {}
+        try { await supabase.schema('public').from('attendance_records').delete().eq('student_id', targetId); } catch {}
+        try { await supabase.schema('public').from('attendance_records').delete().eq('context_id', targetId); } catch {}
+        try { await supabase.schema('public').from('student_payments').delete().eq('student_id', targetId); } catch {}
+        try { await supabase.schema('public').from('exam_grades').delete().eq('student_id', targetId); } catch {}
+        try { await supabase.schema('public').from('report_cards').delete().eq('student_id', targetId); } catch {}
+        try { await supabase.schema('public').from('student_registrations').delete().eq('student_id', targetId); } catch {}
+        try { await supabase.schema('public').from('student_registrations').delete().eq('id', targetId); } catch {}
 
-        // Delete from main public.students table
-        const res1 = await supabase.schema('public').from('students').delete().eq('id', targetId).eq('school_id', schoolId);
+        // Now delete from main students table
+        const res1 = await supabase.schema('public').from('students').delete().eq('id', targetId);
         if (res1.error) {
-          const res2 = await supabase.schema('public').from('students').delete().eq('id', targetId);
+          const res2 = await supabase.schema('public').from('students').delete().eq('student_id', targetId);
           if (res2.error) {
-            const res3 = await supabase.from('students').delete().eq('id', targetId);
-            if (res3.error) {
-              console.error('Supabase Delete Student Error:', res3.error);
-              setStudentDeleteError(`Failed to delete student in Supabase: ${res3.error.message || res1.error.message}`);
-              return;
-            }
+            console.error('Supabase Delete Student Error:', res1.error || res2.error);
+            setStudentDeleteError(`Failed to delete student in Supabase: ${(res1.error || res2.error)?.message}`);
+            return;
           }
         }
       }
