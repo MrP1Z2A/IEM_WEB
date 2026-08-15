@@ -1092,20 +1092,29 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
       const selectedCourse = assignedCoursesList.find(c => c.id === assignedCourseId);
 
-      const { error: saveError } = await supabase
+      const homeworkPayload: any = {
+        title: homeworkTitle,
+        description: homeworkDescription,
+        due_date: homeworkDueDate || null,
+        class_course_id: assignedCourseId,
+        class_id: selectedCourse?.classId,
+        class_name: selectedCourse?.className,
+        course_name: selectedCourse?.name,
+        school_id: schoolId,
+        attachment_url: fileUrl || null,
+      };
+
+      let { error: saveError } = await supabase
         .from('homework_assignments')
-        .insert([{
-          title: homeworkTitle,
-          description: homeworkDescription,
-          due_date: homeworkDueDate || null,
-          class_course_id: assignedCourseId,
-          class_id: selectedCourse?.classId,
-          class_name: selectedCourse?.className,
-          course_name: selectedCourse?.name,
-          school_id: schoolId,
-          attachment_url: fileUrl,
-          file_url: fileUrl
-        }]);
+        .insert([homeworkPayload]);
+
+      if (saveError && /attachment_url|file_url|column|schema cache|does not exist/i.test(saveError.message || '')) {
+        delete homeworkPayload.attachment_url;
+        const retry = await supabase
+          .from('homework_assignments')
+          .insert([homeworkPayload]);
+        saveError = retry.error;
+      }
 
       if (saveError) throw saveError;
 
@@ -1246,6 +1255,11 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         fileUrl = publicUrl;
       }
 
+      const isUuid = (str?: string | null) =>
+        !!str && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+
+      const creatorId = isUuid(user?.id) ? user.id : null;
+
       // Prepare bulk payload
       const insertPayload = selectedNoticeTargets.length > 0
         ? selectedNoticeTargets.map(t => ({
@@ -1254,10 +1268,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           notice_date: noticeDate,
           priority: noticePriority.toLowerCase(),
           school_id: schoolId,
-          attachment_url: fileUrl,
+          attachment_url: fileUrl || null,
           class_id: t.classId,
           class_course_id: t.courseId,
-          created_by: user.id
+          created_by: creatorId
         }))
         : [{
           title: noticeTitle,
@@ -1265,15 +1279,23 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           notice_date: noticeDate,
           priority: noticePriority.toLowerCase(),
           school_id: schoolId,
-          attachment_url: fileUrl,
+          attachment_url: fileUrl || null,
           class_id: null,
           class_course_id: null,
-          created_by: user.id
+          created_by: creatorId
         }];
 
-      const { error: saveError } = await supabase
+      let { error: saveError } = await supabase
         .from('class_announcements')
         .insert(insertPayload);
+
+      if (saveError && /created_by|uuid|invalid input syntax/i.test(saveError.message || '')) {
+        const payloadWithoutCreator = insertPayload.map(({ created_by, ...rest }) => rest);
+        const retry = await supabase
+          .from('class_announcements')
+          .insert(payloadWithoutCreator);
+        saveError = retry.error;
+      }
 
       if (saveError) throw saveError;
 

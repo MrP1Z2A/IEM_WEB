@@ -14,9 +14,11 @@ import Finance from './components/Finance';
 import LoginPage from './components/LoginPage';
 import NoticeDetail from './components/NoticeDetail';
 import MessagingCenter from './components/MessagingCenter';
+import PaymentCheckout from './components/PaymentCheckout';
+import { PaymentRecord } from './services/smsService';
 import { buildParentMessagingId, getFallbackParentName } from '../shared/messaging/parentMessaging';
 
-type ParentView = 'dashboard' | 'student' | 'institution' | 'messages' | 'news' | 'finance' | 'notice-detail';
+type ParentView = 'dashboard' | 'student' | 'institution' | 'messages' | 'news' | 'finance' | 'notice-detail' | 'checkout';
 
 type ParentSessionData = {
   email: string;
@@ -213,6 +215,7 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
   });
   const [currentView, setCurrentView] = useState<ParentView>('dashboard');
   const [selectedNotice, setSelectedNotice] = useState<any>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
 
   // Expose onSwitch to window so Header can call it
   useEffect(() => {
@@ -253,8 +256,9 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
       case 'institution':   return <InstitutionHub schoolId={parentData?.schoolId} parentEmail={parentData?.email} />;
       case 'messages':      return <MessagingCenter schoolId={parentData?.schoolId} parentId={resolvedParentId} parentName={resolvedParentName} parentEmail={parentData?.email || ''} studentNames={names} />;
       case 'news':          return <Communications schoolId={parentData?.schoolId} />;
-      case 'finance':       return <Finance key={keyStr} studentIds={ids} schoolId={parentData?.schoolId} />;
+      case 'finance':       return <Finance key={keyStr} studentIds={ids} schoolId={parentData?.schoolId} onSelectPayment={(payment) => { setSelectedPayment(payment); setCurrentView('checkout'); }} />;
       case 'notice-detail': return <NoticeDetail notice={selectedNotice} onBack={() => setCurrentView('dashboard')} />;
+      case 'checkout':      return <PaymentCheckout payment={selectedPayment} studentId={ids?.[0]} schoolId={parentData?.schoolId} onBack={() => setCurrentView('finance')} />;
       default:              return <Dashboard key={keyStr} studentNames={names} studentIds={ids} schoolId={parentData?.schoolId} />;
     }
   };
@@ -268,13 +272,13 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
         currentView={currentView}
         setView={setCurrentView}
       />
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-auto">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
         <Header
           onMenuClick={() => setSidebarOpen(prev => !prev)}
           sidebarOpen={sidebarOpen}
           parentData={parentData}
         />
-        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <main className="flex-1 p-3 sm:p-4 md:p-8 overflow-y-auto pb-28 sm:pb-8">
           <div className="max-w-7xl mx-auto w-full">
             {renderContent()}
           </div>

@@ -1,41 +1,76 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
-import { fetchParentPortalData, ParentPortalData, ExamResult, fetchEvents } from '../services/smsService';
+import { fetchParentPortalData, ParentPortalData, fetchEvents, PaymentRecord, NoticeRecord } from '../services/smsService';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell
 } from 'recharts';
 import {
   Calendar, TrendingUp, RefreshCw, CheckCircle2, CreditCard,
-  Activity, Users, BookOpen, AlertCircle, Download, FileDown, FileText
+  Activity, Users, BookOpen, AlertCircle, Download, FileDown
 } from 'lucide-react';
+
+interface EventItem {
+  id?: string;
+  title: string;
+  event_date: string;
+  type: string;
+  location?: string;
+}
 
 interface DashboardProps {
   parentEmail?: string;
   studentNames?: string[];
   studentIds?: string[];
   schoolId?: string;
-  onNoticeClick?: (notice: any) => void;
+  onNoticeClick?: (notice: NoticeRecord) => void;
 }
 
-const StatCard = ({ label, value, sub, subColor = 'text-emerald-500', icon: Icon }: any) => (
-  <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
-    <div className="flex items-start justify-between mb-3">
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{label}</p>
-      {Icon && <div className="p-2 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-600 transition-colors"><Icon className="w-4 h-4" /></div>}
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  sub?: string;
+  subColor?: string;
+  icon?: React.ElementType;
+}
+
+/**
+ * Responsive StatCard Component
+ * - Metric Card Badge Icon Container: w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800
+ * - Lucide Icons: className="w-4 h-4 text-slate-600 md:w-5 md:h-5"
+ * - Subheading Typography: text-[10px] sm:text-xs font-semibold tracking-wider text-slate-500 uppercase
+ */
+const StatCard: React.FC<StatCardProps> = ({ label, value, sub, subColor = 'text-emerald-500', icon: Icon }) => (
+  <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between">
+    <div>
+      <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
+        {/* Metric Subheading Typography prevents header truncation */}
+        <p className="text-[10px] sm:text-xs font-semibold tracking-wider text-slate-500 uppercase min-w-0 flex-1 leading-snug">
+          {label}
+        </p>
+        {Icon && (
+          /* Enforce consistent container dimensions & styling */
+          <div className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 group-hover:bg-emerald-50 transition-colors">
+            {/* Lucide Icons: className="w-4 h-4 text-slate-600 md:w-5 md:h-5" */}
+            <Icon className="w-4 h-4 md:w-5 md:h-5 text-slate-600 dark:text-slate-300 group-hover:text-emerald-600 transition-colors" />
+          </div>
+        )}
+      </div>
+      <p className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">{value}</p>
     </div>
-    <p className="text-3xl font-black text-slate-900 tracking-tight">{value}</p>
-    {sub && <p className={`text-[10px] font-bold mt-2 flex items-center gap-1 ${subColor}`}>{sub}</p>}
+    {sub && (
+      <p className={`text-[10px] sm:text-xs font-bold mt-2 flex items-center gap-1 ${subColor} truncate`}>
+        {sub}
+      </p>
+    )}
   </div>
 );
 
 const Dashboard: React.FC<DashboardProps> = ({ parentEmail, studentNames, studentIds, schoolId, onNoticeClick }) => {
   const [data, setData] = useState<ParentPortalData | null>(null);
   const [syncing, setSyncing] = useState(true);
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
 
   const studentName = studentNames?.length ? studentNames[0] : 'Student';
-  const primaryId = studentIds?.length ? studentIds[0] : '';
 
   const fetchData = useCallback(async () => {
     setSyncing(true);
@@ -80,8 +115,7 @@ const Dashboard: React.FC<DashboardProps> = ({ parentEmail, studentNames, studen
     document.body.removeChild(link);
   };
 
-  const downloadInvoice = (payment: any) => {
-    // Simulated invoice download
+  const downloadInvoice = (payment: PaymentRecord) => {
     const invoiceContent = `
       INVOICE
       -----------------
@@ -105,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ parentEmail, studentNames, studen
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
+  const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
 
   // Derive chart data from exam results (per subject averages)
   const chartData: { subject: string; score: number }[] = [];
@@ -131,14 +165,14 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
 
   return (
     <div className="space-y-6 animate-fadeIn pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Dashboard Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Parental Dashboard</h1>
-          <div className="flex items-center gap-3 text-slate-500 text-sm mt-1 flex-wrap">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Parental Dashboard</h1>
+          <div className="flex items-center gap-3 text-slate-500 text-xs sm:text-sm mt-1 flex-wrap">
             <p>Monitoring <span className="font-black text-brand-600">{studentName}</span></p>
             {data && (
-              <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-0.5 rounded-full text-[10px] font-black border border-emerald-100">
+              <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-black border border-emerald-100">
                 <span className={`w-1.5 h-1.5 bg-emerald-500 rounded-full ${syncing ? 'animate-pulse' : ''}`} />
                 {syncing ? 'Syncing…' : `Last: ${data.lastSync}`}
               </span>
@@ -147,15 +181,15 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
         </div>
         <button
           onClick={fetchData} disabled={syncing}
-          className="bg-white border border-slate-100 px-4 py-2.5 rounded-xl text-slate-600 hover:text-brand-600 hover:border-brand-100 transition-all shadow-sm flex items-center gap-2 text-sm font-bold active:scale-95 disabled:opacity-50 self-start"
-         type="button">
-          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin text-brand-600' : ''}`} />
+          className="bg-white border border-slate-100 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-slate-600 hover:text-brand-600 hover:border-brand-100 transition-all shadow-sm flex items-center gap-2 text-xs sm:text-sm font-bold active:scale-95 disabled:opacity-50 self-start"
+          type="button">
+          <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${syncing ? 'animate-spin text-brand-600' : ''}`} />
           {syncing ? 'Syncing…' : 'Refresh'}
         </button>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Metric Card Grid Container: grid grid-cols-2 gap-3 sm:gap-4 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard label="Overall Grade Percentage" value={gpa} sub="From exam grades" icon={TrendingUp} />
         <StatCard label="Attendance" value={attendanceRate} sub={`${totalAbsent} absences recorded`} icon={CheckCircle2} />
         <StatCard label="Pending Tasks" value={pendingHomework} sub={pendingHomework > 0 ? `${pendingHomework} due soon` : 'All clear!'} subColor={pendingHomework > 0 ? 'text-amber-500' : 'text-emerald-500'} icon={Activity} />
@@ -164,12 +198,12 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Performance Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
-              <TrendingUp className="w-5 h-5 text-brand-600" /> Academic Performance
+            <h3 className="font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight text-xs sm:text-sm">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" /> Academic Performance
             </h3>
-            <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-100 uppercase tracking-widest">
+            <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg border border-emerald-100 uppercase tracking-widest">
               Live Exam Data
             </span>
           </div>
@@ -198,33 +232,34 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
             </div>
           ) : (
             <div className="h-56 flex flex-col items-center justify-center text-slate-300 gap-3">
-              <BookOpen className="w-12 h-12 opacity-40" />
-              <p className="text-sm font-bold text-slate-400">No exam results available yet</p>
+              {/* Bottom Section Icon: constrained using responsive dimensions */}
+              <BookOpen className="w-8 h-8 md:w-12 md:h-12 opacity-40 max-h-16 object-contain" />
+              <p className="text-xs sm:text-sm font-bold text-slate-400">No exam results available yet</p>
             </div>
           )}
         </div>
 
         {/* Attendance Breakdown */}
-        <div className="bg-gradient-to-br from-emerald-900 to-emerald-800 p-8 rounded-2xl shadow-xl text-white relative overflow-hidden">
+        <div className="bg-gradient-to-br from-emerald-900 to-emerald-800 p-6 sm:p-8 rounded-2xl shadow-xl text-white relative overflow-hidden">
           <div className="absolute top-[-30%] right-[-20%] w-48 h-48 bg-white/5 rounded-full blur-3xl" />
           <div className="relative z-10 space-y-6">
             <div>
-              <h3 className="font-black text-lg uppercase tracking-tighter flex items-center gap-2">
-                <Users className="w-5 h-5" /> Attendance
+              <h3 className="font-black text-base sm:text-lg uppercase tracking-tighter flex items-center gap-2">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" /> Attendance
               </h3>
               <p className="text-brand-300 text-[10px] font-bold uppercase tracking-widest mt-1">Current Period</p>
             </div>
-            <div className="text-5xl font-black tracking-tighter">{attendanceRate}</div>
+            <div className="text-4xl sm:text-5xl font-black tracking-tighter">{attendanceRate}</div>
             <div className="space-y-3">
               {[
                 { label: 'Present', value: data?.attendance?.present ?? 0, color: 'bg-brand-400' },
                 { label: 'Absent', value: data?.attendance?.absent ?? 0, color: 'bg-rose-400' },
                 { label: 'Late', value: data?.attendance?.late ?? 0, color: 'bg-amber-400' },
               ].map(item => (
-                <div key={item.label} className="flex items-center justify-between text-sm">
+                <div key={item.label} className="flex items-center justify-between text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
                     <div className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
-                    <span className="text-emerald-100/80 font-bold text-xs uppercase tracking-widest">{item.label}</span>
+                    <span className="text-emerald-100/80 font-bold text-[10px] sm:text-xs uppercase tracking-widest">{item.label}</span>
                   </div>
                   <span className="font-black text-white">{item.value} days</span>
                 </div>
@@ -241,9 +276,9 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Notices / Bulletins */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          <h3 className="font-black text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-tight">
-            <Calendar className="w-5 h-5 text-brand-600" /> Institution Bulletins
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-black text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-tight text-xs sm:text-sm">
+            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" /> Institution Bulletins
           </h3>
           <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
             {syncing ? (
@@ -255,27 +290,28 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
                 <button type="button"
                    key={idx}
                    onClick={() => onNoticeClick?.(note)}
-                   className="w-full text-left block flex flex-col gap-2 p-5 bg-slate-50 rounded-2xl border-l-4 border-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer group"
+                   className="w-full text-left block flex flex-col gap-2 p-4 sm:p-5 bg-slate-50 rounded-2xl border-l-4 border-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer group"
                 >
                   <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{note.title}</h4>
+                    <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-emerald-700 transition-colors">{note.title}</h4>
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{note.date}</span>
                   </div>
                 </button>
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-slate-300 gap-2">
-                <AlertCircle className="w-10 h-10 opacity-40" />
-                <p className="text-sm font-bold text-slate-400">No notices available</p>
+                {/* Bottom Section Icon: constrained using responsive dimensions */}
+                <AlertCircle className="w-8 h-8 md:w-10 md:h-10 opacity-40 max-h-16 object-contain" />
+                <p className="text-xs sm:text-sm font-bold text-slate-400">No notices available</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Upcoming Events */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          <h3 className="font-black text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-tight">
-            <Calendar className="w-5 h-5 text-purple-600" /> Upcoming Events
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="font-black text-slate-900 mb-5 flex items-center gap-2 uppercase tracking-tight text-xs sm:text-sm">
+            <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" /> Upcoming Events
           </h3>
           <div className="space-y-4 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
             {syncing ? (
@@ -284,41 +320,42 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
               ))
             ) : events.length > 0 ? (
               events.map((event, idx) => (
-                <div key={idx} className="flex gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-50 hover:bg-purple-50 hover:border-purple-100 transition-all group">
-                  <div className="flex flex-col items-center justify-center bg-white border border-slate-100 rounded-xl px-3 py-2 shrink-0 h-fit group-hover:border-purple-200 shadow-sm">
-                    <span className="text-purple-600 text-[10px] font-black uppercase tracking-widest">{new Date(event.event_date).toLocaleString('default', { month: 'short' })}</span>
-                    <span className="text-slate-900 text-lg font-black leading-none mt-1">{new Date(event.event_date).getDate()}</span>
+                <div key={idx} className="flex gap-3 sm:gap-4 p-3.5 sm:p-4 bg-slate-50/50 rounded-2xl border border-slate-50 hover:bg-purple-50 hover:border-purple-100 transition-all group">
+                  <div className="flex flex-col items-center justify-center bg-white border border-slate-100 rounded-xl px-2.5 sm:px-3 py-1.5 sm:py-2 shrink-0 h-fit group-hover:border-purple-200 shadow-sm">
+                    <span className="text-purple-600 text-[9px] sm:text-[10px] font-black uppercase tracking-widest">{new Date(event.event_date).toLocaleString('default', { month: 'short' })}</span>
+                    <span className="text-slate-900 text-base sm:text-lg font-black leading-none mt-1">{new Date(event.event_date).getDate()}</span>
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[9px] font-black px-2 py-0.5 rounded bg-slate-200 text-slate-600 uppercase tracking-widest">{event.type}</span>
                     </div>
-                    <h4 className="text-sm font-black text-slate-900 truncate">{event.title}</h4>
+                    <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate">{event.title}</h4>
                     <p className="text-[10px] text-slate-500 font-bold truncate mt-1 flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3 text-emerald-500" /> {event.location || 'Institutional Campus'}
+                      <TrendingUp className="w-3 h-3 text-emerald-500 shrink-0" /> {event.location || 'Institutional Campus'}
                     </p>
                   </div>
                 </div>
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-slate-300 gap-2">
-                <Calendar className="w-10 h-10 opacity-40" />
-                <p className="text-sm font-bold text-slate-400">No upcoming events</p>
+                {/* Bottom Section Icon: constrained using responsive dimensions */}
+                <Calendar className="w-8 h-8 md:w-10 md:h-10 opacity-40 max-h-16 object-contain" />
+                <p className="text-xs sm:text-sm font-bold text-slate-400">No upcoming events</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Recent Payments */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
-              <CreditCard className="w-5 h-5 text-brand-600" /> Financial Standing
+            <h3 className="font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight text-xs sm:text-sm">
+              <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" /> Financial Standing
             </h3>
             <button
               onClick={downloadPaymentHistory}
-              className="text-[10px] font-black bg-slate-100 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 uppercase tracking-widest"
-             type="button">
+              className="text-[10px] font-black bg-slate-100 hover:bg-emerald-600 hover:text-white px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 uppercase tracking-widest"
+              type="button">
               <Download className="w-3.5 h-3.5" /> History
             </button>
           </div>
@@ -329,52 +366,53 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
               ))
             ) : data?.payments && data.payments.length > 0 ? (
               data.payments.map(pay => (
-                <div key={pay.id} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 hover:border-emerald-100 hover:bg-emerald-50/20 transition-colors group">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-xl ${pay.status.toLowerCase() === 'paid' ? 'bg-brand-50 text-brand-600' :
+                <div key={pay.id} className="flex items-center justify-between p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-100 hover:border-emerald-100 hover:bg-emerald-50/20 transition-colors group">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                    <div className={`p-2 sm:p-2.5 rounded-xl shrink-0 ${pay.status.toLowerCase() === 'paid' ? 'bg-brand-50 text-brand-600' :
                         pay.status.toLowerCase() === 'overdue' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
                       }`}>
-                      <CreditCard className="w-4 h-4" />
+                      <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-black text-slate-800 leading-tight">{pay.description}</h4>
+                    <div className="min-w-0">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-800 leading-tight truncate">{pay.description}</h4>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{pay.date}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right shrink-0">
-                      <p className="text-base font-black text-slate-900">{Number(pay.amount).toLocaleString()} MMK</p>
-                      <span className={`text-[9px] font-black px-2.5 py-0.5 rounded-md uppercase tracking-widest ${pay.status.toLowerCase() === 'paid' ? 'bg-brand-100 text-brand-700' :
+                      <p className="text-xs sm:text-base font-black text-slate-900">{Number(pay.amount).toLocaleString()} MMK</p>
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest ${pay.status.toLowerCase() === 'paid' ? 'bg-brand-100 text-brand-700' :
                           pay.status.toLowerCase() === 'overdue' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
                         }`}>{pay.status}</span>
                     </div>
                     <button
                       type="button" onClick={() => downloadInvoice(pay)}
-                      className="p-2 text-slate-300 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                      className="p-1.5 sm:p-2 text-slate-300 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                       title="Download Invoice"
                     >
-                      <FileDown className="w-5 h-5" />
+                      <FileDown className="w-4 h-4 sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </div>
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-slate-300 gap-2">
-                <CreditCard className="w-10 h-10 opacity-40" />
-                <p className="text-sm font-bold text-slate-400">No payment records found</p>
+                {/* Bottom Section Icon: constrained using responsive dimensions */}
+                <CreditCard className="w-8 h-8 md:w-10 md:h-10 opacity-40 max-h-16 object-contain" />
+                <p className="text-xs sm:text-sm font-bold text-slate-400">No payment records found</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Pending Homework */}
+      {/* Pending Homework Table */}
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden mt-8">
-        <div className="p-7 border-b border-slate-50 flex items-center justify-between">
-          <h3 className="font-black text-slate-900 flex items-center gap-3 uppercase tracking-tight">
-            <BookOpen className="w-5 h-5 text-brand-600" /> Pending Homework
+        <div className="p-4 sm:p-7 border-b border-slate-50 flex items-center justify-between">
+          <h3 className="font-black text-slate-900 flex items-center gap-2 sm:gap-3 uppercase tracking-tight text-xs sm:text-sm">
+            <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-brand-600" /> Pending Homework
           </h3>
-          <span className="text-[10px] text-amber-600 font-black uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-lg border border-amber-100">
+          <span className="text-[10px] text-amber-600 font-black uppercase tracking-widest bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-100">
             {data?.homework?.filter(h => h.status?.toLowerCase() === 'pending').length || 0} Tasks
           </span>
         </div>
@@ -382,18 +420,18 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                <th className="px-7 py-5">Assignment Title</th>
-                <th className="px-7 py-5">Description</th>
-                <th className="px-7 py-5">Due Date</th>
-                <th className="px-7 py-5 text-center">Status</th>
+                <th className="px-4 sm:px-7 py-4 sm:py-5">Assignment Title</th>
+                <th className="px-4 sm:px-7 py-4 sm:py-5 hidden sm:table-cell">Description</th>
+                <th className="px-4 sm:px-7 py-4 sm:py-5">Due Date</th>
+                <th className="px-4 sm:px-7 py-4 sm:py-5 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {syncing ? (
                 <tr>
-                  <td colSpan={4} className="px-7 py-16 text-center">
-                    <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-slate-400 text-sm font-bold">Fetching assignments…</p>
+                  <td colSpan={4} className="px-4 sm:px-7 py-12 text-center">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin mx-auto mb-3" />
+                    <p className="text-slate-400 text-xs sm:text-sm font-bold">Fetching assignments…</p>
                   </td>
                 </tr>
               ) : data?.homework && data.homework.filter(h => h.status?.toLowerCase() === 'pending').length > 0 ? (
@@ -401,20 +439,20 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
                   .filter(h => h.status?.toLowerCase() === 'pending')
                   .map((hw, idx) => (
                     <tr key={idx} className="hover:bg-slate-50/30 transition-all group">
-                      <td className="px-7 py-5">
-                        <p className="font-bold text-slate-900 text-sm">{hw.title}</p>
+                      <td className="px-4 sm:px-7 py-4 sm:py-5">
+                        <p className="font-bold text-slate-900 text-xs sm:text-sm">{hw.title}</p>
                       </td>
-                      <td className="px-7 py-5 text-xs text-slate-500 max-w-xs truncate" title={hw.description}>
+                      <td className="px-4 sm:px-7 py-4 sm:py-5 text-xs text-slate-500 max-w-xs truncate hidden sm:table-cell" title={hw.description}>
                         {hw.description || 'No description provided'}
                       </td>
-                      <td className="px-7 py-5">
-                        <div className="flex items-center gap-2 text-slate-600">
-                          <Calendar className="w-3.5 h-3.5" />
+                      <td className="px-4 sm:px-7 py-4 sm:py-5">
+                        <div className="flex items-center gap-1.5 text-slate-600">
+                          <Calendar className="w-3.5 h-3.5 shrink-0" />
                           <span className="text-xs font-bold">{hw.dueDate || '—'}</span>
                         </div>
                       </td>
-                      <td className="px-7 py-5 text-center">
-                        <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-100 italic">
+                      <td className="px-4 sm:px-7 py-4 sm:py-5 text-center">
+                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-100 italic">
                           Pending
                         </span>
                       </td>
@@ -422,10 +460,11 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
                   ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="px-7 py-16 text-center">
+                  <td colSpan={4} className="px-4 sm:px-7 py-12 text-center">
                     <div className="flex flex-col items-center justify-center gap-3 text-slate-300">
-                      <CheckCircle2 className="w-12 h-12 opacity-40 text-emerald-500" />
-                      <p className="text-sm font-bold text-slate-400">All assignments completed!</p>
+                      {/* Bottom Section Icon: constrained using responsive dimensions */}
+                      <CheckCircle2 className="w-8 h-8 md:w-12 md:h-12 opacity-40 text-emerald-500 max-h-16 object-contain" />
+                      <p className="text-xs sm:text-sm font-bold text-slate-400">All assignments completed!</p>
                     </div>
                   </td>
                 </tr>
@@ -435,13 +474,13 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
         </div>
       </div>
 
-      {/* Recent Exam Results */}
+      {/* Recent Exam Results Table */}
       <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden mt-8 mb-10">
-        <div className="p-7 border-b border-slate-50 flex items-center justify-between">
-          <h3 className="font-black text-slate-900 flex items-center gap-3 uppercase tracking-tight">
-            <Activity className="w-5 h-5 text-purple-600" /> Recent Exam Results
+        <div className="p-4 sm:p-7 border-b border-slate-50 flex items-center justify-between">
+          <h3 className="font-black text-slate-900 flex items-center gap-2 sm:gap-3 uppercase tracking-tight text-xs sm:text-sm">
+            <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" /> Recent Exam Results
           </h3>
-          <span className="text-[10px] text-purple-600 font-black uppercase tracking-widest bg-purple-50 px-3 py-1 rounded-lg border border-purple-100">
+          <span className="text-[10px] text-purple-600 font-black uppercase tracking-widest bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-100">
             {data?.examResults?.length || 0} Results
           </span>
         </div>
@@ -449,23 +488,23 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                <th className="px-7 py-5">Subject / Exam</th>
-                <th className="px-7 py-5">Date</th>
-                <th className="px-7 py-5 text-right">Score</th>
+                <th className="px-4 sm:px-7 py-4 sm:py-5">Subject / Exam</th>
+                <th className="px-4 sm:px-7 py-4 sm:py-5">Date</th>
+                <th className="px-4 sm:px-7 py-4 sm:py-5 text-right">Score</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {data?.examResults && data.examResults.length > 0 ? (
                 data.examResults.map((result, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/30 transition-all group">
-                    <td className="px-7 py-5">
-                      <p className="font-bold text-slate-900 text-sm">{result.subject}</p>
+                    <td className="px-4 sm:px-7 py-4 sm:py-5">
+                      <p className="font-bold text-slate-900 text-xs sm:text-sm">{result.subject}</p>
                     </td>
-                    <td className="px-7 py-5 text-xs text-slate-500 font-medium">
+                    <td className="px-4 sm:px-7 py-4 sm:py-5 text-xs text-slate-500 font-medium">
                       {result.date || 'N/A'}
                     </td>
-                    <td className="px-7 py-5 text-right">
-                      <span className={`inline-flex items-center px-4 py-1.5 rounded-xl text-xs font-black shadow-sm border ${
+                    <td className="px-4 sm:px-7 py-4 sm:py-5 text-right">
+                      <span className={`inline-flex items-center px-3 sm:px-4 py-1.5 rounded-xl text-xs font-black shadow-sm border ${
                         result.score >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                         result.score >= 50 ? 'bg-amber-50 text-amber-700 border-amber-100' :
                         'bg-rose-50 text-rose-700 border-rose-100'
@@ -477,7 +516,7 @@ const COLORS = ['#4ea59d', '#3f857e', '#366c67', '#2f5854', '#134e4a'];
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} className="px-7 py-16 text-center text-slate-400 text-sm font-bold">
+                  <td colSpan={3} className="px-4 sm:px-7 py-12 text-center text-slate-400 text-xs sm:text-sm font-bold">
                     No individual exam results found.
                   </td>
                 </tr>

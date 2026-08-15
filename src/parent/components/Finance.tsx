@@ -7,13 +7,24 @@ import autoTable from 'jspdf-autotable';
 interface FinanceProps {
   studentIds?: string[];
   schoolId?: string;
+  onSelectPayment?: (payment: PaymentRecord) => void;
 }
 
-const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
+const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId, onSelectPayment }) => {
   const [activeTab, setActiveTab ] = useState<'pending' | 'history'>('pending');
   const [showQr, setShowQr] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleInitiatePayment = (payment?: PaymentRecord) => {
+    const targetPayment = payment || pendingPayments[0];
+    if (!targetPayment) return;
+    if (onSelectPayment) {
+      onSelectPayment(targetPayment);
+    } else {
+      setShowQr(true);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -159,38 +170,38 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
   const currentList = activeTab === 'pending' ? pendingPayments : paidPayments;
 
   return (
-    <div className="space-y-6 animate-fadeIn relative pb-20">
+    <div className="space-y-6 animate-fadeIn relative pb-28 sm:pb-20">
       {/* QR Code Modal */}
       {showQr && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-[2rem] shadow-2xl max-w-[340px] sm:max-w-sm w-full p-5 relative text-center flex flex-col items-center mx-auto my-auto animate-fadeIn">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white rounded-[2rem] shadow-2xl max-w-[340px] sm:max-w-sm w-full p-4 sm:p-5 relative text-center flex flex-col items-center mx-auto my-auto animate-fadeIn max-h-[90vh] overflow-y-auto">
             <button
               type="button"
               onClick={() => setShowQr(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 bg-slate-100 p-2 rounded-xl transition-colors"
+              className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 bg-slate-100 p-2 rounded-xl transition-colors shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
             
-            <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 mb-2 mt-1">
+            <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 mb-2 mt-1 shrink-0">
               <QrCode className="w-3.5 h-3.5" /> Express Payment
             </div>
             
-            <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase">Scan QR Code</h3>
-            <p className="text-[11px] text-slate-500 mb-3 font-medium">Use your banking app to scan and pay instantly.</p>
+            <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase shrink-0">Scan QR Code</h3>
+            <p className="text-[11px] text-slate-500 mb-2 sm:mb-3 font-medium shrink-0">Use your banking app to scan and pay instantly.</p>
             
-            <div className="bg-emerald-50/50 p-3 rounded-2xl border-2 border-dashed border-emerald-200 flex justify-center mb-4">
+            <div className="bg-emerald-50/50 p-2.5 sm:p-3 rounded-2xl border-2 border-dashed border-emerald-200 flex justify-center mb-3 sm:mb-4 shrink-0">
               <img
                 src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IEMPayment&color=059669"
                 alt="Payment QR Code"
-                className="w-36 h-36 sm:w-44 sm:h-44 rounded-xl object-contain bg-white p-1"
+                className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl object-contain bg-white p-1"
               />
             </div>
             
             <button
               type="button"
               onClick={() => setShowQr(false)}
-              className="w-full py-3 bg-slate-900 text-white font-black rounded-xl hover:bg-emerald-600 transition-all text-[10px] uppercase tracking-[0.2em] active:scale-95 shadow-md"
+              className="w-full py-3 bg-slate-900 text-white font-black rounded-xl hover:bg-emerald-600 transition-all text-[10px] uppercase tracking-[0.2em] active:scale-95 shadow-md shrink-0 mt-auto"
             >
               Return to Dashboard
             </button>
@@ -227,10 +238,20 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
           </div>
         </div>
         <div className="flex flex-col justify-center gap-3">
-          <button className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-brand-600 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest shadow-xl active:scale-[0.98]" type="button">
+          <button
+            onClick={() => handleInitiatePayment()}
+            disabled={pendingPayments.length === 0}
+            className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-brand-600 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest shadow-xl active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+          >
             <Plus className="w-5 h-5" /> Online Payment
           </button>
-          <button type="button" onClick={() => setShowQr(true)} className="w-full bg-white text-emerald-600 border-2 border-emerald-100 font-black py-3 rounded-2xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest">
+          <button
+            type="button"
+            onClick={() => handleInitiatePayment()}
+            disabled={pendingPayments.length === 0}
+            className="w-full bg-white text-emerald-600 border-2 border-emerald-100 font-black py-3 rounded-2xl hover:bg-emerald-50 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <QrCode className="w-5 h-5" /> Quick QR Token
           </button>
         </div>
@@ -260,33 +281,35 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
             </div>
           ) : (
             currentList.map(payment => (
-              <div key={payment.id} className="group border border-slate-50 rounded-3xl p-5 hover:border-emerald-100 hover:bg-emerald-50/20 transition-all flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : payment.status === 'Overdue' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {payment.status === 'Paid' ? <DollarSign className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h4 className="font-black text-slate-800 tracking-tight truncate">{payment.description}</h4>
-                    <span className={`text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-widest shrink-0 ${payment.status === 'Paid' ? 'bg-emerald-600 text-white' : payment.status === 'Overdue' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {payment.status}
-                    </span>
+              <div key={payment.id} className="group border border-slate-50 rounded-3xl p-4 sm:p-5 hover:border-emerald-100 hover:bg-emerald-50/20 transition-all flex flex-col sm:flex-row items-stretch sm:items-center gap-4 sm:gap-5">
+                <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                  <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${payment.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : payment.status === 'Overdue' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {payment.status === 'Paid' ? <DollarSign className="w-5 h-5 sm:w-6 sm:h-6" /> : <Clock className="w-5 h-5 sm:w-6 sm:h-6" />}
                   </div>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{payment.date}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <h4 className="font-black text-slate-800 tracking-tight text-sm sm:text-base truncate">{payment.description}</h4>
+                      <span className={`text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-widest shrink-0 ${payment.status === 'Paid' ? 'bg-emerald-600 text-white' : payment.status === 'Overdue' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {payment.status}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{payment.date}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-5 self-end sm:self-center shrink-0">
-                  <div className="text-right">
-                    <p className="text-xl font-black text-slate-900">${payment.amount.toFixed(2)}</p>
+                <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-5 pt-3 sm:pt-0 border-t border-slate-100 sm:border-t-0 shrink-0">
+                  <div className="text-left sm:text-right">
+                    <p className="text-lg sm:text-xl font-black text-slate-900">${payment.amount.toFixed(2)}</p>
                   </div>
                   {payment.status === 'Paid' ? (
                     <button
                       type="button" onClick={() => downloadInvoice(payment)}
-                      className="p-3 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-100 shadow-sm"
+                      className="p-2.5 sm:p-3 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-2xl transition-all border border-transparent hover:border-slate-100 shadow-sm shrink-0"
                       title="Download Invoice"
                     >
                       <FileDown className="w-5 h-5" />
                     </button>
                   ) : (
-                    <button type="button" onClick={() => setShowQr(true)} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 active:scale-95">
+                    <button type="button" onClick={() => handleInitiatePayment(payment)} className="bg-emerald-600 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 active:scale-95 shrink-0">
                       Pay Now
                     </button>
                   )}

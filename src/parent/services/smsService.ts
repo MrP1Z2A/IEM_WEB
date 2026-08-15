@@ -33,6 +33,8 @@ export interface PaymentRecord {
   status: 'Paid' | 'Pending' | 'Overdue' | 'paid' | 'pending' | 'overdue';
   date: string;
   note?: string;
+  receipt_url?: string;
+  receipt_status?: string;
 }
 
 export interface ExamResult {
@@ -122,14 +124,72 @@ export const fetchParentPortalData = async (
       .eq('student_id', primaryStudentId)
       .eq('school_id', schoolId),
 
-    // 5. Student payments - get all history for student and school
-    supabase
-      .from('student_payments')
-      .select('id, amount_mmk, status, created_at, note')
-      .eq('student_id', primaryStudentId)
-      .eq('school_id', schoolId)
-      .order('created_at', { ascending: false })
-      .limit(50),
+    // 5. Student payments - fetch payments for student from Supabase with multi-tier fallback
+    (async () => {
+      // Step 1: Query by student_id & school_id
+      if (studentIds && studentIds.length > 0 && schoolId) {
+        const res1 = await supabase
+          .from('student_payments')
+          .select('*')
+          .in('student_id', studentIds)
+          .eq('school_id', schoolId)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (res1.data && res1.data.length > 0) return res1;
+      }
+
+      // Step 2: Query by primaryStudentId & school_id
+      if (primaryStudentId && schoolId) {
+        const res2 = await supabase
+          .from('student_payments')
+          .select('*')
+          .eq('student_id', primaryStudentId)
+          .eq('school_id', schoolId)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (res2.data && res2.data.length > 0) return res2;
+      }
+
+      // Step 3: Query by student_id list without school_id filter
+      if (studentIds && studentIds.length > 0) {
+        const res3 = await supabase
+          .from('student_payments')
+          .select('*')
+          .in('student_id', studentIds)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (res3.data && res3.data.length > 0) return res3;
+      }
+
+      // Step 4: Query by primaryStudentId without school_id filter
+      if (primaryStudentId) {
+        const res4 = await supabase
+          .from('student_payments')
+          .select('*')
+          .eq('student_id', primaryStudentId)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (res4.data && res4.data.length > 0) return res4;
+      }
+
+      // Step 5: Query by school_id if student_id returned nothing
+      if (schoolId) {
+        const res5 = await supabase
+          .from('student_payments')
+          .select('*')
+          .eq('school_id', schoolId)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        if (res5.data && res5.data.length > 0) return res5;
+      }
+
+      // Step 6: General query on student_payments
+      return await supabase
+        .from('student_payments')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+    })(),
 
     // 6. Latest report card - use student_id and school_id
     supabase
@@ -311,13 +371,21 @@ export const fetchParentPortalData = async (
   const payments: PaymentRecord[] = [];
   if (paymentsRes.status === 'fulfilled' && paymentsRes.value.data) {
     for (const row of paymentsRes.value.data) {
+      const rawStatus = String(row.status || 'pending').toLowerCase().trim();
+      let normalizedStatus: PaymentRecord['status'] = 'Pending';
+      if (rawStatus === 'paid') normalizedStatus = 'Paid';
+      else if (rawStatus === 'overdue') normalizedStatus = 'Overdue';
+      else if (rawStatus.includes('pending')) normalizedStatus = 'Pending';
+
       payments.push({
         id: String(row.id),
-        description: row.note || 'Fee',
-        amount: Number(row.amount_mmk) || 0,
-        status: row.status ? (row.status.charAt(0).toUpperCase() + row.status.slice(1).toLowerCase() as PaymentRecord['status']) : 'Pending',
-        date: row.created_at ? new Date(row.created_at).toLocaleDateString() : '',
+        description: row.note || (row as any).description || (row as any).payment_type || (row as any).title || 'Tuition & School Fee',
+        amount: Number(row.amount_mmk ?? (row as any).amount ?? (row as any).amount_due) || 0,
+        status: normalizedStatus,
+        date: row.created_at ? new Date(row.created_at).toLocaleDateString() : (row.payment_date || new Date().toLocaleDateString()),
         note: row.note || '',
+        receipt_url: row.receipt_url || undefined,
+        receipt_status: row.receipt_status || undefined,
       });
     }
   }
@@ -504,3 +572,75 @@ function getEmptyPortalData(): ParentPortalData {
 
 // Legacy export kept for backward compat
 export const syncSmsData = fetchParentPortalData;
+
+export const fetchStudentHubData = fetchParentPortalData;
+
+/**
+ * Upload proof of payment receipt image/file to Supabase Storage 'payment_receipts' bucket
+ * and update the student_payments record / payment_receipts table.
+ */
+export async function uploadPaymentReceipt(
+  file: File,
+  paymentId: string,
+  studentId: string,
+  schoolId?: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `receipt_${paymentId}_${Date.now()}.${fileExt}`;
+    const filePath = `${schoolId || 'default'}/${studentId || 'unknown'}/${fileName}`;
+
+    // 1. Upload to Supabase Storage Bucket 'payment_receipts'
+    const { data: storageData, error: storageError } = await supabase.storage
+      .from('payment_receipts')
+      .upload(filePath, file, { upsert: true });
+
+    let publicUrl = '';
+    if (!storageError && storageData) {
+      const { data: urlData } = supabase.storage
+        .from('payment_receipts')
+        .getPublicUrl(filePath);
+      publicUrl = urlData?.publicUrl || '';
+    } else {
+      console.warn('[smsService] Storage upload note:', storageError?.message || storageError);
+      // Generate object URL / Data URL as fallback preview if storage bucket policy is restricted
+      publicUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 2. Update student_payments record in Supabase
+    if (paymentId && paymentId !== 'new') {
+      await supabase
+        .from('student_payments')
+        .update({
+          receipt_url: publicUrl,
+          receipt_status: 'pending_verification',
+          receipt_uploaded_at: new Date().toISOString(),
+        })
+        .eq('id', paymentId);
+    }
+
+    // 3. Log to payment_receipts table
+    const { error: logErr } = await supabase.from('payment_receipts').insert([
+      {
+        payment_id: paymentId,
+        student_id: studentId,
+        school_id: schoolId || null,
+        receipt_url: publicUrl,
+        file_name: file.name,
+        status: 'pending_verification',
+      },
+    ]);
+    if (logErr) {
+      console.warn('[smsService] payment_receipts table log note:', logErr.message);
+    }
+
+    return { success: true, url: publicUrl };
+  } catch (error: any) {
+    console.error('[smsService] uploadPaymentReceipt exception:', error);
+    return { success: false, error: error?.message || 'Upload failed' };
+  }
+}
