@@ -162,20 +162,36 @@ const Finance: React.FC<FinanceProps> = ({ studentIds, schoolId }) => {
     <div className="space-y-6 animate-fadeIn relative pb-20">
       {/* QR Code Modal */}
       {showQr && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-white rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl max-w-sm w-full p-5 sm:p-8 relative text-center my-auto max-h-[92vh] flex flex-col items-center overflow-y-auto">
-            <button type="button" onClick={() => setShowQr(false)} className="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-rose-500 bg-slate-50 p-2 rounded-xl transition-colors">
-              <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] shadow-2xl max-w-[340px] sm:max-w-sm w-full p-5 relative text-center flex flex-col items-center mx-auto my-auto animate-fadeIn">
+            <button
+              type="button"
+              onClick={() => setShowQr(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-rose-500 bg-slate-100 p-2 rounded-xl transition-colors"
+            >
+              <X className="w-4 h-4" />
             </button>
-            <div className="bg-emerald-50 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-emerald-600 mx-auto mb-3 sm:mb-4 mt-2 sm:mt-0 shrink-0">
-              <QrCode className="w-6 h-6 sm:w-7 sm:h-7" />
+            
+            <div className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 mb-2 mt-1">
+              <QrCode className="w-3.5 h-3.5" /> Express Payment
             </div>
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">Express Payment</h3>
-            <p className="text-[11px] sm:text-xs text-slate-500 mb-3 sm:mb-5 font-medium">Scan with your banking wallet to finalize transaction.</p>
-            <div className="bg-slate-50 p-3 sm:p-5 rounded-2xl sm:rounded-3xl border-2 border-dashed border-slate-200 flex justify-center mb-4 sm:mb-6 shrink-0">
-              <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IEMPayment&color=059669" alt="QR" className="w-36 h-36 sm:w-44 sm:h-44 rounded-xl" />
+            
+            <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight uppercase">Scan QR Code</h3>
+            <p className="text-[11px] text-slate-500 mb-3 font-medium">Use your banking app to scan and pay instantly.</p>
+            
+            <div className="bg-emerald-50/50 p-3 rounded-2xl border-2 border-dashed border-emerald-200 flex justify-center mb-4">
+              <img
+                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IEMPayment&color=059669"
+                alt="Payment QR Code"
+                className="w-36 h-36 sm:w-44 sm:h-44 rounded-xl object-contain bg-white p-1"
+              />
             </div>
-            <button type="button" onClick={() => setShowQr(false)} className="w-full py-3.5 sm:py-4 bg-slate-900 text-white font-black rounded-2xl hover:bg-emerald-600 transition-all text-[10px] uppercase tracking-[0.2em] active:scale-95 shrink-0">
+            
+            <button
+              type="button"
+              onClick={() => setShowQr(false)}
+              className="w-full py-3 bg-slate-900 text-white font-black rounded-xl hover:bg-emerald-600 transition-all text-[10px] uppercase tracking-[0.2em] active:scale-95 shadow-md"
+            >
               Return to Dashboard
             </button>
           </div>
