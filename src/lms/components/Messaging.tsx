@@ -462,9 +462,9 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
   }, [contacts, activeChat]);
 
   return (
-    <div className="flex bg-[#f6f1e8] rounded-[40px] border border-[#e2d6c2] h-[700px] overflow-hidden shadow-[0_22px_48px_rgba(95,79,53,0.10)]">
+    <div className="flex flex-col md:flex-row bg-[#f6f1e8] rounded-[24px] md:rounded-[40px] border border-[#e2d6c2] min-h-[500px] md:h-[700px] overflow-hidden shadow-[0_22px_48px_rgba(95,79,53,0.10)]">
       {/* ──────────────── SIDEBAR ──────────────── */}
-      <div className="w-80 border-r border-[#ddd1bd] flex flex-col bg-[#ebe4d6]">
+      <div className={`w-full md:w-80 border-r border-[#ddd1bd] flex flex-col bg-[#ebe4d6] ${activeChat ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
         <div className="p-5 border-b border-[#ddd1bd] space-y-3">
           <div className="flex items-center justify-between">
@@ -632,16 +632,16 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
       </div>
 
       {/* ──────────────── MAIN CHAT AREA ──────────────── */}
-      <div className="flex-1 flex flex-col relative">
+      <div className={`w-full flex-1 flex flex-col relative ${activeChat ? 'flex' : 'hidden md:flex'}`}>
         {/* Monitoring Alert Banner */}
-        <div className="bg-[#f6f1e8] border-b border-[#ddd1bd] px-6 py-3 flex items-center justify-between gap-4">
+        <div className="bg-[#f6f1e8] border-b border-[#ddd1bd] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
               <i className="fa-solid fa-shield-check text-amber-600 text-sm"></i>
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.15em] text-amber-700/80 mb-0.5">Safeguarding Active</p>
-              <p className="text-[9px] font-bold text-slate-500/80">Communications are monitored by school administration for safety and compliance.</p>
+              <p className="text-[9px] font-bold text-slate-500/80 line-clamp-1">Communications monitored for safety and compliance.</p>
             </div>
           </div>
           <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-500/5 border border-slate-500/10">
@@ -652,8 +652,15 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
         {activeChat ? (
           <>
             {/* Chat Header */}
-            <div className="p-5 border-b border-[#ddd1bd] flex items-center justify-between bg-[#efe7da]">
-              <div className="flex items-center gap-4">
+            <div className="p-4 sm:p-5 border-b border-[#ddd1bd] flex items-center justify-between bg-[#efe7da] gap-3">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveChat(null)}
+                  className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#ebe4d6] border border-[#d7c8b2] text-slate-800 text-[10px] font-black uppercase tracking-widest shrink-0"
+                >
+                  <i className="fa-solid fa-arrow-left"></i> Back
+                </button>
                 {activeChat.kind === 'dm' ? (
                   <div className="relative">
                     <img src={activeChatAvatar!} className="w-10 h-10 rounded-xl object-cover" alt={activeChatTitle} />

@@ -587,9 +587,9 @@ export const MessagesOversight: React.FC<OversightProps> = ({ schoolId, schoolNa
 
       {/* Main Panel */}
       {activeView === 'messages' ? (
-        <div className="flex bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-premium overflow-hidden" style={{ height: '640px' }}>
+        <div className="flex flex-col md:flex-row bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-premium overflow-hidden min-h-[500px] md:h-[640px]">
           {/* ── Left: Conversation List ── */}
-          <div className="w-80 border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
+          <div className={`w-full md:w-80 border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0 ${activeConv ? 'hidden md:flex' : 'flex'}`}>
             {/* Search & Filters */}
             <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-3">
               <div className="relative">
@@ -697,7 +697,7 @@ export const MessagesOversight: React.FC<OversightProps> = ({ schoolId, schoolNa
           </div>
 
           {/* ── Right: Message Thread ── */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className={`w-full flex-1 flex flex-col min-w-0 ${activeConv ? 'flex' : 'hidden md:flex'}`}>
             <ConversationThreadPanel
               activeConv={activeConv}
               convMessages={convMessages}

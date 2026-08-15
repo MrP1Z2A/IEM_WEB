@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Headset,
   Loader2,
@@ -700,8 +701,8 @@ const ParentMessagingCenter: React.FC<ParentMessagingCenterProps> = ({
         </div>
       )}
 
-      <div className="flex h-[760px] max-h-[calc(100vh-12rem)] bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
-        <div className="w-[340px] min-h-0 border-r border-slate-200 flex flex-col bg-slate-50/70">
+      <div className="flex flex-col md:flex-row h-auto min-h-[500px] md:h-[760px] md:max-h-[calc(100vh-12rem)] bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+        <div className={`w-full md:w-[340px] min-h-0 border-r border-slate-200 flex flex-col bg-slate-50/70 ${activeChat ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-5 border-b border-slate-200 space-y-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -864,11 +865,19 @@ const ParentMessagingCenter: React.FC<ParentMessagingCenterProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 flex flex-col min-w-0">
+        <div className={`w-full flex-1 min-h-0 flex flex-col min-w-0 ${activeChat ? 'flex' : 'hidden md:flex'}`}>
           {activeChat ? (
             <>
-              <div className="p-5 border-b border-slate-200 bg-white flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 min-w-0">
+              <div className="p-4 sm:p-5 border-b border-slate-200 bg-white flex items-center justify-between gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveChat(null)}
+                    className="md:hidden flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-black uppercase tracking-widest shrink-0"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Inbox
+                  </button>
                   {activeChat.kind === 'group' ? (
                     <div className="w-12 h-12 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
                       <Users className="w-5 h-5" />

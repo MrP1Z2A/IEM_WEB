@@ -35,8 +35,15 @@ export const ConversationThreadPanel: React.FC<ConversationThreadPanelProps> = (
   return (
     <>
       {/* Thread Header */}
-      <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+      <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50 gap-3">
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-black uppercase tracking-widest shrink-0"
+          >
+            <i className="fas fa-arrow-left"></i> Back
+          </button>
           {activeConv.kind === 'group' ? (
             <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
               <i className="fas fa-users text-indigo-500"></i>

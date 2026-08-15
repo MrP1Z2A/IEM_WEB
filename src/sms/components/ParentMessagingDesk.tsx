@@ -522,8 +522,8 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
         ))}
       </div>
 
-      <div className="flex bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-premium overflow-hidden" style={{ height: '700px' }}>
-        <div className="w-96 border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
+      <div className="flex flex-col md:flex-row bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-premium overflow-hidden min-h-[500px] md:h-[700px]">
+        <div className={`w-full md:w-96 border-r border-slate-100 dark:border-slate-800 flex flex-col shrink-0 ${activeSelection ? 'hidden md:flex' : 'flex'}`}>
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-3">
             <div className="relative">
               <i className="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
@@ -658,7 +658,7 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className={`w-full flex-1 flex flex-col min-w-0 ${activeSelection ? 'flex' : 'hidden md:flex'}`}>
           {!activeSelection ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center opacity-40 px-8">
               <div className="w-24 h-24 rounded-[32px] bg-emerald-500/10 flex items-center justify-center text-5xl text-emerald-500 mb-6">
@@ -669,8 +669,15 @@ const ParentMessagingDesk: React.FC<ParentMessagingDeskProps> = ({ schoolId, sch
             </div>
           ) : (
             <>
-              <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4 bg-slate-50 dark:bg-slate-900/50">
-                <div className="flex items-center gap-4 min-w-0">
+              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 sm:gap-4 bg-slate-50 dark:bg-slate-900/50">
+                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveSelection(null)}
+                    className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-black uppercase tracking-widest shrink-0"
+                  >
+                    <i className="fas fa-arrow-left"></i> Back
+                  </button>
                   {activeSelection.kind === 'conversation' && activeConversation?.kind === 'group' ? (
                     <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
                       <i className="fas fa-users"></i>
