@@ -640,13 +640,6 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
               >
                 {isBulkAssigning ? 'Assigning...' : `Add To ${bulkTargets.length} Course${bulkTargets.length === 1 ? '' : 's'}`}
               </button>
-              <button
-                type="button" onClick={() => void handleBulkDelete()}
-                disabled={!selectedStudentIds.length || isBulkDeleting || isBulkAssigning}
-                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white ${!selectedStudentIds.length || isBulkDeleting || isBulkAssigning ? 'bg-rose-300 cursor-not-allowed' : 'bg-rose-500'}`}
-              >
-                {isBulkDeleting ? 'Deleting...' : 'Delete Selected'}
-              </button>
             </div>
 
             <div className="space-y-2">
