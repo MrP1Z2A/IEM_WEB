@@ -2686,31 +2686,26 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         if (res1.data && res1.data.length > 0) {
           deletedRows = res1.data;
         } else {
-          const res2 = await supabase.schema('public').from('students').delete().eq('student_id', targetId).select();
+          const res2 = await supabase.from('students').delete().eq('id', targetId).select();
           if (res2.data && res2.data.length > 0) {
             deletedRows = res2.data;
           } else {
-            const res3 = await supabase.from('students').delete().eq('id', targetId).select();
+            const res3 = await supabase.schema('public').from('students').delete().eq('name', expectedName).select();
             if (res3.data && res3.data.length > 0) {
               deletedRows = res3.data;
-            } else {
-              const res4 = await supabase.schema('public').from('students').delete().eq('name', expectedName).select();
-              if (res4.data && res4.data.length > 0) {
-                deletedRows = res4.data;
-              } else if (res1.error || res2.error || res3.error || res4.error) {
-                const err = res1.error || res2.error || res3.error || res4.error;
-                console.error('Supabase Delete Student Error:', err);
-                setStudentDeleteError(`Failed to delete student in Supabase: ${err?.message}`);
-                return;
-              }
+            } else if (res1.error || res2.error || res3.error) {
+              const err = res1.error || res2.error || res3.error;
+              console.error('Supabase Delete Student Error:', err);
+              setStudentDeleteError(`Failed to delete student in Supabase: ${err?.message}`);
+              return;
             }
           }
         }
 
         if (deletedRows.length === 0) {
           console.warn('Student delete affected 0 rows. Attempting unconstrained delete by name...');
-          const res5 = await supabase.from('students').delete().eq('name', expectedName).select();
-          if (!res5.data || res5.data.length === 0) {
+          const res4 = await supabase.from('students').delete().eq('name', expectedName).select();
+          if (!res4.data || res4.data.length === 0) {
             setStudentDeleteError(`Supabase RLS policy or missing permissions blocked deleting student '${expectedName}'. Please run the RLS DELETE policy SQL in Supabase.`);
             return;
           }
