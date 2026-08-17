@@ -61,7 +61,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
   const [selectedContextId, setSelectedContextId] = React.useState<string>('');
   const [isRosterLoading, setIsRosterLoading] = React.useState(false);
   const [internalStudents, setInternalStudents] = React.useState<Student[]>([]);
-  const [isRosterCollapsed, setIsRosterCollapsed] = React.useState(false);
+  const [isRosterCollapsed, setIsRosterCollapsed] = React.useState(true);
   const [attendanceDate, setAttendanceDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [attendanceMap, setAttendanceMap] = React.useState<Record<string, AttendanceStatus>>({});
   const [isLoading, setIsLoading] = React.useState(false);
@@ -286,16 +286,14 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
       {/* Student List Grid */}
       <div className="bg-[#0a1a19] rounded-[28px] sm:rounded-[48px] border border-white/5 overflow-hidden shadow-3xl">
-         <div className="w-full px-4 py-4 sm:px-10 sm:py-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between group">
+         <button type="button"
+            onClick={() => setIsRosterCollapsed(!isRosterCollapsed)}
+            className="w-full text-left px-4 py-4 sm:px-10 sm:py-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between cursor-pointer hover:bg-white/[0.04] transition-all group"
+          >
             <div className="flex items-center gap-4">
-               <button
-                  type="button"
-                  onClick={() => setIsRosterCollapsed(!isRosterCollapsed)}
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 flex items-center justify-center text-[#4ea59d] transition-all duration-300 ${isRosterCollapsed ? '-rotate-90' : ''}`}
-                  title={isRosterCollapsed ? "Expand Roster" : "Collapse Roster"}
-               >
+               <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center text-[#4ea59d] transition-transform duration-300 ${isRosterCollapsed ? '-rotate-90' : ''}`}>
                   <i className="fas fa-chevron-down text-[10px]"></i>
-               </button>
+               </div>
                <div>
                   <h3 className="text-base sm:text-xl font-black text-slate-100 uppercase tracking-tight">Student Roster</h3>
                   <p className="text-[9px] sm:text-[10px] text-slate-300 font-bold uppercase tracking-widest mt-0.5 sm:mt-1">
@@ -312,7 +310,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-rose-500"></div> Absent</span>
                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Leave</span>
             </div>
-         </div>
+         </button>
          {!isRosterCollapsed && activeStudents.length > 0 && (
               <div className="divide-y divide-white/5">
                  {activeStudents.map(student => {
