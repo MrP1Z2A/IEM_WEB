@@ -2017,20 +2017,20 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           </div>
         )}
 
-        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[40px] border border-white/20 shadow-2xl relative overflow-hidden">
-          <div className="flex items-center justify-between mb-8 relative z-10">
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-4">
-              <div className="w-10 h-10 rounded-2xl bg-[#4ea59d]/10 flex items-center justify-center">
-                <i className="fa-solid fa-bell text-[#4ea59d] animate-swing"></i>
+        <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-4 sm:p-8 rounded-3xl sm:rounded-[40px] border border-white/20 shadow-2xl relative overflow-hidden">
+          <div className="flex items-center justify-between mb-4 sm:mb-8 relative z-10">
+            <h3 className="text-base sm:text-xl font-black text-slate-900 uppercase tracking-tight flex items-center gap-2 sm:gap-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-[#4ea59d]/10 flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-bell text-[#4ea59d] animate-swing text-xs sm:text-base"></i>
               </div>
               Recent Notifications
             </h3>
-            <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#4ea59d] transition-colors" type="button">
+            <button className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#4ea59d] transition-colors shrink-0" type="button">
               Mark all as read
             </button>
           </div>
 
-          <div className="space-y-4 relative z-10 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="space-y-3 relative z-10 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
             {[
               ...dynamicExams.slice(0, 1).map(ex => ({
                 id: `ex-${ex.id}`,
@@ -2096,23 +2096,23 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   }
                   setHighlightItemId(notif.id);
                 }}
-                className="p-5 bg-[#f6f1e8] rounded-3xl border border-[#e2d6c2] flex items-center gap-6 hover:border-[#4ea59d]/60 transition-all cursor-pointer group shadow-[0_12px_28px_rgba(95,79,53,0.08)]"
+                className="p-3 sm:p-5 bg-[#f6f1e8] rounded-2xl sm:rounded-3xl border border-[#e2d6c2] flex items-center gap-3 sm:gap-6 hover:border-[#4ea59d]/60 transition-all cursor-pointer group shadow-[0_12px_28px_rgba(95,79,53,0.08)]"
               >
-                <div className={`w-12 h-12 rounded-2xl ${notif.bg} ${notif.color} flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform`}>
+                <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl ${notif.bg} ${notif.color} flex items-center justify-center text-xs sm:text-xl shrink-0 group-hover:scale-110 transition-transform`}>
                   <i className={`fa-solid ${notif.icon}`}></i>
                 </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                    <h4 className="text-sm font-bold text-slate-900 mb-1">{notif.title}</h4>
-                    <span className="text-[9px] font-black text-slate-600 uppercase">{notif.time}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-baseline gap-2">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 mb-0.5 truncate">{notif.title}</h4>
+                    <span className="text-[7px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest shrink-0">{notif.time}</span>
                   </div>
-                  <p className="text-xs text-slate-400 font-medium">{notif.desc}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-400 font-medium truncate">{notif.desc}</p>
                 </div>
-                <div className="w-2 h-2 rounded-full bg-[#4ea59d] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#4ea59d] opacity-0 group-hover:opacity-100 transition-opacity shrink-0"></div>
               </div>
             ))}
             {dynamicExams.length === 0 && examResultsData.length === 0 && dynamicAssignments.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-10">No recent notifications.</p>
+              <p className="text-xs sm:text-sm text-slate-400 text-center py-6 sm:py-10">No recent notifications.</p>
             )}
           </div>
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#4ea59d]/5 blur-[100px] pointer-events-none"></div>
