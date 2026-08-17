@@ -246,6 +246,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   const [calendarDate, setCalendarDate] = useState(new Date(2025, 3, 1));
   const [calendarSubView, setCalendarSubView] = useState<'day' | 'week' | 'month'>('month');
   const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
+  const [selectedFolderTitle, setSelectedFolderTitle] = useState<string | null>(null);
 
   // Dynamic Data States (Linked to SMS)
   const [dynamicAnnouncements, setDynamicAnnouncements] = useState<NoticeItem[]>([]);
@@ -1510,6 +1511,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   const handleCourseClick = async (course: Course) => {
     setSelectedCourse(course);
+    setSelectedFolderTitle(null);
     setCurrentView('course-detail');
 
     if (schoolId && selectedClass?.id) {
@@ -3186,22 +3188,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </section>
             )}
 
-            <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
-              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-6 flex items-center gap-4">
-                <i className="fa-solid fa-compass text-[#4ea59d]"></i> Module Introduction
-              </h3>
-              <p className="text-slate-700 text-lg leading-relaxed ">{selectedCourse.moduleIntro}</p>
-              <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {selectedCourse.topics.map((t, i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 bg-[#0a1a19] rounded-2xl border border-white/20">
-                    <div className="w-8 h-8 rounded-full bg-[#4ea59d]/10 text-[#4ea59d] flex items-center justify-center text-xs font-black">
-                      {i + 1}
-                    </div>
-                    <span className="text-sm font-bold text-slate-100">{t}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
+
 
             <section className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-10 rounded-[40px] border border-white/20 shadow-xl">
               <div 
@@ -3248,70 +3235,101 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     const folders = items.filter(i => i.type === 'folder');
                     const rootFiles = items.filter(i => i.type === 'file' && !i.folder);
 
-                    return (
-                      <div className="space-y-8">
-                        {/* 1. Folders Section */}
-                        {folders.map(folder => {
-                          const folderFiles = items.filter(i => i.type === 'file' && i.folder === folder.title);
-                          const isExpanded = openFolders.has(folder.title);
+                    if (selectedFolderTitle) {
+                      const folderFiles = items.filter(i => i.type === 'file' && i.folder === selectedFolderTitle);
+                      return (
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedFolderTitle(null)}
+                              className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group"
+                            >
+                              <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Folders
+                            </button>
+                            <h4 className="text-sm font-black text-slate-100 uppercase tracking-widest truncate max-w-[200px] sm:max-w-xs">{selectedFolderTitle}</h4>
+                          </div>
+                          <div className="space-y-3">
+                            {folderFiles.length === 0 ? (
+                              <p className="text-xs font-black text-slate-500 uppercase tracking-widest py-4">No files in this folder.</p>
+                            ) : (
+                              folderFiles.map(note => (
+                                <div key={note.id} className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between gap-4 transition-all hover:border-[#4ea59d]/30">
+                                  <div className="flex items-center gap-4 overflow-hidden">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-lg shrink-0">
+                                      <i className="fa-solid fa-file-lines"></i>
+                                    </div>
+                                    <div className="overflow-hidden">
+                                      <h4 className="text-sm font-black text-slate-100 truncate">{note.title}</h4>
+                                      <p className="text-xs text-slate-400 truncate">{note.content}</p>
+                                    </div>
+                                  </div>
+                                  {note.ebookUrl && (
+                                    <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-[#4ea59d] text-slate-900 rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2 shrink-0">
+                                      <i className="fa-solid fa-download"></i> Download
+                                    </a>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
 
-                          return (
-                            <div key={folder.id} className="space-y-6">
+                    return (
+                      <div className="space-y-6">
+                        {/* 1. Folders Section */}
+                        <div className="space-y-3">
+                          {folders.map(folder => {
+                            const folderFiles = items.filter(i => i.type === 'file' && i.folder === folder.title);
+                            return (
                               <div
-                                onClick={() => toggleFolder(folder.title)}
-                                className="p-8 bg-[#4ea59d]/5 backdrop-blur-md rounded-[40px] border border-[#4ea59d]/20 hover:border-[#4ea59d]/40 transition-all cursor-pointer group flex items-center justify-between"
+                                key={folder.id}
+                                onClick={() => setSelectedFolderTitle(folder.title)}
+                                className="p-4 bg-white/5 border border-white/10 rounded-2xl hover:border-[#4ea59d]/40 transition-all cursor-pointer group flex items-center justify-between"
                               >
-                                <div className="flex items-center gap-6">
-                                  <div className={`w-14 h-14 rounded-2xl ${isExpanded ? 'bg-[#4ea59d] text-slate-900' : 'bg-[#4ea59d]/10 text-[#4ea59d]'} flex items-center justify-center text-2xl transition-all group-hover:scale-110`}>
-                                    <i className={`fa-solid ${isExpanded ? 'fa-folder-open' : 'fa-folder'}`}></i>
+                                <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-xl bg-[#4ea59d]/10 text-[#4ea59d] flex items-center justify-center text-lg group-hover:scale-105 transition-all">
+                                    <i className="fa-solid fa-folder"></i>
                                   </div>
                                   <div>
-                                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">{folder.title}</h4>
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{folderFiles.length} Resource Items</p>
+                                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">{folder.title}</h4>
+                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{folderFiles.length} Resource Items</p>
                                   </div>
                                 </div>
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border border-white/10 text-[#4ea59d] transition-transform duration-500 ${isExpanded ? 'rotate-180 bg-white/10' : ''}`}>
-                                  <i className="fa-solid fa-chevron-down text-xs"></i>
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/5 text-[#4ea59d] group-hover:bg-[#4ea59d]/10 transition-all">
+                                  <i className="fa-solid fa-arrow-right text-[10px]"></i>
                                 </div>
                               </div>
-
-                              {isExpanded && (
-                                <div className="ml-10 space-y-6 border-l-2 border-[#1f4e4a] pl-10 animate-slideDown">
-                                  {folderFiles.length === 0 ? (
-                                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest py-4">No files in this folder.</p>
-                                  ) : folderFiles.map(note => (
-                                    <div key={note.id} className="p-8 bg-[#0a1a19] rounded-[40px] border border-white/20 space-y-4 transition-all hover:border-[#4ea59d]/30">
-                                      <div className="flex justify-between items-start flex-col sm:flex-row gap-4">
-                                        <h4 className="text-xl font-black text-slate-100">{note.title}</h4>
-                                        {note.ebookUrl && (
-                                          <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center gap-2">
-                                            <i className="fa-solid fa-download"></i> Download Asset
-                                          </a>
-                                        )}
-                                      </div>
-                                      <p className="text-base text-slate-300 leading-relaxed">{note.content}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
 
                         {/* 2. Root Files Section */}
-                        {rootFiles.map(note => (
-                          <div key={note.id} className="p-8 bg-[#0a1a19] rounded-[40px] border border-white/20 space-y-4 transition-all hover:border-[#4ea59d]/30 shadow-xl">
-                            <div className="flex justify-between items-start flex-col sm:flex-row gap-4">
-                              <h4 className="text-xl font-black text-slate-100">{note.title}</h4>
-                              {note.ebookUrl && (
-                                <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-5 py-2.5 bg-[#4ea59d]/10 border border-[#4ea59d]/20 text-[#4ea59d] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#4ea59d] hover:text-white transition-all flex items-center gap-2">
-                                  <i className="fa-solid fa-download"></i> Download Resource
-                                </a>
-                              )}
-                            </div>
-                            <p className="text-base text-slate-300 leading-relaxed">{note.content}</p>
+                        {rootFiles.length > 0 && (
+                          <div className="space-y-3 pt-4 border-t border-white/5">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Uncategorized Resources</p>
+                            {rootFiles.map(note => (
+                              <div key={note.id} className="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between gap-4 transition-all hover:border-[#4ea59d]/30">
+                                <div className="flex items-center gap-4 overflow-hidden">
+                                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-lg shrink-0">
+                                    <i className="fa-solid fa-file-lines"></i>
+                                  </div>
+                                  <div className="overflow-hidden">
+                                    <h4 className="text-sm font-black text-slate-100 truncate">{note.title}</h4>
+                                    <p className="text-xs text-slate-400 truncate">{note.content}</p>
+                                  </div>
+                                </div>
+                                {note.ebookUrl && (
+                                  <a href={note.ebookUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-[#4ea59d] text-slate-900 rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2 shrink-0">
+                                    <i className="fa-solid fa-download"></i> Download
+                                  </a>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
 
                         {items.length === 0 && (
                           <div className="p-12 text-center bg-[#0a1a19] rounded-[40px] border border-dashed border-[#1f4e4a] text-slate-300 font-black uppercase tracking-widest animate-pulse">
