@@ -3047,46 +3047,47 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           </div>
         </section>
 
-        <section className="lg:col-span-2 bg-[#f6f1e8] p-10 rounded-[40px] border border-[#e2d6c2] shadow-[0_16px_34px_rgba(95,79,53,0.09)]">
-          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8 flex items-center gap-4">
-            <i className="fa-solid fa-file-pdf text-[#4ea59d]"></i> Official Report Cards
+        <section className="lg:col-span-2 bg-[#f6f1e8] p-4 sm:p-10 rounded-3xl sm:rounded-[40px] border border-[#e2d6c2] shadow-[0_16px_34px_rgba(95,79,53,0.09)]">
+          <h3 className="text-base sm:text-xl font-black text-slate-900 uppercase tracking-tight mb-4 sm:mb-8 flex items-center gap-2 sm:gap-4">
+            <i className="fa-solid fa-file-pdf text-[#4ea59d] text-sm sm:text-base"></i> Official Report Cards
           </h3>
-          <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+          <div className="max-h-[400px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 pb-4">
               {dynamicReportCards.length === 0 ? (
                 <div className="md:col-span-2 p-10 bg-[#efe7da] rounded-[32px] border border-dashed border-[#d7c8b2] text-center">
                   <p className="text-sm text-slate-400">No official report cards available for download.</p>
                 </div>
               ) : (
                 dynamicReportCards.map((rc) => (
-                  <div key={rc.id} className="p-8 bg-[#efe7da] rounded-[32px] border border-[#e2d6c2] group hover:border-[#4ea59d]/60 transition-all flex flex-col justify-between shadow-[0_10px_24px_rgba(95,79,53,0.07)]">
-                    <div className="flex items-start justify-between gap-4 mb-6">
-                      <div className="w-12 h-12 bg-[#4ea59d]/10 rounded-2xl flex items-center justify-center text-[#4ea59d] shrink-0">
-                        <i className="fa-solid fa-file-invoice text-2xl"></i>
+                  <div key={rc.id} className="p-3 sm:p-5 bg-[#efe7da] rounded-2xl sm:rounded-[32px] border border-[#e2d6c2] group hover:border-[#4ea59d]/60 transition-all flex items-center justify-between gap-3 sm:gap-6 shadow-[0_10px_24px_rgba(95,79,53,0.07)]">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-8 h-8 sm:w-12 sm:h-12 bg-[#4ea59d]/10 rounded-xl sm:rounded-2xl flex items-center justify-center text-[#4ea59d] shrink-0">
+                        <i className="fa-solid fa-file-invoice text-sm sm:text-2xl"></i>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-lg font-bold text-slate-900 truncate" title={rc.title}>{rc.title}</h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Released on {rc.reportDate}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate" title={rc.title}>{rc.title}</h4>
+                          <span className="hidden sm:inline-block text-[7px] sm:text-[9px] font-black text-[#4ea59d] uppercase tracking-widest bg-[#4ea59d]/10 px-1.5 py-0.5 rounded-md shrink-0">
+                            {rc.reportType}
+                          </span>
+                        </div>
+                        <p className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Released on {rc.reportDate}</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-[10px] font-black text-[#4ea59d]/60 uppercase tracking-widest bg-[#4ea59d]/5 px-3 py-1 rounded-lg">
-                        {rc.reportType}
-                      </span>
-                      {rc.fileUrl && (
-                        <button
-                          type="button" onClick={() => {
-                            if (rc.fileUrl) {
-                              setPreviewPdfUrl(rc.fileUrl);
-                              setPreviewPdfTitle(rc.title || `${rc.reportType} Report Card`);
-                            }
-                          }}
-                          className="px-6 py-3 bg-[#4ea59d] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#3d8c85] transition-all shadow-lg shadow-[#4ea59d]/20 flex items-center gap-2"
-                        >
-                          <i className="fa-solid fa-cloud-arrow-down"></i> Download
-                        </button>
-                      )}
-                    </div>
+                    {rc.fileUrl && (
+                      <button
+                        type="button" onClick={() => {
+                          if (rc.fileUrl) {
+                            setPreviewPdfUrl(rc.fileUrl);
+                            setPreviewPdfTitle(rc.title || `${rc.reportType} Report Card`);
+                          }
+                        }}
+                        className="px-3 py-2 sm:px-6 sm:py-3 bg-[#4ea59d] text-slate-900 rounded-xl sm:rounded-2xl text-[8px] sm:text-[10px] font-black uppercase tracking-widest hover:bg-[#3d8c85] transition-all shadow-lg shadow-[#4ea59d]/20 flex items-center gap-1.5 sm:gap-2 shrink-0"
+                      >
+                        <i className="fa-solid fa-cloud-arrow-down text-[8px] sm:text-xs"></i>
+                        <span>Download</span>
+                      </button>
+                    )}
                   </div>
                 ))
               )}
