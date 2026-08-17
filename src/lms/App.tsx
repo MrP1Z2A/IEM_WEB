@@ -2313,13 +2313,20 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
   const renderInstruction = () => (
     <div className="space-y-12 animate-fadeIn text-slate-800 pb-20">
-      <section className="relative h-72 rounded-[40px] overflow-hidden group">
-        <img src="https://images.unsplash.com/photo-1541339907198-e08759dfc3f0?auto=format&fit=crop&w=1200" alt="School Building" className="w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-1000" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a19] to-transparent"></div>
-        <div className="absolute bottom-10 left-10">
-          <p className="text-[#4ea59d] font-black uppercase tracking-[0.4em] mb-2">About School</p>
-          <h2 className="text-5xl font-black text-slate-900 uppercase tracking-tighter">IEM Academy</h2>
-          <p className="max-w-xl text-slate-400 text-sm mt-4 leading-relaxed font-medium">
+      <section className="relative min-h-[18rem] md:h-72 rounded-3xl md:rounded-[40px] overflow-hidden group flex flex-col justify-end p-6 md:p-10 shadow-xl">
+        <img 
+          src="https://images.unsplash.com/photo-1541339907198-e08759dfc3f0?auto=format&fit=crop&w=1200" 
+          alt="School Building" 
+          className="absolute inset-0 w-full h-full object-cover opacity-40 grayscale group-hover:grayscale-0 transition-all duration-1000"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1a19] via-[#0a1a19]/80 to-transparent"></div>
+        <div className="relative z-10 space-y-2">
+          <p className="text-[#4ea59d] font-black uppercase tracking-[0.4em] text-xs">About School</p>
+          <h2 className="text-3xl md:text-5xl font-black text-slate-900 uppercase tracking-tighter">IEM Academy</h2>
+          <p className="max-w-xl text-slate-400 text-xs md:text-sm leading-relaxed font-medium">
             Pioneering the future of education through AI-integrated curricula and global mentorship. Our mission is to empower every learner to thrive in an era of rapid technological evolution.
           </p>
         </div>
