@@ -2999,50 +2999,50 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        <section className="bg-[#f6f1e8] p-10 rounded-[40px] border border-[#e2d6c2] shadow-[0_16px_34px_rgba(95,79,53,0.09)]">
-          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8">Exam Results</h3>
-          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+        <section className="bg-[#f6f1e8] p-4 sm:p-10 rounded-3xl sm:rounded-[40px] border border-[#e2d6c2] shadow-[0_16px_34px_rgba(95,79,53,0.09)]">
+          <h3 className="text-base sm:text-xl font-black text-slate-900 uppercase tracking-tight mb-4">Exam Results</h3>
+          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
             {examResultsData.map((ex, i) => (
                 <div 
                   key={i} 
                   id={`res-${ex.courseName}`}
-                  className={`p-6 bg-[#efe7da] rounded-3xl border border-[#e2d6c2] flex justify-between items-center shadow-[0_10px_24px_rgba(95,79,53,0.07)] ${highlightItemId === `res-${ex.courseName}` ? 'highlight-pulse-effect' : ''}`}
+                  className={`p-3 sm:p-5 bg-[#efe7da] rounded-2xl sm:rounded-3xl border border-[#e2d6c2] flex justify-between items-center shadow-[0_10px_24px_rgba(95,79,53,0.07)] gap-4 ${highlightItemId === `res-${ex.courseName}` ? 'highlight-pulse-effect' : ''}`}
                 >
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">{ex.assignment || ex.courseName}</h4>
-                  <p className="text-[9px] font-black text-slate-400 uppercase">{ex.className} • {ex.courseName}</p>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{ex.assignment || ex.courseName}</h4>
+                  <p className="text-[7px] sm:text-[9px] font-black text-slate-400 uppercase mt-0.5 truncate">{ex.className} • {ex.courseName}</p>
                 </div>
-                <div className="text-right">
-                  <span className={`text-lg font-black block ${ex.grade === 'Pending' ? 'text-orange-500' : 'text-[#4ea59d]'}`}>{ex.grade}</span>
-                  {ex.percentage && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ex.percentage}%</span>}
+                <div className="text-right shrink-0">
+                  <span className={`text-base sm:text-lg font-black block ${ex.grade === 'Pending' ? 'text-orange-500' : 'text-[#4ea59d]'}`}>{ex.grade}</span>
+                  {ex.percentage && <span className="text-[8px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ex.percentage}%</span>}
                 </div>
               </div>
             ))}
             {examResultsData.length === 0 && (
-              <p className="text-sm text-slate-400">No exam results available.</p>
+              <p className="text-xs sm:text-sm text-slate-400 text-center py-6 sm:py-10">No exam results available.</p>
             )}
           </div>
         </section>
 
-        <section className="bg-[#f6f1e8] p-10 rounded-[40px] border border-[#e2d6c2] shadow-[0_16px_34px_rgba(95,79,53,0.09)]">
-          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8">Assignment Results</h3>
-          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+        <section className="bg-[#f6f1e8] p-4 sm:p-10 rounded-3xl sm:rounded-[40px] border border-[#e2d6c2] shadow-[0_16px_34px_rgba(95,79,53,0.09)]">
+          <h3 className="text-base sm:text-xl font-black text-slate-900 uppercase tracking-tight mb-4">Assignment Results</h3>
+          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
             {examResultsData.length > 0 ? (
               examResultsData.map((g, i) => (
                 <div 
                   key={i} 
                   id={`res-${g.courseName}`}
-                  className={`p-6 bg-[#efe7da] rounded-3xl border border-[#e2d6c2] flex justify-between items-center group relative overflow-hidden shadow-[0_10px_24px_rgba(95,79,53,0.07)] ${highlightItemId === `res-${g.courseName}` ? 'highlight-pulse-effect' : ''}`}
+                  className={`p-3 sm:p-5 bg-[#efe7da] rounded-2xl sm:rounded-3xl border border-[#e2d6c2] flex justify-between items-center group relative overflow-hidden shadow-[0_10px_24px_rgba(95,79,53,0.07)] gap-4 ${highlightItemId === `res-${g.courseName}` ? 'highlight-pulse-effect' : ''}`}
                 >
-                  <div className="flex-1">
-                    <h4 className="text-sm font-bold text-slate-900">{g.assignment}</h4>
-                    <p className="text-[9px] text-[#4ea59d] font-black uppercase mt-1">Feedback: {g.feedback}</p>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{g.assignment}</h4>
+                    <p className="text-[7px] sm:text-[9px] text-[#4ea59d] font-black uppercase mt-0.5 truncate">Feedback: {g.feedback}</p>
                   </div>
-                  <span className="text-lg font-black text-[#4ea59d] ml-4">{g.grade}</span>
+                  <span className="text-base sm:text-lg font-black text-[#4ea59d] ml-4 shrink-0">{g.grade}</span>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-400 text-center py-10">No assignment results available.</p>
+              <p className="text-xs sm:text-sm text-slate-400 text-center py-6 sm:py-10">No assignment results available.</p>
             )}
           </div>
         </section>
