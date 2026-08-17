@@ -480,16 +480,7 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
           <h2 className="text-3xl sm:text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">Campus Formations</h2>
           <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Integrated Class & Curriculum Control</p>
         </div>
-        {isTeacher && (
-          <button
-            type="button" onClick={() => { setEditingClassId(null); setClassName(''); setIsClassFormOpen(true); }}
-            aria-label="Open Form Hub"
-            className="group relative px-10 py-5 rounded-[24px] bg-[#4ea59d] text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] shadow-2xl shadow-[#4ea59d]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
-          >
-            <i className="fa-solid fa-plus-circle text-slate-600 group-hover:text-slate-900 transition-colors"></i> 
-            Form Hub
-          </button>
-        )}
+
       </header>
 
       <ClassForm
