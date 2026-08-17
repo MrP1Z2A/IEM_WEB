@@ -2119,24 +2119,24 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <section className="bg-[#f6f1e8] p-8 rounded-[40px] border border-[#e2d6c2] shadow-[0_16px_34px_rgba(95,79,53,0.09)]">
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8">Recent Grades</h3>
-            <div className="space-y-4">
+          <section className="bg-[#f6f1e8] p-4 sm:p-8 rounded-3xl sm:rounded-[40px] border border-[#e2d6c2] shadow-[0_16px_34px_rgba(95,79,53,0.09)]">
+            <h3 className="text-base sm:text-xl font-black text-slate-900 uppercase tracking-tight mb-4">Recent Grades</h3>
+            <div className="space-y-3">
               {examResultsData.slice(0, 3).map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-6 bg-[#efe7da] rounded-[32px] border border-[#e2d6c2] shadow-[0_10px_24px_rgba(95,79,53,0.07)]">
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">{item.assignment || item.courseName}</h4>
-                    <p className="text-[9px] font-black text-slate-600 uppercase mt-1">Academic Session 2025</p>
+                <div key={i} className="flex items-center justify-between p-3 sm:p-5 bg-[#efe7da] rounded-2xl sm:rounded-[32px] border border-[#e2d6c2] shadow-[0_10px_24px_rgba(95,79,53,0.07)] gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{item.assignment || item.courseName}</h4>
+                    <p className="text-[7px] sm:text-[9px] font-black text-slate-600 uppercase mt-0.5">Academic Session 2025</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-black text-[#4ea59d]">{item.grade}</p>
-                    {item.percentage && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.percentage}%</p>}
+                  <div className="text-right shrink-0">
+                    <p className="text-lg sm:text-2xl font-black text-[#4ea59d]">{item.grade}</p>
+                    {item.percentage && <p className="text-[8px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest">{item.percentage}%</p>}
                   </div>
                 </div>
               ))}
               {examResultsData.length === 0 && (
-                <div className="p-6 bg-[#efe7da] rounded-[32px] border border-[#e2d6c2] text-center shadow-[0_10px_24px_rgba(95,79,53,0.07)]">
-                  <p className="text-sm text-slate-400">No recent grades available.</p>
+                <div className="p-4 bg-[#efe7da] rounded-2xl border border-[#e2d6c2] text-center shadow-[0_10px_24px_rgba(95,79,53,0.07)]">
+                  <p className="text-xs sm:text-sm text-slate-400">No recent grades available.</p>
                 </div>
               )}
             </div>
@@ -2328,27 +2328,27 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-12">
           <section>
-            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-8 flex items-center gap-4">
-              <i className="fa-solid fa-bullhorn text-[#4ea59d]"></i> School Announcements
+            <h3 className="text-base sm:text-2xl font-black text-slate-900 uppercase tracking-tight mb-4 flex items-center gap-2 sm:gap-4">
+              <i className="fa-solid fa-bullhorn text-[#4ea59d] text-sm sm:text-base"></i> School Announcements
             </h3>
-            <div className="max-h-96 overflow-y-auto rounded-[32px] bg-[#e9decd] border border-[#d7c8b2] p-3 pr-2 custom-scrollbar space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
+            <div className="max-h-96 overflow-y-auto rounded-2xl sm:rounded-[32px] bg-[#e9decd] border border-[#d7c8b2] p-2.5 sm:p-3 pr-2 custom-scrollbar space-y-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
               {dynamicAnnouncements.length === 0 && (
-                <div className="p-6 bg-[#f6f1e8] rounded-[28px] border border-[#e2d6c2] text-center shadow-[0_12px_28px_rgba(95,79,53,0.08)]">
-                  <p className="text-sm text-slate-600">No school announcements published yet.</p>
+                <div className="p-4 bg-[#f6f1e8] rounded-xl border border-[#e2d6c2] text-center shadow-[0_12px_28px_rgba(95,79,53,0.08)]">
+                  <p className="text-xs sm:text-sm text-slate-600">No school announcements published yet.</p>
                 </div>
               )}
               {dynamicAnnouncements.map(ann => (
                 <button
                   key={ann.id}
                   type="button" onClick={() => handleNoticeOpen(ann, 'instruction')}
-                  className="w-full p-6 bg-[#f6f1e8] rounded-[28px] border border-[#e2d6c2] hover:border-[#4ea59d]/60 transition-all group text-left shadow-[0_14px_30px_rgba(95,79,53,0.08)]"
+                  className="w-full p-3 sm:p-5 bg-[#f6f1e8] rounded-xl sm:rounded-[28px] border border-[#e2d6c2] hover:border-[#4ea59d]/60 transition-all group text-left shadow-[0_14px_30px_rgba(95,79,53,0.08)] flex items-center justify-between gap-4"
                 >
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center justify-between gap-4 w-full">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <h4 className="text-xl font-bold text-slate-900 truncate">{ann.title}</h4>
-                      <span className="text-xs font-black text-slate-400 uppercase shrink-0">{ann.date}</span>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{ann.title}</h4>
+                      <span className="text-[8px] sm:text-xs font-black text-slate-400 uppercase shrink-0">{ann.date}</span>
                     </div>
-                    <i className="fa-solid fa-chevron-right text-[#4ea59d] text-xs group-hover:translate-x-1 transition-transform shrink-0"></i>
+                    <i className="fa-solid fa-chevron-right text-[#4ea59d] text-[10px] sm:text-xs group-hover:translate-x-1 transition-transform shrink-0"></i>
                   </div>
                 </button>
               ))}
