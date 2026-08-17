@@ -2389,26 +2389,36 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           </section>
         </div>
 
-        <section className="space-y-8">
-          <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8">Upcoming Events</h3>
-          <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+        <section className="space-y-4">
+          <h3 className="text-base sm:text-xl font-black text-slate-900 uppercase tracking-tight mb-4">Upcoming Events</h3>
+          <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             {dynamicSchoolEvents.length > 0 ? dynamicSchoolEvents.map(ev => (
               <div 
                 key={ev.id} 
                 id={`ev-${ev.id}`}
-                className={`relative h-48 rounded-[32px] overflow-hidden group cursor-pointer shadow-xl shrink-0 ${highlightItemId === `ev-${ev.id}` ? 'highlight-pulse-effect font-bold border-2 border-[#4ea59d]' : ''}`}
+                className={`p-3 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between gap-4 transition-all hover:border-[#4ea59d]/30 cursor-pointer group shadow-lg shrink-0 ${highlightItemId === `ev-${ev.id}` ? 'highlight-pulse-effect font-bold border-[#4ea59d]' : ''}`}
               >
-                <img src={ev.image} alt={ev.title || 'Event Image'} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                <div className="absolute bottom-6 left-6">
-                  <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-1">{ev.type}</p>
-                  <h4 className="text-sm font-bold text-slate-900 uppercase">{ev.name}</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 "><i className="fa-solid fa-calendar mr-2"></i> {ev.date}</p>
-                  {ev.location && <p className="text-[9px] text-emerald-400/60 font-black uppercase mt-1"><i className="fa-solid fa-location-dot mr-2"></i> {ev.location}</p>}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-all">
+                    <i className="fa-solid fa-calendar-day animate-pulse"></i>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{ev.name}</h4>
+                      <span className="text-[7px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest shrink-0">{ev.type}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 text-[8px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      <span><i className="fa-solid fa-calendar mr-1"></i> {ev.date}</span>
+                      {ev.location && <span className="truncate max-w-[120px]"><i className="fa-solid fa-location-dot mr-1"></i> {ev.location}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center border border-white/5 text-[#4ea59d] group-hover:bg-[#4ea59d]/10 transition-all shrink-0">
+                  <i className="fa-solid fa-chevron-right text-[8px]"></i>
                 </div>
               </div>
             )) : (
-              <div className="p-6 bg-white/5 border border-white/10 rounded-[32px] text-center">
+              <div className="p-6 bg-white/5 border border-white/10 rounded-2xl text-center">
                 <p className="text-slate-400 text-xs italic">Awaiting upcoming institutional events.</p>
               </div>
             )}
