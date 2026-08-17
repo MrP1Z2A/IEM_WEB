@@ -286,10 +286,16 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
 
       {/* Student List Grid */}
       <div className="bg-[#0a1a19] rounded-[28px] sm:rounded-[48px] border border-white/5 overflow-hidden shadow-3xl">
-         <div 
-            className="w-full text-left px-4 py-4 sm:px-10 sm:py-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between transition-all group"
-          >
+         <div className="w-full px-4 py-4 sm:px-10 sm:py-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between group">
             <div className="flex items-center gap-4">
+               <button
+                  type="button"
+                  onClick={() => setIsRosterCollapsed(!isRosterCollapsed)}
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 flex items-center justify-center text-[#4ea59d] transition-all duration-300 ${isRosterCollapsed ? '-rotate-90' : ''}`}
+                  title={isRosterCollapsed ? "Expand Roster" : "Collapse Roster"}
+               >
+                  <i className="fas fa-chevron-down text-[10px]"></i>
+               </button>
                <div>
                   <h3 className="text-base sm:text-xl font-black text-slate-100 uppercase tracking-tight">Student Roster</h3>
                   <p className="text-[9px] sm:text-[10px] text-slate-300 font-bold uppercase tracking-widest mt-0.5 sm:mt-1">
@@ -307,7 +313,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500"></div> Leave</span>
             </div>
          </div>
-         {activeStudents.length > 0 && (
+         {!isRosterCollapsed && activeStudents.length > 0 && (
               <div className="divide-y divide-white/5">
                  {activeStudents.map(student => {
                     const currentStatus = attendanceMap[String(student.id)];
@@ -346,7 +352,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
                  })}
               </div>
            )}
-         {activeStudents.length === 0 && (
+         {!isRosterCollapsed && activeStudents.length === 0 && (
             <div className="p-20 text-center space-y-4">
                <i className="fas fa-users-slash text-4xl text-slate-500"></i>
                <p className="text-slate-300 text-[11px] font-black uppercase tracking-[0.3em]">No Personnel Records Found</p>
