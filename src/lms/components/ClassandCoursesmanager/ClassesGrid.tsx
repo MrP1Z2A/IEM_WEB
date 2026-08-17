@@ -43,13 +43,13 @@ export const ClassesGrid: React.FC<ClassesGridProps> = ({
          </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
         {filteredClasses.map((classItem) => {
           const isActive = selectedClassId === String(classItem.id);
           return (
             <div
               key={classItem.id}
-              className={`group bg-white/5 border backdrop-blur-2xl rounded-[32px] p-6 text-left transition-all duration-500 overflow-hidden relative shadow-lg ${
+              className={`group bg-white/5 border backdrop-blur-2xl rounded-2xl sm:rounded-[32px] p-3 sm:p-6 text-left transition-all duration-500 overflow-hidden relative shadow-lg ${
                 isActive 
                   ? 'border-[#4ea59d] shadow-[0_0_40px_-10px_rgba(78,165,157,0.3)] ring-1 ring-[#4ea59d]/50' 
                   : 'border-white/10 hover:border-white/30 hover:bg-white/10'
@@ -66,41 +66,41 @@ export const ClassesGrid: React.FC<ClassesGridProps> = ({
               />
               {/* ACTIONS OVERLAY */}
               {isTeacher && (
-                <div className="absolute top-4 right-4 z-10 flex gap-2 opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100 pointer-events-auto">
+                <div className="absolute top-2 right-2 sm:top-4 sm:right-4 z-10 flex gap-1 sm:gap-2 opacity-0 group-hover:opacity-100 transition-all scale-75 sm:scale-100 pointer-events-auto">
                   <button
                     type="button" onClick={(e) => { e.stopPropagation(); startEditClass(classItem); }}
                     aria-label="Edit class"
-                    className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-[#4ea59d] flex items-center justify-center transition-all"
+                    className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-[#4ea59d] flex items-center justify-center transition-all"
                   >
-                    <i className="fas fa-pen text-[10px]"></i>
+                    <i className="fas fa-pen text-[8px] sm:text-[10px]"></i>
                   </button>
                   <button
                     type="button" onClick={(e) => { e.stopPropagation(); void deleteClass(String(classItem.id)); }}
                     aria-label="Delete class"
-                    className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-rose-500 flex items-center justify-center transition-all"
+                    className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-white/10 backdrop-blur-md text-white border border-white/20 hover:bg-rose-500 flex items-center justify-center transition-all"
                   >
-                    <i className="fas fa-trash text-[10px]"></i>
+                    <i className="fas fa-trash text-[8px] sm:text-[10px]"></i>
                   </button>
                 </div>
               )}
 
               <div 
-                 className="w-full aspect-[4/3] relative overflow-hidden flex items-center justify-center pointer-events-none"
+                 className="w-full aspect-[4/3] relative rounded-xl sm:rounded-2xl overflow-hidden flex items-center justify-center pointer-events-none"
                  style={{ backgroundColor: classItem.outer_color || classItem.color || '#134e4a' }}
               >
                 {classItem.image_url ? (
                   <img src={classItem.image_url} alt={classItem.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 ) : (
-                  <div className="text-slate-400 text-4xl"><i className="fas fa-building-columns"></i></div>
+                  <div className="text-slate-400 text-2xl sm:text-4xl"><i className="fas fa-building-columns"></i></div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity"></div>
               </div>
 
-              <div className="p-6 space-y-3 relative pointer-events-none">
-                <h4 className="font-black text-slate-900 text-lg tracking-tight truncate">{classItem.name}</h4>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 rounded-lg bg-slate-200 dark:bg-black/30 border border-slate-300 dark:border-white/5 text-[8px] font-black uppercase text-slate-700 dark:text-slate-300 tracking-widest">{classItem.class_code || 'CLASS-ID'}</span>
-                  <span className="px-3 py-1 rounded-lg bg-[#4ea59d]/20 border border-[#4ea59d]/20 text-[8px] font-black uppercase text-[#4ea59d] tracking-widest">{classItem.student_count || 0} Students</span>
+              <div className="p-1 sm:p-6 pt-3 sm:pt-6 space-y-1.5 sm:space-y-3 relative pointer-events-none">
+                <h4 className="font-black text-slate-900 text-xs sm:text-lg tracking-tight truncate">{classItem.name}</h4>
+                <div className="flex flex-wrap gap-1 sm:gap-2">
+                  <span className="px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-lg bg-slate-200 dark:bg-black/30 border border-slate-300 dark:border-white/5 text-[6px] sm:text-[8px] font-black uppercase text-slate-700 dark:text-slate-300 tracking-widest">{classItem.class_code || 'CLASS-ID'}</span>
+                  <span className="px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-lg bg-[#4ea59d]/20 border border-[#4ea59d]/20 text-[6px] sm:text-[8px] font-black uppercase text-[#4ea59d] tracking-widest">{classItem.student_count || 0} Students</span>
                 </div>
               </div>
               
