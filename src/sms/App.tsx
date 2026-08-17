@@ -4155,12 +4155,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   return (
     <div className="flex min-h-screen bg-[#f3f0e8] dark:bg-[#0a1a19] transition-colors duration-500 relative">
 
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9998] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-2">
-        <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
-          {`Updating to cloud in ${isCloudSyncRunning ? '00:00' : cloudSyncTimeText}second`}
-        </p>
-      </div>
-
       {notification && (
         <div className="fixed top-4 right-4 z-[9999] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-premium rounded-2xl px-4 py-3 min-w-[220px] max-w-[90vw]">
           <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{notification.message}</p>
