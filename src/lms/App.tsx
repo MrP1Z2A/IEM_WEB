@@ -2363,26 +2363,26 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           </section>
 
           <section>
-            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8 flex items-center gap-4">
-              <i className="fa-solid fa-masks-theater text-[#4ea59d]"></i> Student Activities
+            <h3 className="text-base sm:text-xl font-black text-slate-900 uppercase tracking-tight mb-4 flex items-center gap-2 sm:gap-4">
+              <i className="fa-solid fa-masks-theater text-[#4ea59d] text-sm sm:text-base"></i> Student Activities
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="flex flex-wrap gap-3">
               {dynamicStudentActivities.length > 0 ? dynamicStudentActivities.map((act, i) => (
                 <div 
                   key={i} 
                   id={`act-${act.id}`}
-                  className={`p-8 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-[40px] border border-white/20 group hover:bg-[#4ea59d]/5 transition-all ${highlightItemId === `act-${act.id}` ? 'highlight-pulse-effect' : ''}`}
+                  title={`${act.name} (${act.activity_type}): ${act.description}`}
+                  className={`w-24 h-24 sm:w-28 sm:h-28 bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] rounded-2xl border border-white/20 flex flex-col items-center justify-center text-center p-2 group hover:bg-[#4ea59d]/5 transition-all cursor-pointer ${highlightItemId === `act-${act.id}` ? 'highlight-pulse-effect' : ''}`}
                 >
-                  <div className="w-14 h-14 bg-[#4ea59d]/10 rounded-2xl flex items-center justify-center text-[#4ea59d] text-2xl mb-6 group-hover:scale-110 transition-transform">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#4ea59d]/10 rounded-xl flex items-center justify-center text-[#4ea59d] text-sm sm:text-lg mb-1.5 group-hover:scale-110 transition-transform shrink-0">
                     <i className={`fa-solid ${act.icon}`}></i>
                   </div>
-                  <h4 className="text-lg font-bold text-slate-900 mb-2">{act.name}</h4>
-                  <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">{act.activity_type}</p>
-                  <p className="text-xs text-slate-400 leading-relaxed">{act.description}</p>
+                  <h4 className="text-[10px] sm:text-xs font-bold text-slate-900 leading-tight truncate w-full px-1" title={act.name}>{act.name}</h4>
+                  <p className="text-[7px] sm:text-[8px] font-black text-[#4ea59d]/80 uppercase tracking-wider mt-0.5 truncate w-full px-1">{act.activity_type}</p>
                 </div>
               )) : (
-                <div className="col-span-2 p-10 bg-white/5 border border-white/10 rounded-[40px] text-center">
-                  <p className="text-slate-400 text-sm italic">No extracurricular activities recorded at this time.</p>
+                <div className="w-full p-6 bg-white/5 border border-white/10 rounded-2xl text-center">
+                  <p className="text-slate-400 text-xs sm:text-sm italic">No extracurricular activities recorded at this time.</p>
                 </div>
               )}
             </div>
