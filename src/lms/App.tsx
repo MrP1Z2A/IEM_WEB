@@ -2897,9 +2897,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             </button>
             <h2 className="text-3xl sm:text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">{selectedClass.name}</h2>
             <div className="flex flex-wrap gap-4 pt-2">
-              <span className="bg-[#4ea59d]/10 text-[#4ea59d] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-[#4ea59d]/20">
-                School ID: {schoolId}
-              </span>
               <span className="bg-blue-500/10 text-blue-500 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-500/20 flex items-center gap-2">
                 <i className="fa-solid fa-users"></i> {selectedClassStudents.length} Enrolled Students
               </span>
