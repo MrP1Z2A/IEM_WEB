@@ -2889,13 +2889,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     const isTeacher = user.role === UserRole.TEACHER;
 
     return (
-      <div className="space-y-12 animate-fadeIn text-slate-800 pb-20">
+      <div className="space-y-6 sm:space-y-12 animate-fadeIn text-slate-800 pb-20">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
-          <div className="space-y-4 flex-1">
+          <div className="space-y-1.5 flex-1">
             <button type="button" onClick={() => setCurrentView('courses')} className="text-[#4ea59d] font-black uppercase text-[10px] tracking-widest flex items-center gap-2 group">
               <i className="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Back to Campus Manager
             </button>
-            <h2 className="text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">{selectedClass.name}</h2>
+            <h2 className="text-3xl sm:text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">{selectedClass.name}</h2>
             <div className="flex flex-wrap gap-4 pt-2">
               <span className="bg-[#4ea59d]/10 text-[#4ea59d] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-[#4ea59d]/20">
                 School ID: {schoolId}
@@ -2912,9 +2912,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
           <section className="space-y-12">
             <div className="flex items-center justify-between">
-              <h3 className="text-4xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-5">
-                <div className="w-14 h-14 rounded-[24px] bg-[#4ea59d]/10 flex items-center justify-center text-[#4ea59d] shadow-lg border border-[#4ea59d]/10">
-                  <i className="fas fa-layer-group"></i>
+              <h3 className="text-xl sm:text-3xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-3 sm:gap-5">
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-[24px] bg-[#4ea59d]/10 flex items-center justify-center text-[#4ea59d] shadow-lg border border-[#4ea59d]/10 shrink-0">
+                  <i className="fas fa-layer-group text-sm sm:text-base"></i>
                 </div>
                 Curriculum Catalog
               </h3>
@@ -2926,7 +2926,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                 <p className="text-slate-500 text-[12px] font-black uppercase tracking-[0.4em]">Curriculum Modules Pending Dispatch</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
                 {selectedClassCourses.map(crs => (
                   <div
                     key={crs.id}
@@ -2951,30 +2951,30 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                         });
                       }
                     }}
-                    className="group bg-white rounded-[32px] overflow-hidden cursor-pointer shadow- premium border border-slate-100 hover:border-[#4ea59d]/40 transition-all hover:-translate-y-2"
+                    className="group bg-white/5 border backdrop-blur-2xl rounded-2xl sm:rounded-[32px] p-3 sm:p-6 text-left transition-all duration-500 overflow-hidden relative shadow-lg border-white/10 hover:border-white/30 hover:bg-white/10 cursor-pointer"
                   >
-                    <div className="relative aspect-video overflow-hidden bg-slate-50">
+                    <div className="w-full aspect-[4/3] relative rounded-xl sm:rounded-2xl overflow-hidden bg-slate-50/5 pointer-events-none">
                       <img
                         src={crs.image_url || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800'}
                         alt={crs.name || 'Course Image'}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                       />
                       <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-transparent"></div>
-                      <div className="absolute top-6 left-6">
-                        <span className="px-4 py-2 rounded-xl bg-white/20 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-[0.3em] border border-white/20 shadow-xl">
+                      <div className="absolute top-2 left-2 sm:top-4 sm:left-4">
+                        <span className="px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-md sm:rounded-lg bg-white/20 backdrop-blur-md text-white text-[6px] sm:text-[8px] font-black uppercase tracking-[0.3em] border border-white/20 shadow-xl">
                           {crs.code || 'Academic'}
                         </span>
                       </div>
                     </div>
-                    <div className="p-8 space-y-4">
+                    <div className="p-1 sm:p-6 pt-3 sm:pt-6 space-y-1.5 sm:space-y-3 relative pointer-events-none">
                       <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1.5">Course</p>
-                        <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-tight group-hover:text-[#4ea59d] transition-all">{crs.name}</h4>
+                        <p className="text-[6px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-0.5 sm:mb-1.5">Course</p>
+                        <h4 className="text-xs sm:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight group-hover:text-[#4ea59d] transition-all truncate">{crs.name}</h4>
                       </div>
-                      <div className="flex items-center justify-between pt-6 border-t border-slate-50">
-                        <span className="text-[11px] font-black text-slate-300 uppercase tracking-widest group-hover:text-slate-900 transition-colors">Access Portal</span>
-                        <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-[#4ea59d] group-hover:bg-[#4ea59d] group-hover:text-white transition-all shadow-sm">
-                          <i className="fas fa-arrow-right text-[12px]"></i>
+                      <div className="flex items-center justify-between pt-2 sm:pt-6 border-t border-white/5">
+                        <span className="text-[7px] sm:text-[11px] font-black text-slate-300 uppercase tracking-widest group-hover:text-slate-100 transition-colors">Access Portal</span>
+                        <div className="w-6 h-6 sm:w-12 sm:h-12 rounded-lg sm:rounded-2xl bg-white/5 flex items-center justify-center text-[#4ea59d] group-hover:bg-[#4ea59d] group-hover:text-white transition-all shadow-sm">
+                          <i className="fas fa-arrow-right text-[8px] sm:text-[12px]"></i>
                         </div>
                       </div>
                     </div>
