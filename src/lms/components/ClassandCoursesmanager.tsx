@@ -473,10 +473,10 @@ const ClassAndCoursesManager: React.FC<ClassAndCoursesManagerProps> = ({
   };
 
   return (
-    <div className="space-y-12 animate-fadeIn text-slate-800">
+    <div className="space-y-6 sm:space-y-12 animate-fadeIn text-slate-800">
       {/* HEADER SECTION */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b border-[#1f4e4a] pb-8">
-        <div className="space-y-4 flex-1">
+        <div className="space-y-1.5 flex-1">
           <h2 className="text-3xl sm:text-5xl font-black text-slate-900 uppercase tracking-tight leading-none">Campus Formations</h2>
           <p className="text-[#4ea59d]/60 font-black text-[10px] uppercase tracking-[0.4em]">Integrated Class & Curriculum Control</p>
         </div>
