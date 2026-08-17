@@ -177,15 +177,7 @@ const Header = ({
         <p className="text-[10px] text-brand-600 font-black uppercase tracking-[0.2em] hidden sm:block">Parental Monitoring Gateway</p>
       </div>
     </div>
-
     <div className="flex items-center gap-3 md:gap-5">
-      <div className="relative cursor-pointer">
-        <div className="p-2.5 hover:bg-slate-50 rounded-xl transition-colors">
-          <Bell className="w-5 h-5 text-slate-400" />
-        </div>
-        <span className="absolute top-2 right-2 bg-rose-500 text-white text-[9px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full border-2 border-white">3</span>
-      </div>
-
       <div className="flex items-center gap-3 border-l border-slate-100 pl-4">
         <div className="hidden md:block text-right">
           <p className="text-sm font-black text-slate-800">{parentData?.email?.split('@')[0] || 'Parent'}</p>

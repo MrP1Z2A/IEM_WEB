@@ -366,21 +366,21 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses, high
       <div className="bg-white/5 backdrop-blur-xl rounded-[40px] border border-white/10 p-8 shadow-2xl space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Filter by Course</label>
+            <label className="text-[10px] font-black text-[#367d74] dark:text-[#4ea59d] uppercase tracking-[0.2em]">Filter by Course</label>
             <select
               value={selectedCourseId}
               onChange={(e) => setSelectedCourseId(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-bold focus:border-[#4ea59d] transition-all outline-none appearance-none"
+              className="w-full bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-6 py-4 text-slate-800 dark:text-white font-bold focus:border-[#4ea59d] transition-all outline-none appearance-none"
             >
-              <option value="" className="bg-[#0a1a19] text-white">All Assigned Courses</option>
+              <option value="" className="bg-slate-100 dark:bg-[#0a1a19] text-slate-900 dark:text-white">All Assigned Courses</option>
               {assignedCourses.map(c => (
-                <option key={c.id} value={c.id} className="bg-[#0a1a19] text-white">{c.className} - {c.name}</option>
+                <option key={c.id} value={c.id} className="bg-slate-100 dark:bg-[#0a1a19] text-slate-900 dark:text-white">{c.className} - {c.name}</option>
               ))}
             </select>
           </div>
 
           <div className="lg:col-span-2 space-y-2">
-            <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Search Assessments</label>
+            <label className="text-[10px] font-black text-[#367d74] dark:text-[#4ea59d] uppercase tracking-[0.2em]">Search Assessments</label>
             <div className="relative">
               <i className="fa-solid fa-magnifying-glass absolute left-6 top-1/2 -translate-y-1/2 text-slate-500"></i>
               <input aria-label="Action"
@@ -388,7 +388,7 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses, high
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by title, description, or class..."
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-14 py-4 text-white font-medium focus:border-[#4ea59d] transition-all outline-none placeholder:text-slate-500"
+                className="w-full bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-14 py-4 text-slate-800 dark:text-white font-medium focus:border-[#4ea59d] transition-all outline-none placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -425,11 +425,11 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses, high
 
                 <div className="space-y-4 flex-1">
                   <div className="flex items-center gap-3">
-                    <span className="px-3 py-1 bg-[#4ea59d]/10 text-[#4ea59d] text-[8px] font-black uppercase tracking-widest rounded-full">{assignedCourses.find(c => c.id === exam.class_course_id)?.className || 'Evaluation'}</span>
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest ">{new Date(exam.exam_date || exam.created_at).toLocaleDateString()}</span>
+                    <span className="px-3 py-1 bg-[#4ea59d]/20 text-[#367d74] dark:text-[#4ea59d] text-[8px] font-black uppercase tracking-widest rounded-full">{assignedCourses.find(c => c.id === exam.class_course_id)?.className || 'Evaluation'}</span>
+                    <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest ">{new Date(exam.exam_date || exam.created_at).toLocaleDateString()}</span>
                   </div>
-                  <h4 className="text-xl font-black text-white group-hover:text-[#4ea59d] transition-colors">{exam.title}</h4>
-                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{exam.location || 'Intelligence Center'} • {exam.exam_time || '10:00 AM'}</p>
+                  <h4 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-[#4ea59d] transition-colors">{exam.title}</h4>
+                  <p className="text-[9px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{exam.location || 'Intelligence Center'} • {exam.exam_time || '10:00 AM'}</p>
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-white/5 grid grid-cols-2 gap-3">
@@ -442,12 +442,12 @@ export default function TeacherExams({ supabase, schoolId, assignedCourses, high
                   {exam.file_url ? (
                     <button
                       type="button" onClick={() => window.open(exam.file_url!, '_blank')}
-                      className="py-3 bg-white/5 border border-white/10 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                      className="py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-800 dark:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
                     >
                       Question Paper
                     </button>
                   ) : (
-                    <div className="py-3 bg-white/5 border border-white/10 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center italic cursor-not-allowed">
+                    <div className="py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center italic cursor-not-allowed">
                       No File
                     </div>
                   )}

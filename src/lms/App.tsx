@@ -2456,22 +2456,22 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     className={`bg-white/10 backdrop-blur-2xl shadow-xl p-8 rounded-[40px] border border-white/20 group hover:border-[#4ea59d]/50 transition-all flex flex-col h-full min-h-[300px] ${highlightItemId === `ass-${ass.id}` ? 'highlight-pulse-effect' : ''}`}
                   >
                     <div className="flex justify-between items-start mb-6">
-                      <div className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${ass.status === 'Active' || ass.status === 'Submitted' ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                      <div className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${ass.status === 'Active' || ass.status === 'Submitted' ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'}`}>
                         {ass.status}
                       </div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ">{ass.dueDate}</span>
+                      <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest ">{ass.dueDate}</span>
                     </div>
 
                     <h4 className="text-xl font-black text-slate-900 mb-2 group-hover:text-[#4ea59d] transition-colors line-clamp-2">{ass.title}</h4>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{ass.course || 'Core Curriculum'}</p>
+                    <p className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">{ass.course || 'Core Curriculum'}</p>
                     {ass.description && (
-                      <p className="text-xs text-slate-400 leading-relaxed mb-4 line-clamp-3">{ass.description}</p>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed mb-4 line-clamp-3">{ass.description}</p>
                     )}
                     {ass.fileName && (
                       <div className="flex items-center gap-4 mb-4">
                         <div className="flex items-center gap-2">
-                          <i className="fa-solid fa-paperclip text-[#4ea59d] text-[10px]"></i>
-                          <span className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest truncate max-w-[120px]" title={ass.fileName}>{ass.fileName}</span>
+                          <i className="fa-solid fa-paperclip text-[#367d74] dark:text-[#4ea59d] text-[10px]"></i>
+                          <span className="text-[10px] font-black text-[#367d74] dark:text-[#4ea59d] uppercase tracking-widest truncate max-w-[120px]" title={ass.fileName}>{ass.fileName}</span>
                         </div>
                       </div>
                     )}
@@ -2479,7 +2479,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     {/* Teacher-specific Submission Roster */}
                     {user.role === UserRole.TEACHER && ass.submissions && ass.submissions.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
-                        <p className="text-[9px] font-black text-[#4ea59d] uppercase tracking-widest ">Recent Submissions ({ass.submissions.length})</p>
+                        <p className="text-[9px] font-black text-[#367d74] dark:text-[#4ea59d] uppercase tracking-widest ">Recent Submissions ({ass.submissions.length})</p>
                         <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                           {ass.submissions.map((sub: any, idx: number) => (
                             <button
@@ -2501,13 +2501,13 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     )}
                     {user.role === UserRole.TEACHER && (!ass.submissions || ass.submissions.length === 0) && (
                       <div className="mt-4 pt-4 border-t border-white/5">
-                        <p className="text-[9px] font-bold text-slate-500 uppercase italic">No submissions yet.</p>
+                        <p className="text-[9px] font-bold text-slate-700 dark:text-slate-400 uppercase italic">No submissions yet.</p>
                       </div>
                     )}
 
                     <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between gap-4">
                       {user.role === UserRole.TEACHER ? (
-                        <div className="flex-1 px-6 py-3 bg-white/5 border border-white/10 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center">
+                        <div className="flex-1 px-6 py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center">
                           Assignment Published
                         </div>
                       ) : (ass.status === 'Submitted' || (ass.status === 'Active' && ass.submissionUrl) ? (

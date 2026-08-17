@@ -92,7 +92,7 @@ export const ClassForm: React.FC<ClassFormProps> = ({
 
         <div className="p-8 bg-[#0a1a19]/50 rounded-[32px] border border-white/5 flex flex-col justify-between">
           <div>
-            <h4 className="text-sm font-black text-slate-900 uppercase mb-4">Creation Preview</h4>
+            <h4 className="text-sm font-black text-slate-200 uppercase mb-4">Creation Preview</h4>
             <div className="p-6 rounded-3xl border border-white/10" style={{ backgroundColor: '#0a1a19' }}>
                <div 
                   className="w-full aspect-video rounded-2xl mb-4 border border-white/5 flex items-center justify-center overflow-hidden" 
@@ -104,7 +104,7 @@ export const ClassForm: React.FC<ClassFormProps> = ({
                     <i className="fas fa-graduation-cap text-3xl text-slate-400"></i>
                   )}
                </div>
-               <p className="font-black text-lg">{className || 'Your Class Name'}</p>
+               <p className="font-black text-lg text-white">{className || 'Your Class Name'}</p>
                <p className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mt-1">Ready for registration</p>
             </div>
           </div>
@@ -112,7 +112,7 @@ export const ClassForm: React.FC<ClassFormProps> = ({
           <div className="flex gap-4 mt-8">
              <button
                 onClick={resetClassForm}
-                className="flex-1 py-4 rounded-[20px] bg-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-900 transition-all"
+                className="flex-1 py-4 rounded-[20px] bg-white/10 text-slate-300 text-[10px] font-black uppercase tracking-widest hover:text-white hover:bg-white/20 transition-all"
                type="button">
                 Discard
               </button>

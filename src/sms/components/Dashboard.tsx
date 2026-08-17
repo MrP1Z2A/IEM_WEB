@@ -169,11 +169,13 @@ const Dashboard: React.FC<DashboardProps> = React.memo(({ stats, schoolId }) => 
       <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter">Institutional Pulse</h2>
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 items-start content-start lg:col-span-4">
+        <div className="grid grid-cols-2 gap-4 sm:gap-5 items-start content-start lg:col-span-4">
           {metricCards.map((card, i) => (
             <div 
               key={i} 
-              className="relative group w-full min-w-0 p-3 sm:p-3.5 lg:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/70 flex items-center justify-between gap-2 shadow-premium hover:-translate-y-0.5 transition-all"
+              className={`relative group w-full min-w-0 p-3 sm:p-3.5 lg:p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/70 flex items-center justify-between gap-2 shadow-premium hover:-translate-y-0.5 transition-all ${
+                card.label === 'Current Cash Balance' ? 'col-span-2' : ''
+              }`}
             >
               <div>
                 <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider mb-1 group-hover:text-brand-500 transition-colors">

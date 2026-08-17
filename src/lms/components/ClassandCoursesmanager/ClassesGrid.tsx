@@ -99,7 +99,7 @@ export const ClassesGrid: React.FC<ClassesGridProps> = ({
               <div className="p-6 space-y-3 relative pointer-events-none">
                 <h4 className="font-black text-slate-900 text-lg tracking-tight truncate">{classItem.name}</h4>
                 <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 rounded-lg bg-black/20 border border-white/5 text-[8px] font-black uppercase text-slate-400 tracking-widest">{classItem.class_code || 'CLASS-ID'}</span>
+                  <span className="px-3 py-1 rounded-lg bg-slate-200 dark:bg-black/30 border border-slate-300 dark:border-white/5 text-[8px] font-black uppercase text-slate-700 dark:text-slate-300 tracking-widest">{classItem.class_code || 'CLASS-ID'}</span>
                   <span className="px-3 py-1 rounded-lg bg-[#4ea59d]/20 border border-[#4ea59d]/20 text-[8px] font-black uppercase text-[#4ea59d] tracking-widest">{classItem.student_count || 0} Students</span>
                 </div>
               </div>
