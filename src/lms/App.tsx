@@ -1991,25 +1991,25 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
 
         {/* Metric Row */}
         {user.role !== UserRole.TEACHER && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[#4ea59d] p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden md:col-span-2 group">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="bg-[#4ea59d] p-4 sm:p-8 rounded-2xl sm:rounded-[32px] text-white shadow-xl relative overflow-hidden col-span-1 md:col-span-2 group flex flex-col justify-between">
               <div className="relative z-10">
-                <h3 className="text-[10px] font-black opacity-80 uppercase tracking-[0.2em] text-slate-900">Academic Standing</h3>
-                <p className="text-5xl font-black my-4 text-slate-900 uppercase ">{standingText}</p>
-                <div className="mt-4 flex items-center gap-4">
-                  <div className="h-2 flex-1 bg-[#0a1a19]/20 rounded-full overflow-hidden">
+                <h3 className="text-[9px] sm:text-[10px] font-black opacity-80 uppercase tracking-[0.2em] text-slate-900">Academic Standing</h3>
+                <p className="text-xl sm:text-5xl font-black my-1 sm:my-4 text-slate-900 uppercase ">{standingText}</p>
+                <div className="mt-2 sm:mt-4 flex items-center gap-2 sm:gap-4">
+                  <div className="h-1.5 sm:h-2 flex-1 bg-[#0a1a19]/20 rounded-full overflow-hidden">
                     <div className="h-full bg-[#0a1a19]" style={{ width: `${academicScore}%` }}></div>
                   </div>
-                  <span className="text-sm font-bold text-slate-900">{academicScore}%</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900">{academicScore}%</span>
                 </div>
               </div>
               <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-[#0a1a19]/10 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-700"></div>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-8 rounded-[32px] border border-white/20 flex flex-col justify-center">
-              <h3 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attendance</h3>
-              <p className="text-4xl font-black text-slate-900 my-2">{studentAttendanceRate}</p>
-              <div className="flex items-center gap-2 text-[#4ea59d]/60 text-[10px] font-bold">
+            <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-4 sm:p-8 rounded-2xl sm:rounded-[32px] border border-white/20 flex flex-col justify-center col-span-1 md:col-span-1">
+              <h3 className="text-[9px] sm:text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attendance</h3>
+              <p className="text-xl sm:text-4xl font-black text-slate-900 my-1 sm:my-2">{studentAttendanceRate}</p>
+              <div className="flex items-center gap-1 sm:gap-2 text-[#4ea59d]/60 text-[9px] sm:text-[10px] font-bold">
                 <i className="fa-solid fa-arrow-up"></i>
                 <span>2% Improvement</span>
               </div>
