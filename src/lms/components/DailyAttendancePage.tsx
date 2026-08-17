@@ -246,10 +246,10 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
   return (
     <div className="space-y-8">
       {/* Search & Meta Section */}
-      <div className="bg-white/10 backdrop-blur-2xl p-8 rounded-[40px] border border-white/20 shadow-2xl">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="bg-white/10 backdrop-blur-2xl p-4 sm:p-8 rounded-3xl sm:rounded-[40px] border border-white/20 shadow-2xl">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           <div className="flex items-center gap-4 w-full md:w-auto">
-            <div className="flex items-center gap-3 bg-[#0a1a19] px-6 py-3 rounded-2xl border border-white/10">
+            <div className="flex-1 md:flex-none flex items-center justify-between md:justify-start gap-3 bg-[#0a1a19] px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl border border-white/10">
               <label htmlFor="logDateInput" className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em] whitespace-nowrap">Log Date:</label>
               <input
                 id="logDateInput"
@@ -264,7 +264,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
             <button
               type="button" onClick={() => void loadAttendance()}
               disabled={isLoading || isSaving}
-              className="p-3 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-slate-100 transition-all flex items-center justify-center"
+              className="p-2.5 sm:p-3 rounded-lg sm:rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:bg-white/10 hover:text-slate-100 transition-all flex items-center justify-center"
               title="Reload Records"
             >
               {isLoading ? <i className="fas fa-spinner fa-spin text-sm"></i> : <i className="fas fa-rotate text-sm"></i>} 
@@ -275,7 +275,7 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
             <button
               type="button" onClick={() => void markAllPresent()}
               disabled={isLoading || isSaving || activeStudents.length === 0}
-              className="flex-1 md:flex-none px-8 py-4 bg-[#4ea59d] text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-30 flex items-center justify-center gap-3"
+              className="flex-1 md:flex-none px-5 py-3 sm:px-8 sm:py-4 bg-[#4ea59d] text-slate-900 rounded-xl sm:rounded-2xl text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#4ea59d]/20 disabled:opacity-30 flex items-center justify-center gap-2 sm:gap-3"
             >
               <i className="fa-solid fa-users-check"></i>
               {isSaving ? 'Synching...' : 'Bulk Mark Present'}
@@ -285,18 +285,18 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
       </div>
 
       {/* Student List Grid */}
-      <div className="bg-[#0a1a19] rounded-[48px] border border-white/5 overflow-hidden shadow-3xl">
+      <div className="bg-[#0a1a19] rounded-[28px] sm:rounded-[48px] border border-white/5 overflow-hidden shadow-3xl">
          <button type="button"
             onClick={() => setIsRosterCollapsed(!isRosterCollapsed)}
-            className="w-full text-left px-10 py-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between cursor-pointer hover:bg-white/[0.04] transition-all group"
+            className="w-full text-left px-4 py-4 sm:px-10 sm:py-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between cursor-pointer hover:bg-white/[0.04] transition-all group"
           >
             <div className="flex items-center gap-4">
-               <div className={`w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-[#4ea59d] transition-transform duration-300 ${isRosterCollapsed ? '-rotate-90' : ''}`}>
+               <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-white/5 flex items-center justify-center text-[#4ea59d] transition-transform duration-300 ${isRosterCollapsed ? '-rotate-90' : ''}`}>
                   <i className="fas fa-chevron-down text-[10px]"></i>
                </div>
                <div>
-                  <h3 className="text-xl font-black text-slate-100 uppercase tracking-tight">Student Roster</h3>
-                  <p className="text-[10px] text-slate-300 font-bold uppercase tracking-widest mt-1">
+                  <h3 className="text-base sm:text-xl font-black text-slate-100 uppercase tracking-tight">Student Roster</h3>
+                  <p className="text-[9px] sm:text-[10px] text-slate-300 font-bold uppercase tracking-widest mt-0.5 sm:mt-1">
                     {isRosterLoading ? (
                       <span className="flex items-center gap-2"><i className="fas fa-spinner fa-spin"></i> Syncing Records...</span>
                     ) : (
@@ -312,44 +312,44 @@ const DailyAttendancePage: React.FC<DailyAttendancePageProps> = ({
             </div>
          </button>
          {!isRosterCollapsed && activeStudents.length > 0 && (
-             <div className="divide-y divide-white/5">
-                {activeStudents.map(student => {
-                   const currentStatus = attendanceMap[String(student.id)];
-                   return (
-                    <div key={student.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 px-4 sm:px-10 py-5 sm:py-8 hover:bg-white/[0.02] transition-colors">
-                      <div className="flex items-center gap-4 sm:gap-5">
-                         <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-2xl bg-white/5 flex items-center justify-center text-[#4ea59d] font-black border border-white/10 text-sm shrink-0">
-                            {student.name.charAt(0)}
-                         </div>
-                         <div className="overflow-hidden">
-                            <p className="font-bold text-slate-100 text-sm sm:text-base tracking-tight truncate">{student.name}</p>
-                            <p className="text-[9px] sm:text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5 truncate">{student.email || 'Independent ID'}</p>
-                         </div>
-                      </div>
-                      <div className="flex items-center gap-3 sm:gap-4 justify-end">
-                        {(['P', 'A', 'L'] as AttendanceStatus[]).map(status => {
-                          const active = currentStatus === status;
-                          let activeClass = 'bg-[#4ea59d] text-slate-900 shadow-lg shadow-[#4ea59d]/20 scale-110';
-                          if (status === 'A') activeClass = 'bg-rose-500 text-slate-900 shadow-lg shadow-rose-500/20 scale-110';
-                          if (status === 'L') activeClass = 'bg-orange-500 text-slate-900 shadow-lg shadow-orange-500/20 scale-110';
+              <div className="divide-y divide-white/5">
+                 {activeStudents.map(student => {
+                    const currentStatus = attendanceMap[String(student.id)];
+                    return (
+                     <div key={student.id} className="flex items-center justify-between gap-3 px-4 sm:px-10 py-3 sm:py-4 hover:bg-white/[0.02] transition-colors">
+                       <div className="flex items-center gap-3 sm:gap-5 overflow-hidden">
+                          <div className="w-8 sm:w-12 h-8 sm:h-12 rounded-xl sm:rounded-2xl bg-white/5 flex items-center justify-center text-[#4ea59d] font-black border border-white/10 text-xs sm:text-sm shrink-0">
+                             {student.name.charAt(0)}
+                          </div>
+                          <div className="overflow-hidden">
+                             <p className="font-bold text-slate-100 text-xs sm:text-base tracking-tight truncate">{student.name}</p>
+                             <p className="text-[8px] sm:text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5 truncate">{student.email || 'Independent ID'}</p>
+                          </div>
+                       </div>
+                       <div className="flex items-center gap-1.5 sm:gap-3 justify-end shrink-0">
+                         {(['P', 'A', 'L'] as AttendanceStatus[]).map(status => {
+                           const active = currentStatus === status;
+                           let activeClass = 'bg-[#4ea59d] text-slate-900 shadow-lg shadow-[#4ea59d]/20 scale-105 sm:scale-110';
+                           if (status === 'A') activeClass = 'bg-rose-500 text-slate-900 shadow-lg shadow-rose-500/20 scale-105 sm:scale-110';
+                           if (status === 'L') activeClass = 'bg-orange-500 text-slate-900 shadow-lg shadow-orange-500/20 scale-105 sm:scale-110';
 
-                          return (
-                            <button
-                              key={status}
-                              type="button" onClick={() => void saveSingle(String(student.id), status)}
-                              disabled={isSaving}
-                              className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl text-[10px] font-black transition-all ${active ? activeClass : 'bg-white/5 text-slate-300 hover:text-slate-100 border border-white/5'}`}
-                            >
-                              {status}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                   );
-                })}
-             </div>
-          )}
+                           return (
+                             <button
+                               key={status}
+                               type="button" onClick={() => void saveSingle(String(student.id), status)}
+                               disabled={isSaving}
+                               className={`w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-2xl text-[9px] sm:text-[10px] font-black transition-all ${active ? activeClass : 'bg-white/5 text-slate-300 hover:text-slate-100 border border-white/5'}`}
+                             >
+                               {status}
+                             </button>
+                           );
+                         })}
+                       </div>
+                     </div>
+                    );
+                 })}
+              </div>
+           )}
          {!isRosterCollapsed && activeStudents.length === 0 && (
             <div className="p-20 text-center space-y-4">
                <i className="fas fa-users-slash text-4xl text-slate-500"></i>
