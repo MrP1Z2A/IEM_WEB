@@ -30,7 +30,16 @@ function rewriteUrls(obj: any): any {
     const newObj: any = {};
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        newObj[key] = rewriteUrls(obj[key]);
+        let val = obj[key];
+        // Intercept relative avatar paths and resolve them to public proxy storage URLs
+        if ((key === 'avatar' || key === 'avatar_url' || key === 'profile_image_url') && typeof val === 'string' && val.trim().length > 0) {
+          if (!/^(https?:|data:|blob:|\/)/i.test(val)) {
+            const cleanedPath = val.replace(/^\/+/, '');
+            const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}/supabase` : 'https://lzlhsmtkkcpomabqaqdu.supabase.co';
+            val = `${baseUrl}/storage/v1/object/public/student_profile/${cleanedPath}`;
+          }
+        }
+        newObj[key] = rewriteUrls(val);
       }
     }
     return newObj;

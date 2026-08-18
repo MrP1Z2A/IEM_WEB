@@ -235,6 +235,45 @@ export default function Portal() {
           return;
         }
 
+        // 3. Check student_services table
+        const { data: studentService, error: studentServiceError } = await supabase
+          .from('student_services')
+          .select('id, auth_user_id, name, email, temp_password, school_id')
+          .or(`name.eq.${identifier},email.eq.${identifier}`)
+          .eq('temp_password', password)
+          .maybeSingle();
+
+        if (studentServiceError) throw studentServiceError;
+
+        if (studentService) {
+          // Log them in to Supabase Auth so they have a valid session in SMSApp
+          if (studentService.email) {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+              email: studentService.email,
+              password: password,
+            });
+            if (signInError) throw signInError;
+          }
+
+          const newUser = {
+            id: studentService.id,
+            role: 'student_service',
+            email: studentService.email || studentService.name,
+            name: studentService.name,
+            schoolId: studentService.school_id,
+            studentServiceId: studentService.id,
+          };
+          localStorage.setItem('iem_logged_in', 'true');
+          localStorage.setItem('iem_user', JSON.stringify(newUser));
+
+          if (studentService.school_id) {
+            updateSchoolId(studentService.school_id, schoolName);
+          }
+
+          setAppMode('student_service');
+          return;
+        }
+
         // 3. Fallback check for parents who typed a password anyway
         const normalizedEmail = normalizeParentMessagingEmail(identifier);
         let { data: parentFallback } = await supabase
