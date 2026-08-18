@@ -2462,9 +2462,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
             <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-8 flex items-center gap-4">
               <i className="fa-solid fa-list-check text-[#4ea59d]"></i> Assigned Homework
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="flex flex-col gap-4 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
               {dynamicAssignments.length === 0 ? (
-                <div className="md:col-span-2 p-10 bg-white/5 border border-white/10 rounded-[40px] text-center">
+                <div className="p-10 bg-white/5 border border-white/10 rounded-[40px] text-center">
                   <p className="text-slate-400 text-sm">No homework assigned yet. Keep up the good work!</p>
                 </div>
               ) : (
@@ -2472,34 +2472,104 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                   <div 
                     key={ass.id} 
                     id={`ass-${ass.id}`}
-                    className={`bg-white/10 backdrop-blur-2xl shadow-xl p-8 rounded-[40px] border border-white/20 group hover:border-[#4ea59d]/50 transition-all flex flex-col h-full min-h-[300px] ${highlightItemId === `ass-${ass.id}` ? 'highlight-pulse-effect' : ''}`}
+                    className={`bg-white/10 backdrop-blur-2xl shadow-xl p-4 md:p-5 rounded-[24px] border border-white/20 group hover:border-[#4ea59d]/50 transition-all flex flex-col ${highlightItemId === `ass-${ass.id}` ? 'highlight-pulse-effect' : ''}`}
                   >
-                    <div className="flex justify-between items-start mb-6">
-                      <div className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${ass.status === 'Active' || ass.status === 'Submitted' ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'}`}>
-                        {ass.status}
-                      </div>
-                      <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest ">{ass.dueDate}</span>
-                    </div>
+                    {/* Top Row: Info and Actions */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      {/* Left: Metadata & Title */}
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className={`px-2.5 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest ${ass.status === 'Active' || ass.status === 'Submitted' ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300' : 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'}`}>
+                            {ass.status}
+                          </div>
+                          <span className="text-[10px] font-black text-[#367d74] dark:text-[#4ea59d] uppercase tracking-widest">{ass.course || 'Core Curriculum'}</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest hidden md:inline">•</span>
+                          <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest md:hidden">Due: {ass.dueDate}</span>
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
+                          <h4 className="text-base font-black text-slate-900 group-hover:text-[#4ea59d] transition-colors truncate">{ass.title}</h4>
+                          {ass.description && (
+                            <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-md hidden lg:inline">- {ass.description}</span>
+                          )}
+                        </div>
 
-                    <h4 className="text-xl font-black text-slate-900 mb-2 group-hover:text-[#4ea59d] transition-colors line-clamp-2">{ass.title}</h4>
-                    <p className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">{ass.course || 'Core Curriculum'}</p>
-                    {ass.description && (
-                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed mb-4 line-clamp-3">{ass.description}</p>
-                    )}
-                    {ass.fileName && (
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="flex items-center gap-2">
-                          <i className="fa-solid fa-paperclip text-[#367d74] dark:text-[#4ea59d] text-[10px]"></i>
-                          <span className="text-[10px] font-black text-[#367d74] dark:text-[#4ea59d] uppercase tracking-widest truncate max-w-[120px]" title={ass.fileName}>{ass.fileName}</span>
+                        {ass.description && (
+                          <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1 lg:hidden">{ass.description}</p>
+                        )}
+
+                        {ass.fileName && (
+                          <div className="flex items-center gap-1.5 text-[9px] font-black text-[#367d74] dark:text-[#4ea59d] bg-[#4ea59d]/10 px-2 py-0.5 rounded-md w-fit">
+                            <i className="fa-solid fa-paperclip"></i>
+                            <span className="truncate max-w-[150px]" title={ass.fileName}>{ass.fileName}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: Due Date & Actions */}
+                      <div className="flex items-center justify-between md:justify-end gap-6 shrink-0 pt-3 md:pt-0 border-t border-white/5 md:border-t-0">
+                        <div className="flex flex-col items-start md:items-end hidden md:flex">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Due Date</span>
+                          <span className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">{ass.dueDate}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                          {user.role === UserRole.TEACHER ? (
+                            <div className="flex-1 md:flex-none px-4 py-2 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 rounded-xl text-[9px] font-black uppercase tracking-widest text-center">
+                              Published
+                            </div>
+                          ) : (ass.status === 'Submitted' || (ass.status === 'Active' && ass.submissionUrl) ? (
+                            <div className="flex-1 md:flex-none px-4 py-2 bg-green-500/10 border border-green-500/20 text-green-400 rounded-xl text-[9px] font-black uppercase tracking-widest text-center flex items-center justify-center gap-1">
+                              <i className="fa-solid fa-check"></i> Submitted
+                            </div>
+                          ) : ass.status === 'Reopened' ? (
+                            <button
+                              type="button" onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
+                              className="flex-1 md:flex-none px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-1"
+                            >
+                              <i className="fa-solid fa-rotate-left"></i> Resubmit
+                            </button>
+                          ) : (
+                            <button
+                              type="button" onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
+                              className="flex-1 md:flex-none px-4 py-2 bg-[#7fc9c2] hover:bg-[#3d8c85] text-white rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-md shadow-[#4ea59d]/20 text-center"
+                            >
+                              Submit
+                            </button>
+                          ))}
+
+                          {ass.submissionUrl ? (
+                            <button aria-label="Action"
+                              type="button" onClick={() => {
+                                setPreviewPdfUrl(ass.submissionUrl);
+                                setPreviewPdfTitle(`My Submission: ${ass.title}`);
+                              }}
+                              className="w-9 h-9 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
+                              title="View Submission"
+                            >
+                              <i className="fa-solid fa-eye text-xs shadow-sm"></i>
+                            </button>
+                          ) : ass.fileUrl ? (
+                            <button aria-label="Action"
+                              type="button" onClick={() => {
+                                setPreviewPdfUrl(ass.fileUrl);
+                                setPreviewPdfTitle(`Work: ${ass.title}`);
+                              }}
+                              className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
+                              title="View Instructions"
+                            >
+                              <i className="fa-solid fa-eye text-xs shadow-sm"></i>
+                            </button>
+                          ) : null}
                         </div>
                       </div>
-                    )}
+                    </div>
 
                     {/* Teacher-specific Submission Roster */}
                     {user.role === UserRole.TEACHER && ass.submissions && ass.submissions.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-white/5 space-y-3">
+                      <div className="mt-2 pt-2 border-t border-white/5 w-full space-y-2">
                         <p className="text-[9px] font-black text-[#367d74] dark:text-[#4ea59d] uppercase tracking-widest ">Recent Submissions ({ass.submissions.length})</p>
-                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
+                        <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto pr-2 custom-scrollbar">
                           {ass.submissions.map((sub: any, idx: number) => (
                             <button
                               key={sub.id || idx}
@@ -2507,74 +2577,22 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                                 setPreviewPdfUrl(sub.url);
                                 setPreviewPdfTitle(`Submission: ${sub.studentName}`);
                               }}
-                              className="group flex items-center gap-2 px-3 py-1.5 bg-[#4ea59d]/10 hover:bg-[#4ea59d]/20 border border-[#4ea59d]/20 rounded-xl transition-all hover:scale-105 active:scale-95"
+                              className="group flex items-center gap-2 px-2.5 py-1 bg-[#4ea59d]/10 hover:bg-[#4ea59d]/20 border border-[#4ea59d]/20 rounded-lg transition-all hover:scale-105 active:scale-95"
                               title={`View submission from ${sub.studentName}`}
                             >
                               <div className="w-1.5 h-1.5 rounded-full bg-[#4ea59d]"></div>
-                              <span className="text-[10px] font-bold text-slate-700 group-hover:text-slate-900">{sub.studentName}</span>
-                              <i className="fa-solid fa-eye text-[8px] text-[#4ea59d] ml-1 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                              <span className="text-[9px] font-bold text-slate-700 group-hover:text-slate-900">{sub.studentName}</span>
+                              <i className="fa-solid fa-eye text-[7px] text-[#4ea59d] ml-1 opacity-0 group-hover:opacity-100 transition-opacity"></i>
                             </button>
                           ))}
                         </div>
                       </div>
                     )}
                     {user.role === UserRole.TEACHER && (!ass.submissions || ass.submissions.length === 0) && (
-                      <div className="mt-4 pt-4 border-t border-white/5">
+                      <div className="mt-2 pt-2 border-t border-white/5 w-full">
                         <p className="text-[9px] font-bold text-slate-700 dark:text-slate-400 uppercase italic">No submissions yet.</p>
                       </div>
                     )}
-
-                    <div className="mt-auto pt-6 border-t border-white/10 flex items-center justify-between gap-4">
-                      {user.role === UserRole.TEACHER ? (
-                        <div className="flex-1 px-6 py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center">
-                          Assignment Published
-                        </div>
-                      ) : (ass.status === 'Submitted' || (ass.status === 'Active' && ass.submissionUrl) ? (
-                        <div className="flex-1 px-6 py-3 bg-green-500/10 border border-green-500/20 text-green-400 rounded-2xl text-[10px] font-black uppercase tracking-widest text-center">
-                          <i className="fa-solid fa-check mr-2"></i>Submitted
-                        </div>
-                      ) : ass.status === 'Reopened' ? (
-                        <button
-                          type="button" onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
-                          className="flex-1 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 flex items-center justify-center gap-2"
-                        >
-                          <i className="fa-solid fa-rotate-left"></i> Resubmit Task
-                        </button>
-                      ) : (
-                        <button
-                          type="button" onClick={() => { setSelectedAssignment(ass); setIsSubmissionModalOpen(true); }}
-                          className="flex-1 px-6 py-3 bg-[#7fc9c2] hover:bg-[#3d8c85] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#4ea59d]/20"
-                        >
-                          Submit Homework
-                        </button>
-                      ))}
-                      <div className="flex gap-2">
-                        {/* Standardized Download Buttons */}
-                        {ass.submissionUrl ? (
-                          <button aria-label="Action"
-                            type="button" onClick={() => {
-                              setPreviewPdfUrl(ass.submissionUrl);
-                              setPreviewPdfTitle(`My Submission: ${ass.title}`);
-                            }}
-                            className="w-10 h-10 rounded-xl bg-[#4ea59d]/20 flex items-center justify-center text-[#4ea59d] border border-[#4ea59d]/30 hover:bg-[#4ea59d]/30 transition-all hover:scale-105"
-                            title="View Submission"
-                          >
-                            <i className="fa-solid fa-eye shadow-sm"></i>
-                          </button>
-                        ) : ass.fileUrl ? (
-                          <button aria-label="Action"
-                            type="button" onClick={() => {
-                              setPreviewPdfUrl(ass.fileUrl);
-                              setPreviewPdfTitle(`Work: ${ass.title}`);
-                            }}
-                            className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:text-[#4ea59d] border border-white/10 transition-all hover:scale-105"
-                            title="View Instructions"
-                          >
-                            <i className="fa-solid fa-eye shadow-sm"></i>
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
                   </div>
                 ))
               )}

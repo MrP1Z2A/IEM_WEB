@@ -11,5 +11,12 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+# Proxy /supabase/* to the Supabase backend to bypass regional ISP blocks.
+[[redirects]]
+  from = "/supabase/*"
+  to = "https://lzlhsmtkkcpomabqaqdu.supabase.co/:splat"
+  status = 200
+  force = true
+
 [functions]
   node_bundler = "nft"

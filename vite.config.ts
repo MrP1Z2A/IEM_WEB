@@ -142,6 +142,16 @@ export default defineConfig({
       }
     }
   ],
+  server: {
+    port: 5173,
+    proxy: {
+      '/supabase': {
+        target: 'https://lzlhsmtkkcpomabqaqdu.supabase.co',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/supabase/, ''),
+      }
+    }
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
