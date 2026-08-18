@@ -770,7 +770,9 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           if (resolvedStaffData) {
             const normalizedPages = normalizeStaffAllowedPages(resolvedStaffData.permissions);
             setAllowedPages(
-              resolvedStaffData.permissions === null || resolvedStaffData.permissions === undefined
+              resolvedStaffData.permissions === null ||
+              resolvedStaffData.permissions === undefined ||
+              normalizedPages.length === 0
                 ? DEFAULT_STAFF_ALLOWED_PAGES
                 : normalizedPages
             );

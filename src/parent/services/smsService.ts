@@ -133,72 +133,14 @@ export const fetchParentPortalData = async (
       .eq('student_id', primaryStudentId)
       .eq('school_id', schoolId),
 
-    // 5. Student payments - fetch payments for student from Supabase with multi-tier fallback
-    (async () => {
-      // Step 1: Query by student_id & school_id
-      if (studentIds && studentIds.length > 0 && schoolId) {
-        const res1 = await supabase
-          .from('student_payments')
-          .select('*')
-          .in('student_id', studentIds)
-          .eq('school_id', schoolId)
-          .order('created_at', { ascending: false })
-          .limit(50);
-        if (res1.data && res1.data.length > 0) return res1;
-      }
-
-      // Step 2: Query by primaryStudentId & school_id
-      if (primaryStudentId && schoolId) {
-        const res2 = await supabase
-          .from('student_payments')
-          .select('*')
-          .eq('student_id', primaryStudentId)
-          .eq('school_id', schoolId)
-          .order('created_at', { ascending: false })
-          .limit(50);
-        if (res2.data && res2.data.length > 0) return res2;
-      }
-
-      // Step 3: Query by student_id list without school_id filter
-      if (studentIds && studentIds.length > 0) {
-        const res3 = await supabase
-          .from('student_payments')
-          .select('*')
-          .in('student_id', studentIds)
-          .order('created_at', { ascending: false })
-          .limit(50);
-        if (res3.data && res3.data.length > 0) return res3;
-      }
-
-      // Step 4: Query by primaryStudentId without school_id filter
-      if (primaryStudentId) {
-        const res4 = await supabase
-          .from('student_payments')
-          .select('*')
-          .eq('student_id', primaryStudentId)
-          .order('created_at', { ascending: false })
-          .limit(50);
-        if (res4.data && res4.data.length > 0) return res4;
-      }
-
-      // Step 5: Query by school_id if student_id returned nothing
-      if (schoolId) {
-        const res5 = await supabase
-          .from('student_payments')
-          .select('*')
-          .eq('school_id', schoolId)
-          .order('created_at', { ascending: false })
-          .limit(50);
-        if (res5.data && res5.data.length > 0) return res5;
-      }
-
-      // Step 6: General query on student_payments
-      return await supabase
-        .from('student_payments')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-    })(),
+    // 5. Student payments - fetch payments for student from Supabase
+    supabase
+      .from('student_payments')
+      .select('*')
+      .in('student_id', studentIds)
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false })
+      .limit(50),
 
     // 6. Latest report card - use student_id and school_id
     supabase

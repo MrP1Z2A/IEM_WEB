@@ -7,6 +7,7 @@ const SidebarContext = React.createContext<{
   setCurrentPage: (page: PageId) => void;
   setIsMobileMenuOpen: (open: boolean) => void;
   isCollapsed?: boolean;
+  onCollapse?: () => void;
   allowedPages?: string[];
   openDropdowns: Record<string, boolean>;
   setOpenDropdowns: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
@@ -34,7 +35,7 @@ const SidebarSubItem = ({ id, label, activePage }: { id: PageId; label: string; 
 const SidebarMenuItem = ({ id, icon, label, hasDropdown, children, activePage }: { id?: PageId; icon?: string; label: string; hasDropdown?: boolean; children?: React.ReactNode; activePage?: PageId }) => {
   const context = React.useContext(SidebarContext);
   if (!context) return null;
-  const { currentPage, setCurrentPage, setIsMobileMenuOpen, isCollapsed, allowedPages, openDropdowns, setOpenDropdowns } = context;
+  const { currentPage, setCurrentPage, setIsMobileMenuOpen, isCollapsed, onCollapse, allowedPages, openDropdowns, setOpenDropdowns } = context;
 
   const isOpen = openDropdowns[label];
   const isParentActive = children && React.Children.toArray(children).some((child: any) => (child as any).props.id === currentPage);
@@ -50,7 +51,12 @@ const SidebarMenuItem = ({ id, icon, label, hasDropdown, children, activePage }:
     <div className="w-full">
       <button
         type="button" onClick={() => {
-          if (hasDropdown) setOpenDropdowns(prev => ({ ...prev, [label]: !prev[label] }));
+          if (hasDropdown) {
+            setOpenDropdowns(prev => ({ ...prev, [label]: !prev[label] }));
+            if (isCollapsed && onCollapse) {
+              onCollapse();
+            }
+          }
           else if (id) { setCurrentPage(id); setIsMobileMenuOpen(false); }
         }}
         className={`w-full flex items-center justify-between ${isCollapsed ? 'px-0' : 'px-8'} py-3.5 transition-all duration-300 group
@@ -109,10 +115,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     setCurrentPage,
     setIsMobileMenuOpen,
     isCollapsed,
+    onCollapse,
     allowedPages,
     openDropdowns,
     setOpenDropdowns
-  }), [currentPage, setCurrentPage, setIsMobileMenuOpen, isCollapsed, allowedPages, openDropdowns, setOpenDropdowns]);
+  }), [currentPage, setCurrentPage, setIsMobileMenuOpen, isCollapsed, onCollapse, allowedPages, openDropdowns, setOpenDropdowns]);
 
   return (
     <>
