@@ -4051,14 +4051,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Upload PDF (Max 200 MB)</label>
+                <label className="block text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-2">Upload Assignment (PDF or Image, Max 200 MB)</label>
                 <input aria-label="Action"
                   type="file"
-                  accept="application/pdf"
+                  accept="application/pdf,image/*"
                   onChange={(e) => {
                     const file = e.target.files?.[0] || null;
                     if (file && file.size > MAX_SUBMISSION_FILE_SIZE) {
-                      setSubmissionFileError('File exceeds 200 MB limit. Please choose a smaller PDF.');
+                      setSubmissionFileError('File exceeds 200 MB limit. Please choose a smaller file.');
                       setSubmissionFile(null);
                       e.target.value = '';
                     } else {
@@ -4193,9 +4193,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attachment (PDF preferred)</label>
+                <label className="text-[10px] font-black text-[#4ea59d] uppercase tracking-[0.2em]">Attachment (PDF or Image)</label>
                 <input aria-label="Action"
                   type="file"
+                  accept="application/pdf,image/*"
                   onChange={(e) => setHomeworkFile(e.target.files?.[0] || null)}
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-[#4ea59d] file:text-white"
                 />

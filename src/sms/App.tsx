@@ -2371,6 +2371,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           staffschool_id, 
           courseAttendance, 
           securityStatus, 
+          attendanceRate,
+          permissions,
+          parent_name,
+          parent_number,
+          parent_email,
+          secondary_parent_name,
+          secondary_parent_number,
+          secondary_parent_email,
           ...sanitizedTeacherData 
         } = finalData;
 
@@ -2417,6 +2425,14 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           teacherschool_id, 
           courseAttendance, 
           securityStatus, 
+          attendanceRate,
+          permissions,
+          parent_name,
+          parent_number,
+          parent_email,
+          secondary_parent_name,
+          secondary_parent_number,
+          secondary_parent_email,
           ...sanitizedStaffData 
         } = finalData;
 

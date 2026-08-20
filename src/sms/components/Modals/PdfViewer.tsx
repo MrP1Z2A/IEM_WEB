@@ -9,6 +9,8 @@ interface PdfViewerProps {
 const PdfViewer: React.FC<PdfViewerProps> = ({ url, title, onClose }) => {
   if (!url) return null;
 
+  const isImage = /\.(jpg|jpeg|png|gif|webp|svg)\b/i.test(url.split('?')[0]) || url.startsWith('data:image/');
+
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 md:p-10 animate-in fade-in duration-300">
       <button 
@@ -23,11 +25,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ url, title, onClose }) => {
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
           <div className="flex items-center gap-4 truncate">
             <div className="w-10 h-10 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500 shrink-0">
-              <i className="fa-solid fa-file-pdf text-lg"></i>
+              <i className={`fa-solid ${isImage ? 'fa-file-image' : 'fa-file-pdf'} text-lg`}></i>
             </div>
             <div className="truncate">
               <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight truncate">{title}</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">Document Preview</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">
+                {isImage ? 'Image Preview' : 'Document Preview'}
+              </p>
             </div>
           </div>
           
@@ -52,14 +56,22 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ url, title, onClose }) => {
           </div>
         </div>
 
-        {/* PDF Content */}
-        <div className="flex-1 bg-slate-100 dark:bg-slate-950 relative overflow-hidden">
-          <iframe 
-            src={`${url}#toolbar=0&navpanes=0&scrollbar=0`}
-            className="w-full h-full border-none"
-            title={title}
-            sandbox=""
-          />
+        {/* Content */}
+        <div className="flex-1 bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex items-center justify-center p-4">
+          {isImage ? (
+            <img 
+              src={url} 
+              alt={title} 
+              className="max-w-full max-h-full object-contain rounded-2xl shadow-lg"
+            />
+          ) : (
+            <iframe 
+              src={`${url}#toolbar=0&navpanes=0&scrollbar=0`}
+              className="w-full h-full border-none"
+              title={title}
+              sandbox=""
+            />
+          )}
         </div>
 
         {/* Footer actions */}
@@ -79,7 +91,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ url, title, onClose }) => {
               download 
               className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-brand-500 text-white text-xs font-black uppercase tracking-widest hover:bg-brand-600 shadow-lg shadow-brand-500/20 transition-all text-center"
             >
-              Download PDF
+              {isImage ? 'Download Image' : 'Download PDF'}
             </a>
           </div>
         </div>

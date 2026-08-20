@@ -145,51 +145,74 @@ const Sidebar = ({
 // Header
 // ─────────────────────────────────────────────
 const Header = ({
-  onMenuClick, sidebarOpen, parentData
+  onMenuClick, sidebarOpen, parentData, activeStudentId, onStudentChange
 }: {
   onMenuClick: () => void;
   sidebarOpen: boolean;
   parentData: any;
-}) => (
-  <header className="bg-white/90 backdrop-blur-xl border-b border-slate-100 h-18 min-h-[4.5rem] flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 shadow-sm">
-    <div className="flex items-center gap-3">
-      {/* Toggle button visible on ALL screen sizes */}
-      <button
-        onClick={onMenuClick}
-        title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-        className="p-2.5 bg-slate-50 hover:bg-brand-50 rounded-xl text-slate-500 hover:text-brand-600 border border-slate-100 hover:border-brand-100 active:scale-95 transition-all shadow-sm"
-       type="button">
-        {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-      </button>
+  activeStudentId: string | null;
+  onStudentChange: (id: string) => void;
+}) => {
+  const hasMultipleStudents = parentData?.studentIds && parentData.studentIds.length > 1;
 
-      {/* Switch Environment Button */}
-      <button
-        type="button" onClick={() => { (window as any).switchEnvironment?.() }}
-        title="Switch Environment"
-        className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white border border-slate-700 active:scale-95 transition-all shadow-md flex items-center gap-2"
-      >
-        <LayoutGrid className="w-5 h-5" />
-        <span className="text-[10px] font-black uppercase tracking-widest hidden lg:block">Platform Hub</span>
-      </button>
+  return (
+    <header className="bg-white/90 backdrop-blur-xl border-b border-slate-100 h-18 min-h-[4.5rem] flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 shadow-sm">
+      <div className="flex items-center gap-3">
+        {/* Toggle button visible on ALL screen sizes */}
+        <button
+          onClick={onMenuClick}
+          title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+          className="p-2.5 bg-slate-50 hover:bg-brand-50 rounded-xl text-slate-500 hover:text-brand-600 border border-slate-100 hover:border-brand-100 active:scale-95 transition-all shadow-sm"
+         type="button">
+          {sidebarOpen ? <ChevronLeft className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
 
-      <div>
-        <h2 className="text-base font-black text-slate-800 tracking-tight">Academic Portal</h2>
-        <p className="text-[10px] text-brand-600 font-black uppercase tracking-[0.2em] hidden sm:block">Parental Monitoring Gateway</p>
-      </div>
-    </div>
-    <div className="flex items-center gap-3 md:gap-5">
-      <div className="flex items-center gap-3 border-l border-slate-100 pl-4">
-        <div className="hidden md:block text-right">
-          <p className="text-sm font-black text-slate-800">{parentData?.email?.split('@')[0] || 'Parent'}</p>
-          <p className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Active Session</p>
+        {/* Switch Environment Button */}
+        <button
+          type="button" onClick={() => { (window as any).switchEnvironment?.() }}
+          title="Switch Environment"
+          className="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white border border-slate-700 active:scale-95 transition-all shadow-md flex items-center gap-2"
+        >
+          <LayoutGrid className="w-5 h-5" />
+          <span className="text-[10px] font-black uppercase tracking-widest hidden lg:block">Platform Hub</span>
+        </button>
+
+        <div>
+          <h2 className="text-base font-black text-slate-800 tracking-tight">Academic Portal</h2>
+          <p className="text-[10px] text-brand-600 font-black uppercase tracking-[0.2em] hidden sm:block">Parental Monitoring Gateway</p>
         </div>
-        <div className="w-10 h-10 rounded-2xl bg-brand-100 flex items-center justify-center text-brand-700 font-black text-base border-2 border-white shadow-md">
-          {parentData?.email?.[0]?.toUpperCase() || 'P'}
+
+        {hasMultipleStudents && (
+          <div className="ml-2 flex items-center gap-2 bg-emerald-50 border border-emerald-100 hover:border-emerald-200 px-3 py-1.5 rounded-xl transition-all shadow-sm">
+            <UserCircle className="w-4 h-4 text-emerald-700 shrink-0" />
+            <select
+              value={activeStudentId || ''}
+              onChange={(e) => onStudentChange(e.target.value)}
+              className="bg-transparent border-none text-xs font-black text-emerald-800 focus:outline-none focus:ring-0 cursor-pointer pr-1 py-0"
+            >
+              {parentData.studentIds.map((id: string, idx: number) => (
+                <option key={id} value={id} className="text-slate-800 font-bold bg-white">
+                  {parentData.studentNames[idx]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-3 md:gap-5">
+        <div className="flex items-center gap-3 border-l border-slate-100 pl-4">
+          <div className="hidden md:block text-right">
+            <p className="text-sm font-black text-slate-800">{parentData?.email?.split('@')[0] || 'Parent'}</p>
+            <p className="text-[10px] font-black text-brand-600 uppercase tracking-widest">Active Session</p>
+          </div>
+          <div className="w-10 h-10 rounded-2xl bg-brand-100 flex items-center justify-center text-brand-700 font-black text-base border-2 border-white shadow-md">
+            {parentData?.email?.[0]?.toUpperCase() || 'P'}
+          </div>
         </div>
       </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 // ─────────────────────────────────────────────
 // ParentApp
@@ -205,10 +228,17 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
     const saved = localStorage.getItem('iem_parent_data');
     return saved ? JSON.parse(saved) : null;
   });
+  const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ParentView>('dashboard');
   const [selectedNotice, setSelectedNotice] = useState<any>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
   const [schoolPaymentQr, setSchoolPaymentQr] = useState<SchoolPaymentQr | null>(null);
+
+  useEffect(() => {
+    if (parentData?.studentIds?.length && !activeStudentId) {
+      setActiveStudentId(parentData.studentIds[0]);
+    }
+  }, [parentData, activeStudentId]);
 
   useEffect(() => {
     if (parentData?.studentIds && parentData?.schoolId) {
@@ -228,6 +258,9 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
 
   const handleLogin = (data: ParentSessionData) => {
     setParentData(data);
+    if (data.studentIds?.length) {
+      setActiveStudentId(data.studentIds[0]);
+    }
     setIsLoggedIn(true);
     localStorage.setItem(PARENT_SESSION_KEY, 'true');
     localStorage.setItem('iem_parent_data', JSON.stringify(data));
@@ -236,6 +269,7 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
   const handleLogout = () => {
     setIsLoggedIn(false);
     setParentData(null);
+    setActiveStudentId(null);
     setSidebarOpen(false);
     localStorage.removeItem(PARENT_SESSION_KEY);
     localStorage.removeItem('iem_parent_data');
@@ -249,8 +283,18 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
   const resolvedParentName = parentData?.parentName || getFallbackParentName(parentData?.email);
 
   const renderContent = () => {
-    const ids = parentData?.studentIds;
-    const names = parentData?.studentNames;
+    let ids = parentData?.studentIds || [];
+    let names = parentData?.studentNames || [];
+
+    if (activeStudentId && ids.includes(activeStudentId)) {
+      const idx = ids.indexOf(activeStudentId);
+      if (idx > 0) {
+        // Move selected student to the beginning of the arrays
+        ids = [activeStudentId, ...ids.filter(id => id !== activeStudentId)];
+        names = [names[idx], ...names.filter((_, i) => i !== idx)];
+      }
+    }
+
     const keyStr = ids?.join(',') || 'empty';
 
     switch (currentView) {
@@ -280,6 +324,8 @@ const ParentApp: React.FC<ParentAppProps> = ({ onSwitch }) => {
           onMenuClick={() => setSidebarOpen(prev => !prev)}
           sidebarOpen={sidebarOpen}
           parentData={parentData}
+          activeStudentId={activeStudentId}
+          onStudentChange={setActiveStudentId}
         />
         <main className="flex-1 p-3 sm:p-4 md:p-8 overflow-y-auto pb-28 sm:pb-8">
           <div className="max-w-7xl mx-auto w-full">

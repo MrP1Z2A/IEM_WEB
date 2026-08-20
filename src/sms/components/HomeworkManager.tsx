@@ -1507,12 +1507,12 @@ function HomeworkComposerAndList() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Attach PDF / DOC / DOCX</label>
+            <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Attach File (PDF, Word, or Image)</label>
             <input
               type="file"
-              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/*"
               onChange={event => setSelectedFile(event.target.files?.[0] || null)}
-              aria-label="Attach PDF, DOC, or DOCX file"
+              aria-label="Attach PDF, DOC, DOCX, or image file"
               className="w-full text-sm"
             />
             {selectedFile && (
