@@ -117,7 +117,13 @@ type OversightAction =
   | { type: 'UPDATE_INQUIRY_STATUS_START'; payload: string }
   | { type: 'UPDATE_INQUIRY_STATUS_SUCCESS'; payload: { id: string; status: 'unread' | 'read' | 'resolved' } }
   | { type: 'UPDATE_INQUIRY_STATUS_ERROR'; payload: string }
-  | { type: 'SET_CONV_MESSAGES'; payload: MessageRecord[] };
+  | { type: 'SET_CONV_MESSAGES'; payload: MessageRecord[] }
+  | { type: 'REALTIME_INSERT_MESSAGE'; payload: MessageRecord }
+  | { type: 'REALTIME_UPDATE_MESSAGE'; payload: MessageRecord }
+  | { type: 'REALTIME_DELETE_MESSAGE'; payload: string }
+  | { type: 'REALTIME_INSERT_INQUIRY'; payload: ParentInquiryRecord }
+  | { type: 'REALTIME_UPDATE_INQUIRY'; payload: ParentInquiryRecord }
+  | { type: 'REALTIME_DELETE_INQUIRY'; payload: string };
 
 function oversightReducer(state: OversightState, action: OversightAction): OversightState {
   switch (action.type) {
@@ -179,6 +185,48 @@ function oversightReducer(state: OversightState, action: OversightAction): Overs
       return { ...state, isUpdatingInquiryId: null, panelError: action.payload };
     case 'SET_CONV_MESSAGES':
       return { ...state, convMessages: action.payload };
+    case 'REALTIME_INSERT_MESSAGE': {
+      const nextMessage = action.payload;
+      if (state.allMessages.some((msg) => msg.id === nextMessage.id)) {
+        return state;
+      }
+      return { ...state, allMessages: [nextMessage, ...state.allMessages] };
+    }
+    case 'REALTIME_UPDATE_MESSAGE': {
+      const nextMessage = action.payload;
+      return {
+        ...state,
+        allMessages: state.allMessages.map((msg) => msg.id === nextMessage.id ? nextMessage : msg)
+      };
+    }
+    case 'REALTIME_DELETE_MESSAGE': {
+      const deletedId = action.payload;
+      return {
+        ...state,
+        allMessages: state.allMessages.filter((msg) => msg.id !== deletedId)
+      };
+    }
+    case 'REALTIME_INSERT_INQUIRY': {
+      const nextInquiry = action.payload;
+      if (state.parentInquiries.some((inq) => inq.id === nextInquiry.id)) {
+        return state;
+      }
+      return { ...state, parentInquiries: [nextInquiry, ...state.parentInquiries] };
+    }
+    case 'REALTIME_UPDATE_INQUIRY': {
+      const nextInquiry = action.payload;
+      return {
+        ...state,
+        parentInquiries: state.parentInquiries.map((inq) => inq.id === nextInquiry.id ? nextInquiry : inq)
+      };
+    }
+    case 'REALTIME_DELETE_INQUIRY': {
+      const deletedId = action.payload;
+      return {
+        ...state,
+        parentInquiries: state.parentInquiries.filter((inq) => inq.id !== deletedId)
+      };
+    }
     default:
       return state;
   }
@@ -302,6 +350,47 @@ export const MessagesOversight: React.FC<OversightProps> = ({ schoolId, schoolNa
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    if (!supabase || !schoolId) return;
+
+    const messagesChannel = supabase
+      .channel(`sms-oversight-messages:${schoolId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `school_id=eq.${schoolId}` }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          dispatch({ type: 'REALTIME_INSERT_MESSAGE', payload: payload.new as MessageRecord });
+        }
+        if (payload.eventType === 'UPDATE') {
+          dispatch({ type: 'REALTIME_UPDATE_MESSAGE', payload: payload.new as MessageRecord });
+        }
+        if (payload.eventType === 'DELETE') {
+          dispatch({ type: 'REALTIME_DELETE_MESSAGE', payload: String((payload.old as any)?.id || '') });
+        }
+      })
+      .subscribe();
+
+    const inquiriesChannel = supabase
+      .channel(`sms-oversight-inquiries:${schoolId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parent_inquiries', filter: `school_id=eq.${schoolId}` }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          dispatch({ type: 'REALTIME_INSERT_INQUIRY', payload: payload.new as ParentInquiryRecord });
+        }
+        if (payload.eventType === 'UPDATE') {
+          dispatch({ type: 'REALTIME_UPDATE_INQUIRY', payload: payload.new as ParentInquiryRecord });
+        }
+        if (payload.eventType === 'DELETE') {
+          dispatch({ type: 'REALTIME_DELETE_INQUIRY', payload: String((payload.old as any)?.id || '') });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      if (supabase) {
+        supabase.removeChannel(messagesChannel);
+        supabase.removeChannel(inquiriesChannel);
+      }
+    };
+  }, [schoolId, dispatch]);
 
   const userMap = useMemo(() => {
     const m: Record<string, UserProfile> = {};

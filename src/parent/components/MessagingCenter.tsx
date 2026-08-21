@@ -125,9 +125,9 @@ const ParentMessagingCenter: React.FC<ParentMessagingCenterProps> = ({
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRoles, setExpandedRoles] = useState<Record<ContactRole, boolean>>({
-    admin: true,
-    teacher: true,
-    student_service: true,
+    admin: false,
+    teacher: false,
+    student_service: false,
   });
   const [isLoadingContacts, setIsLoadingContacts] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -305,57 +305,46 @@ const ParentMessagingCenter: React.FC<ParentMessagingCenterProps> = ({
   }, [schoolId, parentId]);
 
   useEffect(() => {
-    if (!supabase || !parentId) return;
+    if (!supabase || !schoolId || !parentId) return;
 
-    const receiveChannel = supabase
-      .channel(`parent-dm:${parentId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${parentId}` }, (payload) => {
+    const channel = supabase
+      .channel(`parent-messaging-realtime:${schoolId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `school_id=eq.${schoolId}` }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const message = payload.new as MessageRecord;
-          if (activeChat?.kind === 'dm' && message.sender_id === activeChat.contact.id) {
-            setMessages((previous) => previous.some((entry) => entry.id === message.id) ? previous : [...previous, message]);
-            void markAsRead(message.id);
+          
+          if (activeChat) {
+            const isMatchingDM = activeChat.kind === 'dm' && (
+              (message.sender_id === activeChat.contact.id && message.receiver_id === parentId) ||
+              (message.sender_id === parentId && message.receiver_id === activeChat.contact.id)
+            );
+            const isMatchingGroup = activeChat.kind === 'group' && message.group_id === activeChat.group.id;
+            
+            if (isMatchingDM || isMatchingGroup) {
+              setMessages((previous) => previous.some((entry) => entry.id === message.id) ? previous : [...previous, message]);
+              if (isMatchingDM && message.receiver_id === parentId) {
+                void markAsRead(message.id);
+              }
+            }
           }
+          
           void loadContacts();
+          void loadGroups();
         }
 
         if (payload.eventType === 'DELETE') {
           const deletedId = String((payload.old as any)?.id || '');
           setMessages((previous) => previous.filter((entry) => entry.id !== deletedId));
+          void loadContacts();
+          void loadGroups();
         }
       })
       .subscribe();
 
     return () => {
-      if (supabase) supabase.removeChannel(receiveChannel);
+      if (supabase) supabase.removeChannel(channel);
     };
-  }, [parentId, activeChat]);
-
-  useEffect(() => {
-    if (!supabase || activeChat?.kind !== 'group') return;
-
-    const groupId = activeChat.group.id;
-    const groupChannel = supabase
-      .channel(`parent-group:${groupId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `group_id=eq.${groupId}` }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const message = payload.new as MessageRecord;
-          setMessages((previous) => previous.some((entry) => entry.id === message.id) ? previous : [...previous, message]);
-        }
-
-        if (payload.eventType === 'DELETE') {
-          const deletedId = String((payload.old as any)?.id || '');
-          setMessages((previous) => previous.filter((entry) => entry.id !== deletedId));
-        }
-
-        void loadGroups();
-      })
-      .subscribe();
-
-    return () => {
-      if (supabase) supabase.removeChannel(groupChannel);
-    };
-  }, [activeChat]);
+  }, [schoolId, parentId, activeChat]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

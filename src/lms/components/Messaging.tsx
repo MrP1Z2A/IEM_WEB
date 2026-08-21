@@ -31,8 +31,13 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
 
   // ── Sidebar UI ─────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  const [isGroupsCollapsed, setIsGroupsCollapsed] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+    teacher: true,
+    student: true,
+    student_service: true,
+    parent: true,
+  });
+  const [isGroupsCollapsed, setIsGroupsCollapsed] = useState(true);
 
   // ── Create Group Modal ─────────────────────────────────────
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
@@ -53,45 +58,48 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
     void fetchGroups();
   }, [schoolId]);
 
-  // ── Realtime DM listener ───────────────────────────────────
+  // ── Realtime Messaging listener ────────────────────────────
   useEffect(() => {
-    if (!supabase || !currentUser.id) return;
-    const channel = supabase
-      .channel(`global-dm:${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUser.id}` }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const msg = payload.new as Message;
-          if (activeChat?.kind === 'dm' && msg.sender_id === activeChat.contact.id) {
-            setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-            void markAsRead(msg.id);
-          }
-          void fetchContacts();
-        } else if (payload.eventType === 'DELETE') {
-          setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id));
-        }
-      })
-      .subscribe();
-    return () => { if (supabase) supabase.removeChannel(channel); };
-  }, [currentUser.id, activeChat]);
+    if (!supabase || !schoolId || !currentUser.id) return;
 
-  // ── Realtime Group listener ────────────────────────────────
-  useEffect(() => {
-    if (!supabase || !currentUser.id || activeChat?.kind !== 'group') return;
-    const gid = activeChat.group.id;
     const channel = supabase
-      .channel(`group-msgs:${gid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `group_id=eq.${gid}` }, (payload) => {
+      .channel(`lms-messaging-realtime:${schoolId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `school_id=eq.${schoolId}` }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          const msg = payload.new as Message;
-          setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-        } else if (payload.eventType === 'DELETE') {
-          setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id));
+          const message = payload.new as Message;
+          
+          if (activeChat) {
+            const isMatchingDM = activeChat.kind === 'dm' && (
+              (message.sender_id === activeChat.contact.id && message.receiver_id === currentUser.id) ||
+              (message.sender_id === currentUser.id && message.receiver_id === activeChat.contact.id)
+            );
+            const isMatchingGroup = activeChat.kind === 'group' && message.group_id === activeChat.group.id;
+            
+            if (isMatchingDM || isMatchingGroup) {
+              setMessages((previous) => previous.some((entry) => entry.id === message.id) ? previous : [...previous, message]);
+              if (isMatchingDM && message.receiver_id === currentUser.id) {
+                void markAsRead(message.id);
+              }
+            }
+          }
+          
+          void fetchContacts();
+          void fetchGroups();
         }
-        void fetchGroups();
+
+        if (payload.eventType === 'DELETE') {
+          const deletedId = String((payload.old as any)?.id || '');
+          setMessages((previous) => previous.filter((entry) => entry.id !== deletedId));
+          void fetchContacts();
+          void fetchGroups();
+        }
       })
       .subscribe();
-    return () => { if (supabase) supabase.removeChannel(channel); };
-  }, [activeChat]);
+
+    return () => {
+      if (supabase) supabase.removeChannel(channel);
+    };
+  }, [schoolId, currentUser.id, activeChat]);
 
   // ── Auto-scroll ────────────────────────────────────────────
   useEffect(() => { scrollToBottom(); }, [messages.length]);
