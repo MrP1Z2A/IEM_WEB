@@ -87,6 +87,25 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
           void fetchGroups();
         }
 
+        if (payload.eventType === 'UPDATE') {
+          const message = payload.new as Message;
+          
+          if (activeChat) {
+            const isMatchingDM = activeChat.kind === 'dm' && (
+              (message.sender_id === activeChat.contact.id && message.receiver_id === currentUser.id) ||
+              (message.sender_id === currentUser.id && message.receiver_id === activeChat.contact.id)
+            );
+            const isMatchingGroup = activeChat.kind === 'group' && message.group_id === activeChat.group.id;
+            
+            if (isMatchingDM || isMatchingGroup) {
+              setMessages((previous) => previous.map((entry) => entry.id === message.id ? message : entry));
+            }
+          }
+          
+          void fetchContacts();
+          void fetchGroups();
+        }
+
         if (payload.eventType === 'DELETE') {
           const deletedId = String((payload.old as any)?.id || '');
           setMessages((previous) => previous.filter((entry) => entry.id !== deletedId));

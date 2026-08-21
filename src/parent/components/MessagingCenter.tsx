@@ -332,6 +332,25 @@ const ParentMessagingCenter: React.FC<ParentMessagingCenterProps> = ({
           void loadGroups();
         }
 
+        if (payload.eventType === 'UPDATE') {
+          const message = payload.new as MessageRecord;
+          
+          if (activeChat) {
+            const isMatchingDM = activeChat.kind === 'dm' && (
+              (message.sender_id === activeChat.contact.id && message.receiver_id === parentId) ||
+              (message.sender_id === parentId && message.receiver_id === activeChat.contact.id)
+            );
+            const isMatchingGroup = activeChat.kind === 'group' && message.group_id === activeChat.group.id;
+            
+            if (isMatchingDM || isMatchingGroup) {
+              setMessages((previous) => previous.map((entry) => entry.id === message.id ? message : entry));
+            }
+          }
+          
+          void loadContacts();
+          void loadGroups();
+        }
+
         if (payload.eventType === 'DELETE') {
           const deletedId = String((payload.old as any)?.id || '');
           setMessages((previous) => previous.filter((entry) => entry.id !== deletedId));

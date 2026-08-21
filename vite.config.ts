@@ -148,6 +148,7 @@ export default defineConfig({
       '/supabase': {
         target: 'https://lzlhsmtkkcpomabqaqdu.supabase.co',
         changeOrigin: true,
+        ws: true,
         rewrite: (path) => path.replace(/^\/supabase/, ''),
       }
     }
