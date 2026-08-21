@@ -2,7 +2,8 @@
 export enum UserRole {
   STUDENT = 'STUDENT',
   PARENT = 'PARENT',
-  TEACHER = 'TEACHER'
+  TEACHER = 'TEACHER',
+  STUDENT_SERVICE = 'STUDENT_SERVICE'
 }
 
 export interface User {

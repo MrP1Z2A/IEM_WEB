@@ -65,7 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: 'fa-house', roles: [UserRole.STUDENT, UserRole.TEACHER] },
     { id: 'notice-board', label: 'Notice Board', icon: 'fa-bullhorn', roles: [UserRole.STUDENT, UserRole.PARENT, UserRole.TEACHER] },
     { id: 'parent-portal', label: 'Parent Portal', icon: 'fa-clipboard-user', roles: [UserRole.PARENT] },
-    { id: 'profile', label: 'PROFILE', icon: 'fa-id-card', roles: [UserRole.STUDENT, UserRole.PARENT, UserRole.TEACHER] },
+    { id: 'profile', label: 'PROFILE', icon: 'fa-id-card', roles: [UserRole.STUDENT, UserRole.PARENT, UserRole.TEACHER, UserRole.STUDENT_SERVICE] },
     { id: 'instruction', label: 'Instruction Page', icon: 'fa-book-open', roles: [UserRole.STUDENT, UserRole.PARENT, UserRole.TEACHER] },
     { id: 'courses', label: 'Courses', icon: 'fa-graduation-cap', roles: [UserRole.STUDENT, UserRole.TEACHER] },
     { id: 'video-conference', label: 'Video Conference', icon: 'fa-video', roles: [UserRole.STUDENT, UserRole.TEACHER] },
@@ -74,7 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'exams', label: 'Exams', icon: 'fa-clipboard-check', roles: [UserRole.TEACHER] },
     { id: 'timetable', label: 'Time table / Calendar', icon: 'fa-calendar', roles: [UserRole.STUDENT, UserRole.TEACHER] },
     { id: 'studies', label: 'Grades / Achievement', icon: 'fa-trophy', roles: [UserRole.STUDENT] },
-    { id: 'contact', label: 'Messages / Contact', icon: 'fa-comments', roles: [UserRole.STUDENT, UserRole.PARENT, UserRole.TEACHER] },
+    { id: 'contact', label: 'Messages / Contact', icon: 'fa-comments', roles: [UserRole.STUDENT, UserRole.PARENT, UserRole.TEACHER, UserRole.STUDENT_SERVICE] },
     { id: 'about-school', label: 'About School', icon: 'fa-school-circle-check', roles: [UserRole.STUDENT, UserRole.PARENT, UserRole.TEACHER] },
   ];
 

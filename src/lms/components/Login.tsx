@@ -95,7 +95,22 @@ const Login: React.FC<LoginProps> = ({ onLogin, onBackToHubs }) => {
         return;
       }
 
-      // Reject when no matching student or teacher record exists.
+      // If no student or teacher found, try matching student services credentials from student_services table.
+      const { data: service, error: serviceError } = await supabase
+        .from('student_services')
+        .select('id, auth_user_id, name, email, temp_password, school_id')
+        .or(`name.eq.${identifier},email.eq.${identifier}`)
+        .eq('temp_password', password)
+        .maybeSingle();
+
+      if (serviceError) throw serviceError;
+
+      if (service) {
+        onLogin(UserRole.STUDENT_SERVICE, service.email || service.name, service.school_id || undefined, service.id, service.auth_user_id || undefined);
+        return;
+      }
+
+      // Reject when no matching student, teacher, or student service record exists.
       throw new Error('Invalid name/email or temporary password');
     } catch (err: any) {
       // Display known error message or fallback generic auth error.

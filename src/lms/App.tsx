@@ -736,6 +736,8 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       performSmsSync(true);
       if (user.role === UserRole.PARENT) {
         setCurrentView('parent-portal');
+      } else if (user.role === UserRole.STUDENT_SERVICE) {
+        setCurrentView('contact');
       }
     }
   }, [isLoggedIn, user.role, schoolId, performSmsSync, assignedCourseIds, assignedClassIds]);
@@ -831,6 +833,37 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         dob: teacher.date_of_birth || undefined,
         eduLevel: teacher.educational_background || teacher.job_position || undefined,
         teacherschool_id: teacher.teacherschool_id || undefined
+      }));
+      return;
+    }
+
+    if (user.role === UserRole.STUDENT_SERVICE) {
+      let serviceQuery = supabase
+        .from('student_services')
+        .select('*, staffschool_id')
+        .or(`email.eq."${user.email}",name.eq."${user.email}"`);
+
+      if (schoolId) serviceQuery = serviceQuery.eq('school_id', schoolId);
+
+      const { data: service, error } = await serviceQuery.maybeSingle();
+
+      if (error || !service) {
+        console.error('Failed to load student service profile', error?.message);
+        return;
+      }
+
+      setUser(prev => ({
+        ...prev,
+        name: service.name || prev.name,
+        email: service.email || prev.email,
+        id: String(service.id),
+        schoolId: service.school_id || prev.schoolId,
+        avatar: getStudentAvatarUrl(service.avatar) || prev.avatar,
+        phone: service.phone || undefined,
+        address: service.address || undefined,
+        dob: service.date_of_birth || undefined,
+        eduLevel: service.educational_background || service.job_position || undefined,
+        staffschool_id: service.staffschool_id || undefined
       }));
       return;
     }
@@ -3813,7 +3846,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         {currentView === 'profile' && (
           <div className="space-y-8 animate-fadeIn text-slate-800">
             <h2 className="text-2xl md:text-3xl font-black text-slate-900 uppercase tracking-tight">
-              {user.role === UserRole.TEACHER ? 'Teacher Profile' : 'Student Profile'}
+              {user.role === UserRole.TEACHER ? 'Teacher Profile' : user.role === UserRole.STUDENT_SERVICE ? 'Student Service Profile' : 'Student Profile'}
             </h2>
             <div className="bg-white/10 backdrop-blur-2xl shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] p-6 md:p-10 rounded-[32px] md:rounded-[40px] border border-white/20 max-w-4xl shadow-2xl relative overflow-hidden">
               <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start relative z-10">
@@ -3838,7 +3871,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                       accept="image/*"
                     />
                   </div>
-                  {user.role !== UserRole.TEACHER && (
+                  {user.role === UserRole.STUDENT && (
                     <div className="px-4 py-2 bg-[#4ea59d]/20 rounded-xl border border-[#4ea59d]/30 text-center">
                       <p className="text-[10px] font-black text-[#4ea59d] uppercase">Attendance</p>
                       <p className="text-xl font-black text-slate-900">{studentAttendanceRate}</p>
@@ -3853,10 +3886,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     </div>
                     <div className="bg-white/5 px-4 py-2 rounded-2xl border border-white/10">
                       <p className="text-[9px] font-black text-slate-400 uppercase mb-1">
-                        {user.role === UserRole.TEACHER ? 'Specialization' : 'Grade / Level'}
+                        {user.role === UserRole.TEACHER ? 'Specialization' : user.role === UserRole.STUDENT_SERVICE ? 'Designation' : 'Grade / Level'}
                       </p>
                       <p className="text-sm font-black text-[#4ea59d]">
-                        {user.role === UserRole.TEACHER ? (user.eduLevel || 'Faculty') : (user.grade || 'N/A')}
+                        {user.role === UserRole.TEACHER ? (user.eduLevel || 'Faculty') : user.role === UserRole.STUDENT_SERVICE ? (user.eduLevel || 'Support Staff') : (user.grade || 'N/A')}
                       </p>
                     </div>
                   </div>
@@ -3870,10 +3903,10 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
-                        <i className="fa-solid fa-id-card text-[#4ea59d]"></i> {user.role === UserRole.TEACHER ? 'Teacher ID' : 'Student ID'}
+                        <i className="fa-solid fa-id-card text-[#4ea59d]"></i> {user.role === UserRole.TEACHER ? 'Teacher ID' : user.role === UserRole.STUDENT_SERVICE ? 'Staff ID' : 'Student ID'}
                       </p>
                       <p className="text-sm font-mono font-bold text-slate-700">
-                        {user.role === UserRole.TEACHER ? (user.teacherId || user.teacherschool_id || 'N/A') : (user.studentschool_id || user.studentId || 'N/A')}
+                        {user.role === UserRole.TEACHER ? (user.teacherId || user.teacherschool_id || 'N/A') : user.role === UserRole.STUDENT_SERVICE ? (user.staffschool_id || user.id || 'N/A') : (user.studentschool_id || user.studentId || 'N/A')}
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -3884,7 +3917,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-2">
-                        <i className="fa-solid fa-phone text-[#4ea59d]"></i> {user.role === UserRole.TEACHER ? 'Contact Number' : 'Student Phone'}
+                        <i className="fa-solid fa-phone text-[#4ea59d]"></i> {user.role === UserRole.TEACHER ? 'Contact Number' : user.role === UserRole.STUDENT_SERVICE ? 'Phone Number' : 'Student Phone'}
                       </p>
                       <p className="text-sm font-bold text-slate-700">{user.phone || 'N/A'}</p>
                     </div>
@@ -3896,7 +3929,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
                     </div>
                   </div>
 
-                  {user.role !== UserRole.TEACHER && (
+                  {user.role === UserRole.STUDENT && (
                     <div className="pt-6 border-t border-white/5">
                       <h4 className="text-[10px] font-black text-[#4ea59d] uppercase tracking-widest mb-4 flex items-center gap-2">
                         <i className="fa-solid fa-users-gear"></i> Guardian Information

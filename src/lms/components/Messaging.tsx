@@ -125,7 +125,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
         ...(teachers?.map(t => ({ ...t, auth_user_id: t.id, role: 'teacher' as const })) || []),
         ...(students?.map(s => ({ ...s, auth_user_id: s.id, role: 'student' as const })) || []),
         ...(services?.map(sv => ({ ...sv, auth_user_id: sv.id, role: 'student_service' as const })) || []),
-      ];
+      ].filter(c => c.id !== currentUser.id);
 
       const { data: allMessages } = await supabase
         .from('messages')
@@ -137,7 +137,7 @@ const Messaging: React.FC<MessagingProps> = ({ currentUser, schoolId }) => {
       const lastMsgMap: Record<string, { lastAt: string; lastContent: string }> = {};
       const unreadCounts: Record<string, number> = {};
 
-      if (currentUser.role === UserRole.TEACHER) {
+      if (currentUser.role === UserRole.TEACHER || currentUser.role === UserRole.STUDENT_SERVICE) {
         const parentConversationIds = Array.from(new Set(
           (allMessages || [])
             .map((msg) => msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id)
