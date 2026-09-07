@@ -4337,7 +4337,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
       )}
 
       {confirmDialog && (
-        <div className="fixed inset-0 z-[120] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[250] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-2xl p-6 space-y-5">
             <h3 className="text-xl font-black tracking-tight">Confirm Deletion</h3>
             <p className="text-sm text-slate-600 dark:text-slate-300">{confirmDialog.message}</p>

@@ -879,60 +879,6 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
                   <p className="text-sm font-bold text-slate-400">No Class</p>
                 )}
               </div>
-              
-              <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Assign to Class</p>
-                <div className="flex flex-col gap-2">
-                  <select
-                    value={singleAssignClassId}
-                    onChange={(e) => {
-                      setSingleAssignClassId(e.target.value);
-                      setSingleAssignCourseId('');
-                      if (e.target.value && !bulkSelectedClassIds.includes(e.target.value)) {
-                        setBulkSelectedClassIds([e.target.value]);
-                      }
-                    }}
-                    className="w-full bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm outline-none"
-                  >
-                    <option value="">Select Class...</option>
-                    {classes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name || c.class_code}</option>
-                    ))}
-                  </select>
-                  
-                  {singleAssignClassId && bulkCoursesByClass[singleAssignClassId] && (
-                    <select
-                      value={singleAssignCourseId}
-                      onChange={(e) => setSingleAssignCourseId(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm outline-none"
-                    >
-                      <option value="">Select Course...</option>
-                      {bulkCoursesByClass[singleAssignClassId].map(course => (
-                        <option key={course.id} value={course.id}>{course.name}</option>
-                      ))}
-                    </select>
-                  )}
-                  
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!singleAssignClassId || !singleAssignCourseId) return;
-                      setIsSingleAssigning(true);
-                      try {
-                        await bulkAssignStudentsToClass([String(selectedStudent.id)], singleAssignClassId, singleAssignCourseId);
-                        setSingleAssignClassId('');
-                        setSingleAssignCourseId('');
-                      } finally {
-                        setIsSingleAssigning(false);
-                      }
-                    }}
-                    disabled={!singleAssignClassId || !singleAssignCourseId || isSingleAssigning}
-                    className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white mt-1 ${( !singleAssignClassId || !singleAssignCourseId || isSingleAssigning ) ? 'bg-slate-300 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'}`}
-                  >
-                    {isSingleAssigning ? 'Adding...' : 'Add Class & Course'}
-                  </button>
-                </div>
-              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
