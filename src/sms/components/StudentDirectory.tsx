@@ -20,6 +20,7 @@ interface StudentDirectoryProps {
   selectedDate: string;
   setSelectedDate: (date: string) => void;
   bulkAssignStudentsToClass: (studentIds: string[], classId: string, classCourseId?: string) => Promise<void>;
+  removeStudentFromClass?: (classId: string, studentId: string, classCourseId?: string) => Promise<void>;
   bulkDeleteStudents: (studentIds: string[]) => Promise<void>;
   openPermissions: (student: Student) => void;
   openEditModal: (type: string, data: any) => void;
@@ -52,6 +53,7 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
   selectedDate,
   setSelectedDate,
   bulkAssignStudentsToClass,
+  removeStudentFromClass,
   bulkDeleteStudents,
   openPermissions,
   openEditModal,
@@ -79,6 +81,9 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
   const [isTempPasswordAuthSubmitting, setIsTempPasswordAuthSubmitting] = React.useState(false);
   const [isPhotoUploading, setIsPhotoUploading] = React.useState(false);
   const [photoUploadError, setPhotoUploadError] = React.useState<string | null>(null);
+  const [singleAssignClassId, setSingleAssignClassId] = React.useState<string>('');
+  const [singleAssignCourseId, setSingleAssignCourseId] = React.useState<string>('');
+  const [isSingleAssigning, setIsSingleAssigning] = React.useState(false);
   const profilePhotoInputRef = React.useRef<HTMLInputElement | null>(null);
   const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
   const ALLOWED_PROFILE_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -215,6 +220,8 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
     setIsTempPasswordAuthSubmitting(false);
     setIsPhotoUploading(false);
     setPhotoUploadError(null);
+    setSingleAssignClassId('');
+    setSingleAssignCourseId('');
   }, [selectedStudent?.id]);
 
   React.useEffect(() => {
@@ -852,7 +859,80 @@ const StudentDirectory: React.FC<StudentDirectoryProps> = ({
 
             <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 border border-slate-100 dark:border-slate-700">
               <p className="text-[10px] font-black uppercase tracking-widest text-brand-500 mb-2">Enrolled Classes</p>
-              <p className="text-sm font-bold text-brand-600 dark:text-brand-400">{getStudentClassNames(selectedStudent.id)}</p>
+              <div className="flex flex-col gap-2">
+                {classes.filter(c => (c.student_ids || []).map((id: any) => String(id)).includes(String(selectedStudent.id))).length > 0 ? (
+                  classes.filter(c => (c.student_ids || []).map((id: any) => String(id)).includes(String(selectedStudent.id))).map(c => (
+                    <div key={c.id} className="flex items-center justify-between bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <span className="text-sm font-bold text-brand-600 dark:text-brand-400">{c.name || c.class_code || 'Unnamed'}</span>
+                      {removeStudentFromClass && (
+                        <button
+                          type="button"
+                          onClick={() => removeStudentFromClass(String(c.id), String(selectedStudent.id))}
+                          className="px-2 py-1 bg-rose-100 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-200 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm font-bold text-slate-400">No Class</p>
+                )}
+              </div>
+              
+              <div className="mt-4 border-t border-slate-200 dark:border-slate-700 pt-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Assign to Class</p>
+                <div className="flex flex-col gap-2">
+                  <select
+                    value={singleAssignClassId}
+                    onChange={(e) => {
+                      setSingleAssignClassId(e.target.value);
+                      setSingleAssignCourseId('');
+                      if (e.target.value && !bulkSelectedClassIds.includes(e.target.value)) {
+                        setBulkSelectedClassIds([e.target.value]);
+                      }
+                    }}
+                    className="w-full bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm outline-none"
+                  >
+                    <option value="">Select Class...</option>
+                    {classes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name || c.class_code}</option>
+                    ))}
+                  </select>
+                  
+                  {singleAssignClassId && bulkCoursesByClass[singleAssignClassId] && (
+                    <select
+                      value={singleAssignCourseId}
+                      onChange={(e) => setSingleAssignCourseId(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm outline-none"
+                    >
+                      <option value="">Select Course...</option>
+                      {bulkCoursesByClass[singleAssignClassId].map(course => (
+                        <option key={course.id} value={course.id}>{course.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!singleAssignClassId || !singleAssignCourseId) return;
+                      setIsSingleAssigning(true);
+                      try {
+                        await bulkAssignStudentsToClass([String(selectedStudent.id)], singleAssignClassId, singleAssignCourseId);
+                        setSingleAssignClassId('');
+                        setSingleAssignCourseId('');
+                      } finally {
+                        setIsSingleAssigning(false);
+                      }
+                    }}
+                    disabled={!singleAssignClassId || !singleAssignCourseId || isSingleAssigning}
+                    className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white mt-1 ${( !singleAssignClassId || !singleAssignCourseId || isSingleAssigning ) ? 'bg-slate-300 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'}`}
+                  >
+                    {isSingleAssigning ? 'Adding...' : 'Add Class & Course'}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

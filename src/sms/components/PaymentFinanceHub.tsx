@@ -167,6 +167,8 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
   const [financeStatusTab, setFinanceStatusTab] = useState<'all' | 'pending'>('all');
   const [historyTab, setHistoryTab] = useState<'pending' | 'paid'>('pending');
   const [viewingReceiptUrl, setViewingReceiptUrl] = useState<string | null>(null);
+  const [verifyingPaymentId, setVerifyingPaymentId] = useState<string | null>(null);
+  const [verificationNote, setVerificationNote] = useState<string>('');
 
   const [formData, setFormData] = useState({
     student_id: '',
@@ -806,24 +808,31 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
     }
   };
 
-  const markPaymentAsPaid = async (paymentId: string) => {
+  const markPaymentAsPaid = async (paymentId: string, customNote?: string) => {
     setError(null);
     setStatus(null);
     setIsSaving(true);
     try {
+      const updateData: any = {
+        status: 'paid',
+        receipt_status: 'verified',
+        payment_date: getTodayIso(),
+        updated_at: new Date().toISOString()
+      };
+      if (customNote !== undefined) {
+        updateData.note = customNote;
+      }
+
       const { error: updateErr } = await supabase
         .from('student_payments')
-        .update({
-          status: 'paid',
-          receipt_status: 'verified',
-          payment_date: getTodayIso(),
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', paymentId);
 
       if (updateErr) throw updateErr;
 
       setStatus('Payment verified and marked as paid! Pending status removed for parent.');
+      setVerifyingPaymentId(null);
+      setVerificationNote('');
       await loadData();
     } catch (err: any) {
       setError(err?.message || 'Failed to update payment status.');
@@ -1453,63 +1462,129 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
                     </div>
                   ) : (
                     filteredPayments.filter(p => p.status !== 'paid').map(payment => (
-                      <div key={payment.id} className="rounded-3xl border border-amber-200/60 dark:border-slate-800 bg-amber-50/10 dark:bg-slate-900 p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm hover:border-amber-400 transition-all">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-base font-black text-slate-900 dark:text-white">{studentMap.get(payment.student_id)?.name || payment.student_id}</p>
-                            <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest">
-                              {payment.status}
-                            </span>
-                            {payment.receipt_url ? (
-                              <span className="px-2.5 py-0.5 rounded-md bg-cyan-100 text-cyan-800 text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                                📄 Receipt Uploaded
+                      <div key={payment.id} className="rounded-3xl border border-amber-200/60 dark:border-slate-800 bg-amber-50/10 dark:bg-slate-900 p-5 flex flex-col gap-4 shadow-sm hover:border-amber-400 transition-all">
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-base font-black text-slate-900 dark:text-white">{studentMap.get(payment.student_id)?.name || payment.student_id}</p>
+                              <span className="px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-black uppercase tracking-widest">
+                                {payment.status}
                               </span>
-                            ) : (
-                              <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
-                                Awaiting Receipt
+                              {payment.receipt_url ? (
+                                <span className="px-2.5 py-0.5 rounded-md bg-cyan-100 text-cyan-800 text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                                  📄 Receipt Uploaded
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                                  Awaiting Receipt
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                              {payment.note || 'Tuition / Academic Dues'} | Deadline: <span className="font-bold text-rose-600">{toIsoDate(payment.due_date) || 'No deadline'}</span>
+                            </p>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <span className="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black">
+                                Class: {getStudentAcademic(payment.student_id).className}
                               </span>
-                            )}
+                              <span className="px-3 py-1 rounded-xl bg-cyan-50 text-cyan-700 text-xs font-black">
+                                Course: {getStudentAcademic(payment.student_id).courseName}
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                            {payment.note || 'Tuition / Academic Dues'} | Deadline: <span className="font-bold text-rose-600">{toIsoDate(payment.due_date) || 'No deadline'}</span>
-                          </p>
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            <span className="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-black">
-                              Class: {getStudentAcademic(payment.student_id).className}
-                            </span>
-                            <span className="px-3 py-1 rounded-xl bg-cyan-50 text-cyan-700 text-xs font-black">
-                              Course: {getStudentAcademic(payment.student_id).courseName}
-                            </span>
+
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0 pt-3 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0">
+                            <div className="text-left sm:text-right">
+                              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Amount Due</p>
+                              <p className="text-xl font-black text-emerald-600">{formatMMK(payment.amount_mmk)}</p>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                              {payment.receipt_url && (
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingReceiptUrl(payment.receipt_url || null)}
+                                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-black uppercase tracking-widest shadow-md transition-all flex items-center justify-center gap-2"
+                                >
+                                  👁️ View Receipt
+                                </button>
+                              )}
+
+                              {verifyingPaymentId !== payment.id ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVerifyingPaymentId(payment.id);
+                                    setVerificationNote(payment.note || '');
+                                  }}
+                                  disabled={isSaving}
+                                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest shadow-md transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                                >
+                                  ✓ Verify & Mark Paid
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVerifyingPaymentId(null);
+                                    setVerificationNote('');
+                                  }}
+                                  disabled={isSaving}
+                                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-2xl bg-slate-500 hover:bg-slate-600 text-white text-xs font-black uppercase tracking-widest shadow-md transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
+                                >
+                                  ✕ Cancel
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0 pt-3 lg:pt-0 border-t border-slate-100 dark:border-slate-800 lg:border-t-0">
-                          <div className="text-left sm:text-right">
-                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Amount Due</p>
-                            <p className="text-xl font-black text-emerald-600">{formatMMK(payment.amount_mmk)}</p>
-                          </div>
+                        {verifyingPaymentId === payment.id && (
+                          <div className="mt-2 pt-4 border-t border-dashed border-amber-200 dark:border-slate-800 space-y-3 animate-fadeIn">
+                            <div className="bg-amber-500/10 dark:bg-amber-500/5 rounded-2xl p-4 border border-amber-200/50 dark:border-amber-900/30 space-y-3">
+                              <p className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                                ⚠️ Are you sure this payment is paid?
+                              </p>
+                              <p className="text-[11px] text-slate-600 dark:text-slate-400 font-semibold leading-relaxed">
+                                Please confirm you have verified the transaction receipt or bank record. You can optionally add or edit the payment notes below before marking it as paid.
+                              </p>
+                              
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                  Payment Note / Verification Note
+                                </label>
+                                <input
+                                  type="text"
+                                  value={verificationNote}
+                                  onChange={(e) => setVerificationNote(e.target.value)}
+                                  placeholder="e.g., KBZPay Ref: 123456, confirmed by finance"
+                                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-semibold outline-none"
+                                />
+                              </div>
 
-                          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-                            {payment.receipt_url && (
-                              <button
-                                type="button"
-                                onClick={() => setViewingReceiptUrl(payment.receipt_url || null)}
-                                className="flex-1 sm:flex-none px-4 py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-black uppercase tracking-widest shadow-md transition-all flex items-center justify-center gap-2"
-                              >
-                                👁️ View Receipt
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => void markPaymentAsPaid(payment.id)}
-                              disabled={isSaving}
-                              className="flex-1 sm:flex-none px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest shadow-md transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2"
-                            >
-                              ✓ Verify & Mark Paid
-                            </button>
+                              <div className="flex items-center justify-end gap-2 pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVerifyingPaymentId(null);
+                                    setVerificationNote('');
+                                  }}
+                                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all"
+                                >
+                                  No, Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isSaving}
+                                  onClick={() => void markPaymentAsPaid(payment.id, verificationNote)}
+                                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-md transition-all active:scale-95 disabled:opacity-60 flex items-center gap-1.5"
+                                >
+                                  {isSaving ? 'Processing...' : '✓ Yes, Verify & Mark Paid'}
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     ))
                   )}

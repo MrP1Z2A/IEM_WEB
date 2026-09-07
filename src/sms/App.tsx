@@ -4644,6 +4644,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
               selectedDate={selectedDate}
               setSelectedDate={setSelectedDate}
               bulkAssignStudentsToClass={bulkAssignStudentsToClass}
+              removeStudentFromClass={removeStudentFromClass}
               openPermissions={openPermissions}
               openEditModal={openEditModal}
               requestStudentEditWithPassword={requestStudentEditWithPassword}

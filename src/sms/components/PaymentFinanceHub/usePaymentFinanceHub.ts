@@ -700,19 +700,24 @@ export function usePaymentFinanceHub(schoolId: string | undefined, view: any) {
     }
   };
 
-  const markPaymentAsPaid = async (paymentId: string) => {
+  const markPaymentAsPaid = async (paymentId: string, customNote?: string) => {
     setError(null);
     setStatus(null);
     setIsSaving(true);
     try {
+      const updateData: any = {
+        status: 'paid',
+        receipt_status: 'verified',
+        payment_date: getTodayIso(),
+        updated_at: new Date().toISOString()
+      };
+      if (customNote !== undefined) {
+        updateData.note = customNote;
+      }
+
       const { error: updateErr } = await supabase
         .from('student_payments')
-        .update({
-          status: 'paid',
-          receipt_status: 'verified',
-          payment_date: getTodayIso(),
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', paymentId);
 
       if (updateErr) throw updateErr;
