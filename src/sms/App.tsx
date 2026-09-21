@@ -2694,7 +2694,6 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         try { await supabase.schema('public').from('class_course_students').delete().eq('student_id', targetId); } catch {}
         try { await supabase.schema('public').from('attendance_records').delete().eq('student_id', targetId); } catch {}
         try { await supabase.schema('public').from('attendance_records').delete().eq('context_id', targetId); } catch {}
-        try { await supabase.schema('public').from('student_payments').delete().eq('student_id', targetId); } catch {}
         try { await supabase.schema('public').from('exam_grades').delete().eq('student_id', targetId); } catch {}
         try { await supabase.schema('public').from('report_cards').delete().eq('student_id', targetId); } catch {}
         try { await supabase.schema('public').from('student_registrations').delete().eq('student_id', targetId); } catch {}
