@@ -1,4 +1,4 @@
-# IEM desktop app (Windows)
+# IEM desktop app (Windows and Mac)
 
 A secure Windows app around the live website, **https://iemsms.com**.
 
@@ -69,3 +69,23 @@ For a test build without publishing, run the workflow manually (Actions → Desk
 Share the `IEM-Setup-x.y.z.exe` link from the GitHub Release page. The installer needs no admin rights and adds Desktop and Start-menu shortcuts.
 
 Because the installer is not code-signed, Windows SmartScreen shows **"Windows protected your PC"** the first time. Users click **More info → Run anyway**. A code-signing certificate removes this warning.
+
+## Mac
+
+The same app is built for Mac as `IEM-x.y.z-mac.dmg` (one file for both Intel and Apple-silicon Macs)
+by the **Mac** job of the same GitHub Action. Download it from the run's **IEM-Mac-app** artifact.
+
+**Installing:** open the `.dmg`, drag **IEM** into **Applications**, then open it. Because the app is
+not signed with a paid Apple Developer certificate, macOS blocks it the first time:
+
+1. Open IEM once and click **Done** on the warning.
+2. Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to IEM, then confirm.
+
+After that it opens normally. An Apple Developer account ($99/year) would remove this warning (signing + notarization).
+
+**Mac differences:**
+
+- Camera and microphone: macOS asks the first time.
+- Screen sharing: macOS needs **Screen & System Audio Recording** permission (IEM explains how when needed).
+- No automatic app updates on Mac (macOS only allows them for signed apps). Website changes still appear instantly;
+  for a new desktop version, Help → Check for updates opens the downloads page.

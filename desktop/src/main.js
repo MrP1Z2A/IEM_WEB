@@ -15,6 +15,7 @@ const {
   ipcMain,
   session,
   shell,
+  systemPreferences,
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const windowState = require('./window-state');
@@ -49,6 +50,11 @@ const OFFLINE_PAGE = path.join(__dirname, 'offline.html');
 const PICKER_PAGE = path.join(__dirname, 'picker.html');
 const ICON = path.join(__dirname, 'assets', 'logo.png');
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const IS_MAC = process.platform === 'darwin';
+// The Mac app is not signed with a paid Apple certificate, so macOS does not
+// let it update itself. Mac users download new versions from this page instead.
+// (Website changes still reach the Mac app instantly, like on Windows.)
+const RELEASES_URL = 'https://github.com/MrP1Z2A/IEM_WEB/releases';
 
 let mainWindow = null;
 let lastUrl = APP_URL;
@@ -265,6 +271,21 @@ function configureSession() {
       callback({});
       return;
     }
+    // macOS needs "Screen Recording" permission before anything can be shared.
+    if (IS_MAC && ['denied', 'restricted'].includes(systemPreferences.getMediaAccessStatus('screen'))) {
+      callback({});
+      const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        buttons: ['Open Settings', 'Cancel'],
+        defaultId: 0,
+        cancelId: 1,
+        title: 'Allow screen sharing',
+        message: 'IEM needs permission to share your screen.',
+        detail: 'In System Settings → Privacy & Security → Screen & System Audio Recording, turn on IEM. Then quit and reopen IEM.',
+      });
+      if (response === 0) shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+      return;
+    }
     try {
       const sources = await desktopCapturer.getSources({
         types: ['screen', 'window'],
@@ -387,9 +408,15 @@ function registerIpc() {
 
 function buildAppMenu() {
   const template = [
+    // On Mac the first menu is the "IEM" app menu (About, Hide, Quit...).
+    ...(IS_MAC ? [{ role: 'appMenu' }] : []),
     {
       label: 'File',
-      submenu: [{ label: 'Go to home page', accelerator: 'Alt+Home', click: () => loadApp(APP_URL) }, { type: 'separator' }, { role: 'quit' }],
+      submenu: [
+        { label: 'Go to home page', accelerator: IS_MAC ? 'Cmd+Shift+H' : 'Alt+Home', click: () => loadApp(APP_URL) },
+        { type: 'separator' },
+        IS_MAC ? { role: 'close' } : { role: 'quit' },
+      ],
     },
     { role: 'editMenu' },
     {
@@ -431,7 +458,7 @@ function buildAppMenu() {
 let manualUpdateCheck = false;
 
 function setupAutoUpdates() {
-  if (!app.isPackaged) return;
+  if (!app.isPackaged || IS_MAC) return;
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -468,6 +495,10 @@ function setupAutoUpdates() {
 }
 
 function checkForUpdates(manual) {
+  if (IS_MAC) {
+    if (manual) shell.openExternal(RELEASES_URL);
+    return;
+  }
   if (!app.isPackaged) {
     if (manual) dialog.showMessageBox(mainWindow, { type: 'info', message: 'Updates are only available in the installed app.' });
     return;

@@ -2,7 +2,7 @@
   "name": "iem-desktop",
   "productName": "IEM",
   "version": "1.0.0",
-  "description": "IEM School Management & Learning — Windows desktop app",
+  "description": "IEM School Management & Learning — desktop app (Windows and Mac)",
   "author": "IEM",
   "private": true,
   "main": "src/main.js",
@@ -11,7 +11,9 @@
     "start:local": "cross-env IEM_APP_URL=http://localhost:5173 electron .",
     "check": "node --check src/main.js && node --check src/preload.js && node --check src/picker-preload.js && node --check src/window-state.js",
     "dist": "electron-builder --win --publish never",
-    "release": "electron-builder --win --publish always"
+    "dist:mac": "electron-builder --mac --publish never",
+    "release": "electron-builder --win --publish always",
+    "release:mac": "electron-builder --mac --publish always"
   },
   "dependencies": {
     "electron-updater": "^6.8.11"
@@ -37,7 +39,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.png",
@@ -50,6 +54,28 @@
       "createStartMenuShortcut": true,
       "shortcutName": "IEM",
       "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.education",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "artifactName": "IEM-${version}-mac.${ext}",
+      "extendInfo": {
+        "NSCameraUsageDescription": "IEM uses the camera for live classes.",
+        "NSMicrophoneUsageDescription": "IEM uses the microphone for live classes."
+      }
+    },
+    "dmg": {
+      "title": "IEM ${version}"
     },
     "publish": [
       {
