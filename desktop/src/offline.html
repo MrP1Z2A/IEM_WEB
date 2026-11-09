@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <title>IEM — No connection</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f6f8f8; --card: #ffffff; --text: #1f2a2a; --muted: #5d6b6b; --brand: #4ea59d; --brand-dark: #3b8880; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #111717; --card: #1a2222; --text: #e8f0ef; --muted: #9aaeac; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--text);
+           font: 15px/1.5 "Segoe UI", system-ui, sans-serif; }
+    .card { width: min(440px, calc(100vw - 32px)); background: var(--card); border-radius: 16px; padding: 40px 32px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+    img { width: 72px; height: 72px; }
+    h1 { font-size: 20px; margin: 20px 0 8px; }
+    p { margin: 0 0 24px; color: var(--muted); }
+    button { border: 0; border-radius: 10px; padding: 11px 26px; font: 600 15px "Segoe UI", system-ui, sans-serif; color: #fff;
+             background: var(--brand); cursor: pointer; }
+    button:hover { background: var(--brand-dark); }
+    button:disabled { opacity: .6; cursor: default; }
+    small { display: block; margin-top: 18px; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img src="assets/logo.png" alt="IEM" />
+    <h1>Can't reach IEM</h1>
+    <p>Check your internet connection. IEM will reconnect automatically as soon as you're back online.</p>
+    <button id="retry" type="button">Try again</button>
+    <small id="detail"></small>
+  </main>
+  <script>
+    const button = document.getElementById('retry');
+    const reason = new URLSearchParams(location.search).get('reason');
+    if (reason) document.getElementById('detail').textContent = 'Details: ' + reason;
+
+    function retry() {
+      button.disabled = true;
+      button.textContent = 'Connecting…';
+      if (window.iemDesktop) window.iemDesktop.retry();
+      setTimeout(() => { button.disabled = false; button.textContent = 'Try again'; }, 4000);
+    }
+
+    button.addEventListener('click', retry);
+    window.addEventListener('online', retry);
+    // Keep trying quietly in the background.
+    setInterval(() => { if (navigator.onLine) retry(); }, 20000);
+  </script>
+</body>
+</html>
