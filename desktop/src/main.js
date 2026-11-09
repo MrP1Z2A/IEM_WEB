@@ -29,7 +29,7 @@ const APP_URL = (!app.isPackaged && process.env.IEM_APP_URL) || PRODUCTION_URL;
 // camera, microphone, screen share and notifications. Everything else opens in
 // the user's normal browser.
 const TRUSTED_ORIGINS = new Set([
-  new URL(APP_URL).origin,
+  originOf(APP_URL),
   'https://iemsms.com',
   'https://www.iemsms.com',
   'https://adminsmstest1.netlify.app',
@@ -416,7 +416,7 @@ function buildAppMenu() {
             type: 'info',
             title: 'About IEM',
             message: `IEM desktop ${app.getVersion()}`,
-            detail: `Connected to ${new URL(APP_URL).host}`,
+            detail: `Connected to ${APP_URL.replace(/^https?:\/\//, '')}`,
           }),
         },
       ],

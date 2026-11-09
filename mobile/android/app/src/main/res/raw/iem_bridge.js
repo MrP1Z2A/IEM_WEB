@@ -88,7 +88,10 @@
         saveBlob(blob, name);
       } else {
         fetch(url.href)
-          .then(function (response) { return response.blob(); })
+          .then(function (response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.blob();
+          })
           .then(function (fetched) { saveBlob(fetched, name); })
           .catch(function () { send({ type: 'error', message: 'Could not save the file.' }); });
       }
