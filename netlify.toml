@@ -4,9 +4,19 @@
   publish = "dist"
   command = "npm run build"
 
+# Proxy /api/get-livekit-token to the Netlify serverless function on the fly!
+# This keeps the frontend clean and platform-independent.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
 # Proxy /supabase/* to the Supabase backend to bypass regional ISP blocks.
 [[redirects]]
   from = "/supabase/*"
   to = "https://lzlhsmtkkcpomabqaqdu.supabase.co/:splat"
   status = 200
   force = true
+
+[functions]
+  node_bundler = "nft"
