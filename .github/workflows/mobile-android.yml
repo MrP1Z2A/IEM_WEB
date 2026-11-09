@@ -1,0 +1,78 @@
+# Builds the IEM Android app (mobile/) as an installable APK.
+#
+# - Pull requests / manual runs: builds the APK and attaches it to the run as a
+#   downloadable artifact. Nothing is published.
+#
+# Website changes never need a new app build: the app loads iemsms.com live.
+name: Mobile app (Android)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Copy app settings into the Android project
+        run: npx cap sync android
+
+      # Optional permanent signing key (lets users update without uninstalling).
+      # Add these repository secrets to use it: IEM_KEYSTORE_BASE64,
+      # IEM_KEYSTORE_PASSWORD, IEM_KEY_ALIAS, IEM_KEY_PASSWORD.
+      - name: Prepare signing key
+        env:
+          IEM_KEYSTORE_BASE64: ${{ secrets.IEM_KEYSTORE_BASE64 }}
+        if: ${{ env.IEM_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "$IEM_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/iem.keystore"
+          echo "IEM_KEYSTORE_PATH=$RUNNER_TEMP/iem.keystore" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        working-directory: mobile/android
+        env:
+          IEM_KEYSTORE_PASSWORD: ${{ secrets.IEM_KEYSTORE_PASSWORD }}
+          IEM_KEY_ALIAS: ${{ secrets.IEM_KEY_ALIAS }}
+          IEM_KEY_PASSWORD: ${{ secrets.IEM_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Name the APK
+        run: |
+          version=$(node -p "require('./package.json').version")
+          mkdir -p release
+          cp android/app/build/outputs/apk/release/app-release.apk "release/IEM-Android-$version.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IEM-Android-app
+          path: mobile/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
