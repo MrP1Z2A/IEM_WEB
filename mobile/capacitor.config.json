@@ -1,0 +1,24 @@
+{
+  "appId": "com.iemsms.app",
+  "appName": "IEM",
+  "webDir": "www",
+  "server": {
+    "url": "https://iemsms.com",
+    "errorPath": "offline.html",
+    "allowNavigation": [
+      "iemsms.com",
+      "www.iemsms.com",
+      "adminsmstest1.netlify.app"
+    ]
+  },
+  "android": {
+    "appendUserAgent": "IEMMobile/1.0.0",
+    "backgroundColor": "#ffffff",
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "LIGHT"
+    }
+  }
+}

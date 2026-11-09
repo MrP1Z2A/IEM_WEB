@@ -1,0 +1,90 @@
+{
+  "name": "iem-desktop",
+  "productName": "IEM",
+  "version": "1.0.0",
+  "description": "IEM School Management & Learning — desktop app (Windows and Mac)",
+  "author": "IEM",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:local": "cross-env IEM_APP_URL=http://localhost:5173 electron .",
+    "check": "node --check src/main.js && node --check src/preload.js && node --check src/picker-preload.js && node --check src/window-state.js",
+    "dist": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "release": "electron-builder --win --publish always",
+    "release:mac": "electron-builder --mac --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.iemsms.desktop",
+    "productName": "IEM",
+    "copyright": "Copyright © IEM",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "IEM-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "IEM",
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.education",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "artifactName": "IEM-${version}-mac.${ext}",
+      "extendInfo": {
+        "NSCameraUsageDescription": "IEM uses the camera for live classes.",
+        "NSMicrophoneUsageDescription": "IEM uses the microphone for live classes."
+      }
+    },
+    "dmg": {
+      "title": "IEM ${version}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "MrP1Z2A",
+        "repo": "IEM_WEB",
+        "tagNamePrefix": "desktop-v",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

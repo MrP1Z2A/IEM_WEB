@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+  <title>Choose what to share</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #ffffff; --tile: #f3f6f6; --text: #1f2a2a; --muted: #5d6b6b; --brand: #4ea59d; --brand-dark: #3b8880; --line: #dfe6e5; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #161d1d; --tile: #1f2828; --text: #e8f0ef; --muted: #9aaeac; --line: #2c3838; } }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body { margin: 0; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 14px/1.4 "Segoe UI", system-ui, sans-serif; }
+    header { padding: 18px 22px 8px; }
+    h1 { margin: 0; font-size: 18px; }
+    .tabs { display: flex; gap: 8px; padding: 10px 22px; border-bottom: 1px solid var(--line); }
+    .tabs button { border: 0; background: transparent; color: var(--muted); padding: 6px 12px; border-radius: 8px; font: inherit; cursor: pointer; }
+    .tabs button[aria-selected="true"] { background: var(--tile); color: var(--text); font-weight: 600; }
+    .grid { flex: 1; overflow: auto; padding: 16px 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; align-content: start; }
+    .source { border: 2px solid transparent; border-radius: 10px; background: var(--tile); padding: 8px; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+    .source:hover { border-color: var(--line); }
+    .source[aria-pressed="true"] { border-color: var(--brand); }
+    .thumb { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; border-radius: 6px; display: block; }
+    .name { display: flex; align-items: center; gap: 6px; margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .name img { width: 16px; height: 16px; flex: none; }
+    .name span { overflow: hidden; text-overflow: ellipsis; }
+    .empty { color: var(--muted); grid-column: 1 / -1; text-align: center; padding: 40px 0; }
+    footer { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--line); }
+    footer label { margin-right: auto; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+    footer button { border: 0; border-radius: 8px; padding: 9px 20px; font: 600 14px "Segoe UI", system-ui, sans-serif; cursor: pointer; }
+    #cancel { background: var(--tile); color: var(--text); }
+    #share { background: var(--brand); color: #fff; }
+    #share:disabled { opacity: .5; cursor: default; }
+  </style>
+</head>
+<body>
+  <header><h1>Choose what to share</h1></header>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" data-kind="screen" aria-selected="true">Entire screen</button>
+    <button type="button" role="tab" data-kind="window" aria-selected="false">Window</button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <footer>
+    <label id="audio-label" hidden><input type="checkbox" id="audio" /> Share computer sound</label>
+    <button type="button" id="cancel">Cancel</button>
+    <button type="button" id="share" disabled>Share</button>
+  </footer>
+  <script>
+    const grid = document.getElementById('grid');
+    const shareButton = document.getElementById('share');
+    const audioBox = document.getElementById('audio');
+    let sources = [];
+    let kind = 'screen';
+    let selectedId = null;
+
+    function render() {
+      grid.replaceChildren();
+      const visible = sources.filter((s) => (kind === 'screen') === s.isScreen);
+      if (!visible.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = kind === 'screen' ? 'No screens found.' : 'No open windows found.';
+        grid.append(empty);
+      }
+      for (const source of visible) {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'source';
+        tile.setAttribute('aria-pressed', String(source.id === selectedId));
+        tile.title = source.name;
+
+        const thumb = document.createElement('img');
+        thumb.className = 'thumb';
+        thumb.alt = '';
+        if (source.thumbnail) thumb.src = source.thumbnail;
+
+        const name = document.createElement('div');
+        name.className = 'name';
+        if (source.icon) {
+          const icon = document.createElement('img');
+          icon.src = source.icon;
+          icon.alt = '';
+          name.append(icon);
+        }
+        const label = document.createElement('span');
+        label.textContent = source.name;
+        name.append(label);
+
+        tile.append(thumb, name);
+        tile.addEventListener('click', () => { selectedId = source.id; shareButton.disabled = false; render(); });
+        tile.addEventListener('dblclick', share);
+        grid.append(tile);
+      }
+    }
+
+    function share() {
+      if (selectedId) window.iemPicker.choose(selectedId, audioBox.checked);
+    }
+
+    document.querySelectorAll('.tabs button').forEach((tab) => {
+      tab.addEventListener('click', () => {
+        kind = tab.dataset.kind;
+        document.querySelectorAll('.tabs button').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
+        render();
+      });
+    });
+    shareButton.addEventListener('click', share);
+    document.getElementById('cancel').addEventListener('click', () => window.iemPicker.cancel());
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') window.iemPicker.cancel();
+      if (e.key === 'Enter') share();
+    });
+
+    window.iemPicker.getSources().then((payload) => {
+      sources = payload.sources || [];
+      if (payload.canShareAudio) document.getElementById('audio-label').hidden = false;
+      const firstScreen = sources.find((s) => s.isScreen);
+      if (firstScreen && sources.filter((s) => s.isScreen).length === 1) {
+        selectedId = firstScreen.id;
+        shareButton.disabled = false;
+      }
+      render();
+    });
+  </script>
+</body>
+</html>

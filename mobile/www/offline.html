@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IEM - No connection</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f6f8f8; --card: #ffffff; --text: #1f2a2a; --muted: #5d6b6b; --brand: #4ea59d; --brand-dark: #3b8880; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #111717; --card: #1a2222; --text: #e8f0ef; --muted: #9aaeac; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--bg); color: var(--text);
+           font: 16px/1.5 system-ui, -apple-system, Roboto, sans-serif; }
+    .card { width: 100%; max-width: 420px; background: var(--card); border-radius: 16px; padding: 36px 24px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+    img { width: 72px; height: 72px; }
+    h1 { font-size: 20px; margin: 18px 0 8px; }
+    p { margin: 0 0 24px; color: var(--muted); }
+    button { border: 0; border-radius: 10px; padding: 12px 28px; font: 600 16px system-ui, sans-serif; color: #fff; background: var(--brand); }
+    button:active { background: var(--brand-dark); }
+    button:disabled { opacity: .6; }
+    small { display: block; margin-top: 16px; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <img src="logo.png" alt="IEM" />
+    <h1>Can't reach IEM</h1>
+    <p>Check your internet connection. IEM will reconnect automatically as soon as you're back online.</p>
+    <button id="retry" type="button">Try again</button>
+    <small id="status"></small>
+  </main>
+  <script>
+    const SITE = 'https://iemsms.com';
+    const button = document.getElementById('retry');
+    const status = document.getElementById('status');
+
+    function retry() {
+      button.disabled = true;
+      button.textContent = 'Connecting…';
+      location.href = SITE;
+    }
+
+    button.addEventListener('click', retry);
+    window.addEventListener('online', retry);
+
+    let seconds = 20;
+    setInterval(() => {
+      seconds -= 1;
+      if (seconds <= 0) { seconds = 20; if (navigator.onLine) retry(); }
+      status.textContent = navigator.onLine ? 'Trying again in ' + seconds + 's' : 'Waiting for internet…';
+    }, 1000);
+  </script>
+</body>
+</html>

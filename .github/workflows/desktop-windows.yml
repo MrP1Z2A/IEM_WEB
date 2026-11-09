@@ -1,0 +1,124 @@
+# Builds the IEM desktop app (desktop/) for Windows and Mac.
+#
+# - Pull requests / manual runs: builds the installer and attaches it to the run
+#   as a downloadable artifact (for testing). Nothing is published.
+# - Pushing a tag like `desktop-v1.0.1`: builds and publishes a GitHub Release.
+#   Installed apps pick the new version up automatically within a few hours.
+#
+# Website changes never need a new desktop release: the app loads iemsms.com live.
+name: Desktop app (Windows and Mac)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['desktop-v*']
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-windows.yml'
+
+permissions:
+  contents: write # needed only to publish the release on tag pushes
+
+jobs:
+  build:
+    name: Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check source
+        run: npm run check
+
+      - name: Check tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: |
+          expected="desktop-v$(node -p "require('./package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version ($expected). Bump desktop/package.json first."
+            exit 1
+          fi
+
+      - name: Build installer
+        if: ${{ !startsWith(github.ref, 'refs/tags/desktop-v') }}
+        run: npm run dist
+
+      - name: Build and publish release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IEM-Windows-installer
+          path: |
+            desktop/release/*.exe
+            desktop/release/latest.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  build-mac:
+    name: Mac
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check source
+        run: npm run check
+
+      - name: Check tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: |
+          expected="desktop-v$(node -p "require('./package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version ($expected). Bump desktop/package.json first."
+            exit 1
+          fi
+
+      # Ad-hoc signed (no paid Apple certificate), so no signing secrets are needed.
+      - name: Build Mac app
+        if: ${{ !startsWith(github.ref, 'refs/tags/desktop-v') }}
+        run: npm run dist:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Build and publish release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        run: npm run release:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IEM-Mac-app
+          path: desktop/release/*.dmg
+          if-no-files-found: error
+          retention-days: 14
