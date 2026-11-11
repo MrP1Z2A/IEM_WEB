@@ -1704,6 +1704,35 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
   };
 
 
+  /**
+   * Delete a student and everything linked to them EXCEPT financial records.
+   * Payments are kept (with the student's name copied onto them) by the
+   * database function public.delete_student_keep_finance.
+   */
+  const deleteStudentKeepingFinance = async (studentId: string) => {
+    const { data, error } = await supabase.rpc('delete_student_keep_finance', { p_student_id: String(studentId) });
+    if (error) {
+      if (error.code === 'PGRST202' || /delete_student_keep_finance/.test(error.message || '')) {
+        throw new Error('Student deletion is not set up yet. Run src/sms/supabase/sql/student_delete_keep_finance.sql in the Supabase SQL Editor.');
+      }
+      throw new Error(error.message || 'Failed to delete student.');
+    }
+
+    // Best-effort file cleanup (the database rows are already gone).
+    const result = (data || {}) as { avatar?: string | null; report_card_files?: string[] };
+    const avatar = String(result.avatar || '');
+    const avatarMatch = avatar.match(/\/student_profile\/(.+)$/);
+    const avatarPath = avatarMatch ? decodeURIComponent(avatarMatch[1].split('?')[0]) : (/^(https?:|data:|blob:|\/)/i.test(avatar) ? '' : avatar);
+    if (avatarPath) {
+      try { await supabase.storage.from('student_profile').remove([avatarPath]); } catch {}
+    }
+    const reportFiles = (result.report_card_files || []).filter(Boolean);
+    if (reportFiles.length) {
+      try { await supabase.storage.from('report_cards').remove(reportFiles); } catch {}
+    }
+    return data;
+  };
+
   const bulkDeleteStudents = async (studentIds: string[]) => {
     const uniqueIds = Array.from(new Set(studentIds.map(id => String(id)).filter(Boolean)));
     if (!uniqueIds.length) {
@@ -1714,37 +1743,25 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
     setConfirmDialog({
       message: `Delete ${uniqueIds.length} selected student(s)? This action is irreversible.`,
       onConfirm: async () => {
-        const classRelationDeleteResult = await supabase
-          .from('class_course_students')
-          .delete()
-          .in('student_id', uniqueIds);
+        const deletedIds: string[] = [];
+        const failures: string[] = [];
+        for (const id of uniqueIds) {
+          try {
+            await deleteStudentKeepingFinance(id);
+            deletedIds.push(id);
+          } catch (err: any) {
+            failures.push(`${id}: ${err?.message || 'Unknown error'}`);
+          }
+        }
 
-        if (classRelationDeleteResult.error && !isCourseAssignmentSchemaMissing(classRelationDeleteResult.error.message)) {
-          notify(`Failed to delete class relations: ${classRelationDeleteResult.error.message || 'Unknown error'}`);
+        if (failures.length) {
+          notify(`Failed to delete ${failures.length} student(s): ${failures[0]}`);
+        }
+        if (!deletedIds.length) {
           return;
         }
 
-        const { error: attendanceDeleteError } = await supabase
-          .from('attendance_records')
-          .delete()
-          .in('student_id', uniqueIds);
-
-        if (attendanceDeleteError) {
-          notify(`Failed to delete attendance records: ${attendanceDeleteError.message || 'Unknown error'}`);
-          return;
-        }
-
-        const { error: deleteError } = await supabase
-          .from('students')
-          .delete()
-          .in('id', uniqueIds);
-
-        if (deleteError) {
-          notify(`Failed to delete students: ${deleteError.message || 'Unknown error'}`);
-          return;
-        }
-
-        const deletedIdSet = new Set(uniqueIds.map(id => String(id)));
+        const deletedIdSet = new Set(deletedIds.map(id => String(id)));
 
         setStudents(prev => prev.filter(student => !deletedIdSet.has(String(student.id))));
         setTeachers(prev => prev.filter(teacher => !deletedIdSet.has(String(teacher.id))));
@@ -1768,7 +1785,7 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
           };
         }));
 
-        notify(`${uniqueIds.length} student(s) deleted.`);
+        notify(`${deletedIds.length} student(s) deleted. Payment records were kept.`);
       }
     });
   };
@@ -2680,56 +2697,17 @@ const App: React.FC<AppProps> = ({ onSwitch, schoolId, schoolName, onSchoolIdCha
         }
 
         if (deletedRows.length === 0) {
-          // Cross-table fallback: check if entity exists in students table by name/id
-          const resCross = await supabase.schema('public').from('students').delete().eq('name', expectedName).select();
-          if (resCross.data && resCross.data.length > 0) {
-            deletedRows = resCross.data;
-          } else {
-            setStudentDeleteError(`Supabase RLS policy or missing permissions blocked deleting teacher '${expectedName}'. Please run the RLS DELETE policy SQL in Supabase.`);
-            return;
-          }
+          setStudentDeleteError(`Supabase RLS policy or missing permissions blocked deleting teacher '${expectedName}'. Please run the RLS DELETE policy SQL in Supabase.`);
+          return;
         }
       } else {
-        // Sequentially clean up child tables first to avoid foreign key errors
-        try { await supabase.schema('public').from('class_course_students').delete().eq('student_id', targetId); } catch {}
-        try { await supabase.schema('public').from('attendance_records').delete().eq('student_id', targetId); } catch {}
-        try { await supabase.schema('public').from('attendance_records').delete().eq('context_id', targetId); } catch {}
-        try { await supabase.schema('public').from('exam_grades').delete().eq('student_id', targetId); } catch {}
-        try { await supabase.schema('public').from('report_cards').delete().eq('student_id', targetId); } catch {}
-        try { await supabase.schema('public').from('student_registrations').delete().eq('student_id', targetId); } catch {}
-        try { await supabase.schema('public').from('student_registrations').delete().eq('id', targetId); } catch {}
-
-        // Now delete from main students table with .select() verification
-        let deletedRows: any[] = [];
-        const res1 = await supabase.schema('public').from('students').delete().eq('id', targetId).select();
-        if (res1.data && res1.data.length > 0) {
-          deletedRows = res1.data;
-        } else {
-          const res2 = await supabase.from('students').delete().eq('id', targetId).select();
-          if (res2.data && res2.data.length > 0) {
-            deletedRows = res2.data;
-          } else {
-            const res3 = await supabase.schema('public').from('students').delete().eq('name', expectedName).select();
-            if (res3.data && res3.data.length > 0) {
-              deletedRows = res3.data;
-            } else if (res1.error || res2.error || res3.error) {
-              const err = res1.error || res2.error || res3.error;
-              console.error('Supabase Delete Student Error:', err);
-              setStudentDeleteError(`Failed to delete student in Supabase: ${err?.message}`);
-              return;
-            }
-          }
-        }
-
-        if (deletedRows.length === 0) {
-          // Cross-table fallback: check if entity exists in teachers table by name/id
-          const resCross = await supabase.schema('public').from('teachers').delete().eq('name', expectedName).select();
-          if (resCross.data && resCross.data.length > 0) {
-            deletedRows = resCross.data;
-          } else {
-            setStudentDeleteError(`Supabase RLS policy or missing permissions blocked deleting '${expectedName}'. Please run the RLS DELETE policy SQL in Supabase.`);
-            return;
-          }
+        // Deletes all student data except financial records (see
+        // src/sms/supabase/sql/student_delete_keep_finance.sql).
+        try {
+          await deleteStudentKeepingFinance(targetId);
+        } catch (err: any) {
+          setStudentDeleteError(err?.message || 'Failed to delete student.');
+          return;
         }
       }
 
