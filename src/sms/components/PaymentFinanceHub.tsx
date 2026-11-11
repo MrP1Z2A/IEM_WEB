@@ -144,6 +144,8 @@ const amountToWords = (value: number) => {
 
 const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId }) => {
   const [students, setStudents] = useState<AppStudent[]>([]);
+  // Students that were deleted but still have payment history (name snapshot).
+  const [deletedPaymentStudents, setDeletedPaymentStudents] = useState<AppStudent[]>([]);
   const [payments, setPayments] = useState<StudentPayment[]>([]);
   const [cashOutRecords, setCashOutRecords] = useState<CashOutRecord[]>([]);
   const [studentCourseLinks, setStudentCourseLinks] = useState<StudentCourseLink[]>([]);
@@ -290,9 +292,10 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
 
   const studentMap = useMemo(() => {
     const map = new Map<string, AppStudent>();
+    deletedPaymentStudents.forEach(student => map.set(student.id, student));
     students.forEach(student => map.set(student.id, student));
     return map;
-  }, [students]);
+  }, [students, deletedPaymentStudents]);
 
   const studentAcademicMap = useMemo(() => {
     const map = new Map<string, { className: string; courseName: string }>();
@@ -504,7 +507,20 @@ const PaymentFinanceHub: React.FC<PaymentFinanceHubProps> = ({ view, schoolId })
         setCashOutRecords(cashRows);
       }
 
+      const activeStudentIds = new Set(studentRows.map(student => student.id));
+      const deletedStudentRows = new Map<string, AppStudent>();
+      (paymentsResult.data || []).forEach((row: any) => {
+        const id = String(row.student_id || '');
+        if (!id || activeStudentIds.has(id) || deletedStudentRows.has(id) || !row.student_name) return;
+        deletedStudentRows.set(id, {
+          id,
+          name: `${String(row.student_name)} (deleted)`,
+          email: row.student_email ? String(row.student_email) : '',
+        });
+      });
+
       setStudents(studentRows);
+      setDeletedPaymentStudents(Array.from(deletedStudentRows.values()));
       setPayments(paymentRows);
       setClassesMap(nextClassesMap);
       setCoursesMap(nextCoursesMap);
